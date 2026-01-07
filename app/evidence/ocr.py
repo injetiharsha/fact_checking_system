@@ -1,41 +1,47 @@
 import pytesseract
-from PIL import Image
 import cv2
-import numpy as np
+import os
 
-# IMPORTANT: adjust if path differs
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-def extract_text_from_image(image_path: str) -> str:
+def _configure_tesseract():
     """
-    Robust OCR with preprocessing
+    Configure Tesseract path only if explicitly provided.
     """
+    tesseract_cmd = os.getenv("TESSERACT_CMD")
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+
+_configured = False
+
+
+def extract_text_from_image(image_path: str, lang: str = "eng") -> str:
+    global _configured
+
+    if not _configured:
+        _configure_tesseract()
+        _configured = True
+
     try:
-        # read image using OpenCV
         image = cv2.imread(image_path)
-
         if image is None:
             return ""
 
-        # convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        # increase contrast
         gray = cv2.threshold(
             gray, 0, 255,
             cv2.THRESH_BINARY + cv2.THRESH_OTSU
         )[1]
 
-        # OCR config
-        custom_config = r"--oem 3 --psm 6"
+        config = f"--oem 3 --psm 6 -l {lang}"
 
         text = pytesseract.image_to_string(
             gray,
-            config=custom_config
+            config=config
         )
 
         return text.strip()
 
-    except Exception as e:
-        print("OCR ERROR:", e)
+    except Exception:
         return ""

@@ -1,24 +1,40 @@
 import requests
-from bs4 import BeautifulSoup
+
+DDG_API = "https://api.duckduckgo.com/"
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (FactCheckingBot)"
+    "User-Agent": "FactCheckingSystem/1.0"
 }
 
-def search_web(query: str, max_results=5):
-    """
-    Uses DuckDuckGo HTML results (safe scraping).
-    """
-    url = "https://duckduckgo.com/html/"
-    params = {"q": query}
+def search_web(query: str, max_results: int = 5):
+    params = {
+        "q": query,
+        "format": "json",
+        "no_html": 1,
+        "skip_disambig": 1
+    }
 
-    resp = requests.post(url, data=params, headers=HEADERS, timeout=5)
-    soup = BeautifulSoup(resp.text, "html.parser")
+    urls = []
 
-    links = []
-    for a in soup.select("a.result__a", limit=max_results):
-        href = a.get("href")
-        if href and href.startswith("http"):
-            links.append(href)
+    try:
+        r = requests.get(
+            DDG_API,
+            params=params,
+            headers=HEADERS,
+            timeout=5
+        )
+        r.raise_for_status()
+        data = r.json()
 
-    return links
+        for item in data.get("RelatedTopics", []):
+            if isinstance(item, dict) and "FirstURL" in item:
+                urls.append(item["FirstURL"])
+                if len(urls) >= max_results:
+                    break
+
+    except Exception as e:
+        # IMPORTANT: do not silently fail
+        # Let fetcher metrics handle zero-result cases
+        return []
+
+    return urls

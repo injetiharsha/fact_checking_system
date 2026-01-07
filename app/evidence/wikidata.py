@@ -1,39 +1,41 @@
 import requests
 
-WIKIDATA_API = "https://www.wikidata.org/wiki/Special:EntityData/{}.json"
+WIKI_API = "https://en.wikipedia.org/api/rest_v1/page/summary/{}"
 
-# Common entities
-ENTITY_MAP = {
-    "india": "Q668",
-    "europe": "Q46",
-    "asia": "Q48"
+HEADERS = {
+    "User-Agent": "FactCheckingSystem/1.0"
 }
 
-def check_country_continent(country: str, continent: str):
-    """
-    Returns True/False if country is in continent using Wikidata
-    """
-    country = country.lower()
-    continent = continent.lower()
+async def fetch_wikipedia_evidence(query: str):
+    results = []
 
-    if country not in ENTITY_MAP or continent not in ENTITY_MAP:
-        return None
+    title = query.replace(" ", "_")
 
-    country_id = ENTITY_MAP[country]
-    continent_id = ENTITY_MAP[continent]
+    try:
+        r = requests.get(
+            WIKI_API.format(title),
+            headers=HEADERS,
+            timeout=5
+        )
 
-    url = WIKIDATA_API.format(country_id)
-    data = requests.get(url, timeout=3).json()
+        if r.status_code != 200:
+            return []
 
-    claims = data["entities"][country_id]["claims"]
+        data = r.json()
 
-    # P30 = continent property
-    if "P30" not in claims:
-        return False
+        extract = data.get("extract")
+        if not extract:
+            return []
 
-    continents = [
-        c["mainsnak"]["datavalue"]["value"]["id"]
-        for c in claims["P30"]
-    ]
+        results.append({
+            "source": "Wikipedia",
+            "url": data.get("content_urls", {})
+                     .get("desktop", {})
+                     .get("page"),
+            "text": extract
+        })
 
-    return continent_id in continents
+    except Exception:
+        return []
+
+    return results

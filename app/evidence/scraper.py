@@ -2,23 +2,26 @@ import requests
 from bs4 import BeautifulSoup
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (FactCheckingBot)"
+    "User-Agent": "FactCheckingSystem/1.0"
 }
 
-def scrape_article(url: str, max_chars=2000):
-    """
-    Extracts visible text from a webpage.
-    """
+def scrape_article(url: str) -> str:
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=5)
-        soup = BeautifulSoup(resp.text, "html.parser")
+        r = requests.get(url, headers=HEADERS, timeout=5)
+        r.raise_for_status()
 
-        # remove scripts/styles
-        for tag in soup(["script", "style", "noscript"]):
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        for tag in soup(["script", "style", "nav", "footer", "header"]):
             tag.decompose()
 
-        text = " ".join(p.get_text() for p in soup.find_all("p"))
-        return text[:max_chars]
+        paragraphs = [
+            p.get_text().strip()
+            for p in soup.find_all("p")
+            if len(p.get_text(strip=True)) > 80
+        ]
+
+        return " ".join(paragraphs[:3])
 
     except Exception:
         return ""
