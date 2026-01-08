@@ -8,11 +8,14 @@ from app.evidence.fetcher import fact_check_pipeline
 router = APIRouter()
 
 @router.post("/check")
-async def check(payload: dict):
-    claim = payload.get("claim", "").strip()
+async def check(payload: ClaimRequest):
+    claim = payload.claim.strip()
+
     if not claim:
         return {"error": "Empty claim"}
+
     return await fact_check_pipeline(claim)
+
 
 
 @router.post("/check/image")
