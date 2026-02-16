@@ -1,10 +1,11 @@
 from transformers import pipeline
+import torch
 
 # Load once at startup
 _nli = pipeline(
     task="zero-shot-classification",
     model="facebook/bart-large-mnli",
-    device=0
+    device=0 if torch.cuda.is_available() else -1
 )
 
 LABELS = ["supports", "contradicts", "neutral"]

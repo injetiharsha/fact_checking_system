@@ -13,6 +13,8 @@ from app.semantic.evidence_embedder import embed_evidence
 from app.semantic.similarity import filter_by_similarity
 from app.semantic.stance import attach_stance
 from app.verdict.consensus import consensus_verdict
+from app.verdict.confidence import calibrate_confidence
+from app.verdict.explanation import build_explanation
 
 from app.evidence.metrics import ScrapeMetrics
 from app.evidence.quality import deduplicate
@@ -72,24 +74,33 @@ async def fact_check_pipeline(claim: str) -> Dict:
 
     stances = []
     for e in relevant:
-        label, score = detect_stance(claim, e["text"])
+        with_stance = attach_stance(claim, e)
         stances.append({
-            "label": label,
-            "confidence": score,
-            "source": e.get("source"),
-            "url": e.get("url"),
-            "similarity": e.get("similarity")
+            "label": with_stance.get("label", "neutral"),
+            "confidence": with_stance.get("confidence", 0.0),
+            "source": with_stance.get("source"),
+            "url": with_stance.get("url"),
+            "similarity": with_stance.get("similarity")
         })
 
-    verdict = consensus_verdict(stances)
+    verdict, consensus_score = consensus_verdict(stances)
+    confidence = calibrate_confidence(verdict, stances)
+    explanation = build_explanation(verdict, stances)
 
-    logger.info(f"VERDICT: {verdict}")
+    logger.info(f"VERDICT: {verdict} ({confidence})")
     logger.info("=== FACT CHECK END ===")
 
     return {
         "claim": claim,
         "verdict": verdict,
+        "confidence": confidence,
+        "consensus_score": round(consensus_score, 3),
+        "explanation": explanation,
         "evidence_used": len(relevant),
         "stances": stances,
         "scraping_metrics": metrics.summary()
     }
+
+
+async def _single_claim_pipeline(claim: str) -> Dict:
+    return await fact_check_pipeline(claim)
