@@ -1,0 +1,95 @@
+# =========================
+# OS FILES
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================
+# EDITOR / IDE
+# =========================
+.vscode/
+.idea/
+*.iml
+
+# =========================
+# PYTHON
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Python distribution
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# LOGS
+# =========================
+*.log
+logs/
+
+# =========================
+# JUPYTER
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# TESTING / CACHE
+# =========================
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# =========================
+# MACHINE LEARNING
+# =========================
+# Model weights
+*.h5
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Training checkpoints
+checkpoints/
+runs/
+
+# =========================
+# DATASETS
+# =========================
+data/
+datasets/
+*.csv
+*.tsv
+*.jsonl
+
+# =========================
+# ENVIRONMENT VARIABLES
+# =========================
+.env
+.env.*
+*.env
+secrets.json
+config.json
+
+# =========================
+# TEMP FILES
+# =========================
+*.tmp
+*.bak
+*.swp
+
+# =========================
+# Docker (if you use later)
+# =========================
+docker-compose.override.yml
