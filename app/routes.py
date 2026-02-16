@@ -4,6 +4,7 @@ import os
 
 from app.evidence.ocr import extract_text_from_image
 from app.evidence.fetcher import fact_check_pipeline
+from app.verdict.check import ClaimRequest
 
 router = APIRouter()
 
