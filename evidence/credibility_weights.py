@@ -23,6 +23,9 @@ INTERNATIONAL_ORGS = [
 
 
 def get_weight(url):
+
+    url = url.lower()
+
     for domain in GOVERNMENT_SITES:
         if domain in url:
             return 1.0
@@ -35,4 +38,4 @@ def get_weight(url):
         if domain in url:
             return 0.85
 
-    return 0.6  # unknown website
+    return 0.6
