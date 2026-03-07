@@ -6,27 +6,34 @@ p = inflect.engine()
 
 def extract_all_ranks(text):
     text = text.lower().replace("-", " ")
-
     ranks = []
 
-    # Numeric ordinals (5th, 21st, etc.)
+    # detect standalone numbers
+    for match in re.findall(r'\b\d+\b', text):
+        ranks.append(int(match))
+
+    # numeric ordinals (5th, 21st)
     for match in re.findall(r'(\d+)(st|nd|rd|th)', text):
         ranks.append(int(match[0]))
 
-    # Word ordinals (first, second, fourth, etc.)
-    words = text.split()
-    for word in words:
+    # word ordinals (first, second)
+    for word in text.split():
         try:
-            number = p.ordinal_to_number(word)
-            if number:
-                ranks.append(int(number))
+            num = p.ordinal_to_number(word)
+            if num:
+                ranks.append(int(num))
         except:
             continue
+
+    # detect words implying rank 1
+    if "largest" in text or "biggest" in text or "tallest" in text:
+        ranks.append(1)
 
     return ranks
 
 
 def numeric_rank_reasoning(claim, evidence_text):
+
     claim_ranks = extract_all_ranks(claim)
     evidence_ranks = extract_all_ranks(evidence_text)
 
@@ -35,7 +42,10 @@ def numeric_rank_reasoning(claim, evidence_text):
 
     claim_rank = claim_ranks[0]
 
-    if claim_rank in evidence_ranks:
+    evidence_rank = evidence_ranks[0]
+    if evidence_rank == claim_rank:
         return "SUPPORT"
-    else:
+
+    if evidence_rank != claim_rank:
         return "REFUTE"
+    return None

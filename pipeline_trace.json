@@ -1,0 +1,94 @@
+{
+  "claim": "Climate change is a hoax",
+  "search_results": [
+    {
+      "source": "Climate change denial - Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Climate_change_denial"
+    },
+    {
+      "source": "10 Climate Change Myths Debunked \u2014 Covering Climate Now",
+      "url": "https://coveringclimatenow.org/resource/10-climate-change-myths-debunked/"
+    },
+    {
+      "source": "Climate change myths debunked by scientific evidence",
+      "url": "https://www.augustachronicle.com/story/news/environment/2025/11/19/climate-change-myths-debunked-by-scientific-evidence/87322607007/"
+    },
+    {
+      "source": "False claims global warming is a hoax due to failure to understand ...",
+      "url": "https://www.aap.com.au/factcheck/false-claims-global-warming-is-a-hoax-due-to-failure-to-understand-research/"
+    },
+    {
+      "source": "Did 1,609 scientists sign a declaration saying 'there is no climate ...",
+      "url": "https://www.politifact.com/factchecks/2023/oct/09/tweets/did-1609-scientists-sign-a-declaration-saying-ther/"
+    },
+    {
+      "source": "Climate Change Described as \u201cHoax\u201d by Louisiana Attorney-General | Sabin Center for Climate Change Law",
+      "url": "https://climate.law.columbia.edu/content/climate-change-described-hoax-louisiana-attorney-general-0"
+    },
+    {
+      "source": "HKS Misinformation ReviewUnderstanding climate change conspiracy beliefs: A comparative outlook | HKS Misinformation Review",
+      "url": "https://misinforeview.hks.harvard.edu/article/understanding-climate-change-conspiracy-beliefs-a-comparative-outlook/"
+    },
+    {
+      "source": "What is climate change and is it really a hoax? - BBC Bitesize",
+      "url": "https://www.bbc.co.uk/bitesize/articles/zc3tvj6"
+    },
+    {
+      "source": "Climate change, hoax or imminent catastrophe?",
+      "url": "https://www.dnv.com/article/climate-change-hoax-or-imminent-catastrophe--179622/"
+    }
+  ],
+  "scraped_pages": [],
+  "evidence_selected": [
+    {
+      "url": "https://coveringclimatenow.org/resource/10-climate-change-myths-debunked/",
+      "sentence": "Scientists the world over agree that climate change is real, it\u2019s happening now, and it\u2019s caused by the burning of fossil fuels.",
+      "relevance": 0.764,
+      "quality": 0.3
+    },
+    {
+      "url": "https://www.augustachronicle.com/story/news/environment/2025/11/19/climate-change-myths-debunked-by-scientific-evidence/87322607007/",
+      "sentence": "There are a number of myths surrounding climate change and its impacts.",
+      "relevance": 0.684,
+      "quality": 0.3
+    },
+    {
+      "url": "https://climate.law.columbia.edu/content/climate-change-described-hoax-louisiana-attorney-general-0",
+      "sentence": "That\u2019s the face of climate change hoax believers.\u201d",
+      "relevance": 0.811,
+      "quality": 0.3
+    },
+    {
+      "url": "https://www.dnv.com/article/climate-change-hoax-or-imminent-catastrophe--179622/",
+      "sentence": "Climate change is not a hoax, if we don\u2019t act humanity will face a planetary catastrophe.",
+      "relevance": 0.82,
+      "quality": 0.3
+    }
+  ],
+  "stance_predictions": [
+    {
+      "url": "https://www.dnv.com/article/climate-change-hoax-or-imminent-catastrophe--179622/",
+      "stance": "REFUTE",
+      "confidence": 0.9
+    },
+    {
+      "url": "https://climate.law.columbia.edu/content/climate-change-described-hoax-louisiana-attorney-general-0",
+      "stance": "NEUTRAL",
+      "confidence": 0.956
+    },
+    {
+      "url": "https://coveringclimatenow.org/resource/10-climate-change-myths-debunked/",
+      "stance": "REFUTE",
+      "confidence": 0.9
+    },
+    {
+      "url": "https://www.augustachronicle.com/story/news/environment/2025/11/19/climate-change-myths-debunked-by-scientific-evidence/87322607007/",
+      "stance": "SUPPORT",
+      "confidence": 0.533
+    }
+  ],
+  "final_verdict": {
+    "verdict": "FALSE",
+    "confidence": 0.5424164524421594
+  }
+}

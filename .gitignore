@@ -92,4 +92,8 @@ config.json
 # =========================
 # Docker (if you use later)
 # =========================
-docker-compose.override.yml
+docker-compose.override.
+
+
+
+batch_results.json

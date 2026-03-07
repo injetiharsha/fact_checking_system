@@ -1,3 +1,4 @@
+# verdict/document_scorer.py
 def score_document(claim_results):
 
     true_count = 0
@@ -5,10 +6,15 @@ def score_document(claim_results):
     neutral_count = 0
 
     for result in claim_results:
-        if result["final_verdict"] == "TRUE":
+
+        verdict = result.get("final_verdict", "NEUTRAL")
+
+        if verdict == "TRUE":
             true_count += 1
-        elif result["final_verdict"] == "FALSE":
+
+        elif verdict == "FALSE":
             false_count += 1
+
         else:
             neutral_count += 1
 
@@ -23,16 +29,24 @@ def score_document(claim_results):
             "neutral": 0
         }
 
-    score = (true_count - false_count) / total
+    # Neutral reduces confidence
+    effective_total = total + (neutral_count * 0.5)
 
-    if score > 0.6:
+    score = (true_count - false_count) / effective_total
+
+    # Adjusted thresholds for small batches
+    if score >= 0.6:
         verdict = "Highly Reliable"
-    elif score > 0.2:
+
+    elif score >= 0.25:
         verdict = "Mostly Reliable"
-    elif score >= -0.2:
+
+    elif score > -0.25:
         verdict = "Mixed"
-    elif score >= -0.6:
+
+    elif score > -0.6:
         verdict = "Mostly Misleading"
+
     else:
         verdict = "Highly Misleading"
 

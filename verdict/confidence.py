@@ -12,4 +12,4 @@ class ConfidenceCalculator:
         if total == 0:
             return 0
 
-        return round(abs(support_score - refute_score) / total, 3)
+        return abs(support_score - refute_score) / total
