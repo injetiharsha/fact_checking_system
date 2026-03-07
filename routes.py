@@ -20,7 +20,7 @@ async def check_claim(data: ClaimRequest):
 
 
 @router.post("/analyze_url")
-def analyze_url(data: URLRequest):
+async def analyze_url(data: URLRequest):
     return document_pipeline.run(data.url)
 
 

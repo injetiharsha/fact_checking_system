@@ -13,8 +13,8 @@ class ClaimExtractor:
         for part in parts:
             part = part.strip()
 
-            # Skip very short fragments
-            if len(part.split()) < 8:
+            # Skip empty fragments
+            if not part:
                 continue
 
             claims.append(part)

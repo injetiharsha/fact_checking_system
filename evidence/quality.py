@@ -10,14 +10,24 @@ class QualityScorer:
         if not text:
             return 0
 
-        length = len(text.split())
+        words = text.split()
+        length = len(words)
 
-        # very short = low quality
-        if length < 20:
-            return 0.2
+        score = 0
 
-        # medium length
-        if length < 100:
-            return 0.6
+        if length > 120:
+            score += 0.2
 
-        return 1.0
+        if length > 30:
+            score += 0.3
+
+        if length > 80:
+            score += 0.3
+
+        if any(char.isdigit() for char in text):
+            score += 0.2
+
+        if "." in text:
+            score += 0.2
+
+        return min(score, 1.0)
