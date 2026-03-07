@@ -2,38 +2,68 @@
 
 import requests
 from bs4 import BeautifulSoup
-import random
-
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class WebScraper:
 
+    def __init__(self):
+
+        self.headers = {
+            "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0 Safari/537.36"
+        }
+
+        self.timeout = 6
+
     def scrape(self, url):
 
-        try:
-            USER_AGENTS = [
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605 Safari/605.1.15",
-            ]
-            headers = {
-                "User-Agent": random.choice(USER_AGENTS)
-            }
+        print("\nScraping:", url)
 
-            response = requests.get(url, headers=headers, timeout=3)
+        try:
+
+            # Skip non HTML content
+            if url.endswith(".pdf"):
+                return None
+
+            response = requests.get(
+                url,
+                headers=self.headers,
+                timeout=self.timeout,
+                verify=False  # fixes SSL errors
+            )
 
             if response.status_code != 200:
                 return None
 
-            soup = BeautifulSoup(response.text, "lxml")
+            soup = BeautifulSoup(response.text, "html.parser")
 
             paragraphs = soup.find_all("p")
 
-            if not paragraphs:
-                return None
-
             text = " ".join(p.get_text() for p in paragraphs)
 
-            return text.strip()
+            text = text.strip()
 
-        except Exception as e:
-            print("Scrape error:", e)
+            if len(text.split()) < 30:
+                return None
+            
+            print("Scraped length:", len(text.split()), "words")
+            print("Preview:", text[:200])
+
+            return text
+        
+
+
+        except requests.exceptions.Timeout:
+            return None
+
+        except requests.exceptions.SSLError:
+            return None
+
+        except requests.exceptions.ConnectionError:
+            return None
+
+        except Exception:
             return None

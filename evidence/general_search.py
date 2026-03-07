@@ -5,7 +5,7 @@ from ddgs import DDGS
 
 class SearchEngine:
 
-    def search(self, query, max_results=5):
+    def search(self, query, max_results=15):
 
         results = []
 

@@ -1,3 +1,12 @@
+# weighted_score.py
+
+class WeightedScorer:
+
+    def __init__(self, min_evidence=1):
+        self.min_evidence = min_evidence
+
+# verdict/weighted_score.py
+
 class WeightedScorer:
 
     def __init__(self, min_evidence=1):
@@ -13,12 +22,16 @@ class WeightedScorer:
         for ev in evidence_list:
 
             stance = ev.get("stance")
+
+            if stance == "NEUTRAL":
+                continue
+
             weight = ev.get("weight", 0)
             confidence = ev.get("confidence", 0)
 
             final_strength = weight * confidence
 
-            # Ignore very weak evidence
+            # ignore weak evidence
             if final_strength < 0.2:
                 continue
 
@@ -30,7 +43,6 @@ class WeightedScorer:
             elif stance == "REFUTE":
                 refute_score += final_strength
 
-        # If not enough evidence → Neutral
         if strong_evidence_count < self.min_evidence:
             return 0, 0
 

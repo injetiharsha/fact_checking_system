@@ -7,6 +7,7 @@ from verdict.confidence import ConfidenceCalculator
 class FinalVerdictEngine:
 
     def __init__(self):
+
         self.scorer = WeightedScorer()
         self.confidence_calc = ConfidenceCalculator()
 
@@ -14,10 +15,16 @@ class FinalVerdictEngine:
 
         support_score, refute_score = self.scorer.compute_score(evidence_list)
 
-        if support_score > refute_score:
+        # Determine verdict
+        if support_score == 0 and refute_score == 0:
+            verdict = "NEUTRAL"
+
+        elif support_score > refute_score:
             verdict = "TRUE"
+
         elif refute_score > support_score:
             verdict = "FALSE"
+
         else:
             verdict = "NEUTRAL"
 
@@ -25,5 +32,11 @@ class FinalVerdictEngine:
             support_score,
             refute_score
         )
+
+        print("\n--- VERDICT AGGREGATION ---")
+        print("Support score:", support_score)
+        print("Refute score:", refute_score)
+        print("Final verdict:", verdict)
+        print("Confidence:", confidence)
 
         return verdict, confidence
