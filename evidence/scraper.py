@@ -2,6 +2,7 @@
 
 import requests
 from bs4 import BeautifulSoup
+import random
 
 
 class WebScraper:
@@ -9,8 +10,12 @@ class WebScraper:
     def scrape(self, url):
 
         try:
+            USER_AGENTS = [
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605 Safari/605.1.15",
+            ]
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                "User-Agent": random.choice(USER_AGENTS)
             }
 
             response = requests.get(url, headers=headers, timeout=3)

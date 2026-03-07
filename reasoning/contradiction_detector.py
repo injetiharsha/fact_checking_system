@@ -20,5 +20,6 @@ def analyze_conflict(evidence_list):
 
     if support_score > 0 and refute_score > 0:
         return "Conflicting Evidence Present"
-
-    return "Insufficient Evidence"
+    
+    if len(evidence_list) > 2:
+        return "Insufficient Evidence"

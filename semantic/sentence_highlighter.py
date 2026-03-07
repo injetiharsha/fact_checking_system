@@ -1,7 +1,7 @@
 # semantic/sentence_highlighter.py
 
 import nltk
-from semantic.encoder import EmbeddingModel
+from models.embeddings.sentence_model import EmbeddingModel
 import torch
 
 nltk.download("punkt")

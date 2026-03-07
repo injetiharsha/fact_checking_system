@@ -22,5 +22,6 @@ class RBIAPI:
                 "weight": 1.0
             }
 
-        except:
+        except Exception as e:
+            print("RBI API error:", e)
             return None

@@ -16,7 +16,7 @@ class SearchEngine:
                         "title": r.get("title"),
                         "url": r.get("href")
                     })
-        except:
-            pass
+        except Exception as e:
+            print(f"Search error: {e}")
 
         return results

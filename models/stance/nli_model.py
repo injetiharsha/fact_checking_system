@@ -20,7 +20,7 @@ class NLIModel:
             "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli"
         ).to(self.device)
 
-        self.labels = ["CONTRADICTION", "NEUTRAL", "ENTAILMENT"]
+        self.labels = ["REFUTE", "NEUTRAL", "SUPPORT"]
 
     def predict(self, claim, evidence):
 
