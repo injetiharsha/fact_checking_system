@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FactLens</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/frontend/styles.css">
+</head>
+<body>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <main class="page">
+    <section class="hero">
+      <p class="eyebrow">Intelligence Layer</p>
+      <h1>FactLens</h1>
+      <p class="subtitle">A focused workspace for claim checks, URL credibility scans, and document evidence analysis.</p>
+    </section>
+
+    <section class="workspace">
+      <section class="panel controls">
+        <div class="tabs" role="tablist" aria-label="Analysis type">
+          <button class="tab active" data-mode="claim" role="tab">Claim</button>
+          <button class="tab" data-mode="url" role="tab">URL</button>
+          <button class="tab" data-mode="pdf" role="tab">PDF</button>
+          <button class="tab" data-mode="image" role="tab">Image</button>
+        </div>
+
+        <form id="analyzer-form">
+          <div class="field mode-block active" data-mode="claim">
+            <label for="claim-text">Claim text</label>
+            <textarea id="claim-text" rows="4" placeholder="Example: India's inflation was below 4% in 2024."></textarea>
+          </div>
+
+          <div class="field mode-block" data-mode="url">
+            <label for="url-text">Article URL</label>
+            <input id="url-text" type="url" placeholder="https://example.com/article">
+          </div>
+
+          <div class="field mode-block file mode-block-inline" data-mode="pdf">
+            <label for="pdf-file">Upload PDF</label>
+            <input id="pdf-file" type="file" accept=".pdf">
+          </div>
+
+          <div class="field mode-block file mode-block-inline" data-mode="image">
+            <label for="image-file">Upload image</label>
+            <input id="image-file" type="file" accept=".png,.jpg,.jpeg">
+          </div>
+
+          <div class="actions">
+            <button id="run-btn" type="submit">Run Analysis</button>
+            <button id="cancel-btn" type="button" class="danger" hidden>Cancel</button>
+            <span id="status" class="status" aria-live="polite"></span>
+          </div>
+        </form>
+      </section>
+
+      <aside class="panel process-panel" id="process-panel">
+        <h3>Fact-Check Progress</h3>
+        <p id="process-preview" class="meta">Submit a claim, URL, PDF, or image to start.</p>
+        <ul id="process-steps" class="steps"></ul>
+      </aside>
+    </section>
+
+    <section id="results" class="results"></section>
+  </main>
+
+  <script src="/frontend/app.js"></script>
+</body>
+</html>

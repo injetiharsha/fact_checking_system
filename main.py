@@ -3,6 +3,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 # Load env first and force model caches to a custom local path.
 BASE_DIR = Path(__file__).resolve().parent
@@ -29,6 +31,14 @@ from routes import router
 app = FastAPI()
 app.include_router(router)
 
+frontend_dir = BASE_DIR / "frontend"
+app.mount("/frontend", StaticFiles(directory=frontend_dir), name="frontend")
+
 @app.get("/")
 def root():
+    return FileResponse(frontend_dir / "index.html")
+
+
+@app.get("/health")
+def health():
     return {"message": "Fact Checking System Running"}

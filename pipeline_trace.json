@@ -1,59 +1,78 @@
 {
-  "claim": "Humans can breathe in space without equipment",
+  "claim": "Our deep learning models convert any type of paper document into structured data.",
   "search_results": [
     {
-      "source": "The Simple Force That Could Let Astronauts Breathe Forever in ...",
-      "url": "https://www.sciencenewstoday.org/the-simple-force-that-could-let-astronauts-breathe-forever-in-space"
+      "source": "From PDFs to AI-ready structured data: a deep dive \u00b7 Explosion",
+      "url": "https://explosion.ai/blog/pdfs-nlp-structured-data"
     },
     {
-      "source": "How Do Astronauts Breathe In Space? - LunarSail.com",
-      "url": "https://www.lunarsail.com/how-do-astronauts-breathe-in-space/"
+      "source": "5 Most Valuable Ways To Convert Unstructured Text To Structured Data | Width.ai",
+      "url": "https://www.width.ai/post/convert-unstructured-text-to-structured-data"
     },
     {
-      "source": "What Do Astronauts Need To Survive In Space? - LunarSail.com",
-      "url": "https://www.lunarsail.com/what-do-astronauts-need-to-survive-in-space/"
+      "source": "Shinydocs Blog | Unstructured Data",
+      "url": "https://shinydocs.com/blog-home/topic/unstructured-data"
     },
     {
-      "source": "Humans in space - Curious",
-      "url": "https://www.science.org.au/curious/space-time/humans-space"
+      "source": "Unfolding the Structure of a Document using Deep Learning",
+      "url": "https://arxiv.org/pdf/1910.03678"
     },
     {
-      "source": "How Astronauts Eat, Sleep, and Use the Toilet in Space",
-      "url": "https://techvortex.net/space-travel-101-how-astronauts-eat-sleep-and-use-the-toilet-in-space/"
+      "source": "How to Convert Unstructured Data to Structured Data Using AI",
+      "url": "https://www.multimodal.dev/post/how-to-convert-unstructured-data-to-structured-data"
     },
     {
-      "source": "Could you breathe underwater?",
-      "url": "https://moviecultists.com/could-you-breathe-underwater"
+      "source": "Generative AI for Documents Classification",
+      "url": "https://www.altimetrik.com/blog/generative-ai-for-document-classification"
     },
     {
-      "source": "Humans might be able to breathe alien atmospheres under the",
-      "url": "https://www.syfy.com/syfy-wire/could-humans-breathe-in-alien-atmospheres"
+      "source": "Ultimate Guide to AI Document Ingestion and Processing: Everything You Need to Know",
+      "url": "https://spiralscout.com/blog/ai-document-ingestion-processing"
     },
     {
-      "source": "How to Breathe in Space: The Science of Survival - Biology ...",
-      "url": "https://biologyinsights.com/how-to-breathe-in-space-the-science-of-survival/"
+      "source": "Unlock Unstructured Data AI: The Ultimate 2025 Guide | SmartDev",
+      "url": "https://smartdev.com/ultimate-guide-to-unstructured-ai-how-ai-unlocks-the-power-of-unstructured-data/"
     },
     {
-      "source": "What would happen to the human body in the vacuum of space? Images How long could you survive in space without a spacesuit? r/space on Reddit: Exoplanets where a human could go outside ...",
-      "url": "https://www.livescience.com/human-body-no-spacesuit"
+      "source": "Document Classification: End-to-End ML Workflow Explained in 2025 | Label Your Data",
+      "url": "https://labelyourdata.com/articles/document-classification"
     },
     {
-      "source": "How long could you survive in space without a spacesuit?",
-      "url": "https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit"
+      "source": "Extracting Data from Unstructured Text: Guide with NLP & ...",
+      "url": "https://klearstack.com/extracting-data-from-unstructured-text-guide"
+    },
+    {
+      "source": "Lightweight LLM for converting text to structured data - Amazon Science",
+      "url": "https://www.amazon.science/blog/lightweight-llm-for-converting-text-to-structured-data"
+    },
+    {
+      "source": "GitHub - tstanislawek/awesome-document-understanding: A curated list of resources for Document Understanding (DU) topic",
+      "url": "https://github.com/tstanislawek/awesome-document-understanding"
     }
   ],
   "scraped_pages": [],
   "evidence_selected": [
     {
-      "url": "https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit",
-      "sentence": "Thanks to science fiction, many people have wondered how long a person could survive in space without a spacesuit.",
-      "relevance": 0.429,
+      "url": "https://www.width.ai/post/convert-unstructured-text-to-structured-data",
+      "sentence": "\u200d We used spaCy + a number of other deep learning based models to build an entity extraction pipeline for legal document cover sheets.",
+      "relevance": 0.385,
+      "quality": 0.3
+    },
+    {
+      "url": "https://www.multimodal.dev/post/how-to-convert-unstructured-data-to-structured-data",
+      "sentence": "The biggest pro of using specialized, AI-powered data conversion tools is that you don\u2019t need any data science, AI, or similar expertise to convert unstructured data into structured formats successfully.",
+      "relevance": 0.385,
       "quality": 0.3
     }
   ],
   "stance_predictions": [
     {
-      "url": "https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit",
+      "url": "https://www.width.ai/post/convert-unstructured-text-to-structured-data",
+      "stance": "NEUTRAL",
+      "confidence": 0.5
+    },
+    {
+      "url": "https://www.multimodal.dev/post/how-to-convert-unstructured-data-to-structured-data",
       "stance": "NEUTRAL",
       "confidence": 0.5
     }
@@ -63,12 +82,12 @@
     "confidence": 0
   },
   "claim_type": {
-    "type": "factual",
-    "confidence": 0.7,
-    "reasoning": "Factual markers detected",
+    "type": "opinion",
+    "confidence": 0.8909875154495239,
+    "reasoning": "Opinion-leaning language",
     "scores": {
-      "factual": 0.7,
-      "opinion": 0.3
+      "factual": 0.10901246219873428,
+      "opinion": 0.8909875154495239
     }
   }
 }
