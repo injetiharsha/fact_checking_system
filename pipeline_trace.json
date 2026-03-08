@@ -1,93 +1,132 @@
 {
-  "claim": "Our deep learning models convert any type of paper document into structured data.",
+  "claim": "The Earth is flat",
   "search_results": [
     {
-      "source": "From PDFs to AI-ready structured data: a deep dive \u00b7 Explosion",
-      "url": "https://explosion.ai/blog/pdfs-nlp-structured-data"
+      "source": "The earth is flat",
+      "url": "https://en.wikipedia.org/wiki/The_earth_is_flat"
     },
     {
-      "source": "5 Most Valuable Ways To Convert Unstructured Text To Structured Data | Width.ai",
-      "url": "https://www.width.ai/post/convert-unstructured-text-to-structured-data"
+      "source": "Flat Earth - Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Flat_Earth"
     },
     {
-      "source": "Shinydocs Blog | Unstructured Data",
-      "url": "https://shinydocs.com/blog-home/topic/unstructured-data"
+      "source": "Flat Earth 'theory': Why do some people think the Earth ... | Live Scie...",
+      "url": "https://www.livescience.com/24310-flat-earth-belief.html"
     },
     {
-      "source": "Unfolding the Structure of a Document using Deep Learning",
-      "url": "https://arxiv.org/pdf/1910.03678"
+      "source": "How to debate a flat -Earther - Proven scientific arguments and... | Space",
+      "url": "https://www.space.com/how-to-debate-flat-earther.html"
     },
     {
-      "source": "How to Convert Unstructured Data to Structured Data Using AI",
-      "url": "https://www.multimodal.dev/post/how-to-convert-unstructured-data-to-structured-data"
+      "source": "Here are 10 \u2018proofs\u2019 that the Earth is actually flat , not... | Metro News",
+      "url": "https://metro.co.uk/2016/07/19/here-are-10-proofs-that-the-earth-is-actually-flat-not-round-6016710/"
     },
     {
-      "source": "Generative AI for Documents Classification",
-      "url": "https://www.altimetrik.com/blog/generative-ai-for-document-classification"
+      "source": "How to prove the Earth is round | Popular Science",
+      "url": "https://www.popsci.com/10-ways-you-can-prove-earth-is-round/"
     },
     {
-      "source": "Ultimate Guide to AI Document Ingestion and Processing: Everything You Need to Know",
-      "url": "https://spiralscout.com/blog/ai-document-ingestion-processing"
+      "source": "Home - The Flat Earth Podcast - DITRH",
+      "url": "https://flatearthdave.com/"
     },
     {
-      "source": "Unlock Unstructured Data AI: The Ultimate 2025 Guide | SmartDev",
-      "url": "https://smartdev.com/ultimate-guide-to-unstructured-ai-how-ai-unlocks-the-power-of-unstructured-data/"
+      "source": "Flat earth Stock Videos & Footage - HD and 4K Video Clips - Alamy",
+      "url": "https://www.alamy.com/stock-video/flat-earth.html"
     },
     {
-      "source": "Document Classification: End-to-End ML Workflow Explained in 2025 | Label Your Data",
-      "url": "https://labelyourdata.com/articles/document-classification"
+      "source": "The Earth is Flat ! | HuffPost Contributor",
+      "url": "https://www.huffpost.com/entry/the-earth-is-flat_b_598b61a7e4b08a4c247f27dc"
     },
     {
-      "source": "Extracting Data from Unstructured Text: Guide with NLP & ...",
-      "url": "https://klearstack.com/extracting-data-from-unstructured-text-guide"
+      "source": "Earth Curvature Calculator",
+      "url": "https://www.omnicalculator.com/physics/earth-curvature"
     },
     {
-      "source": "Lightweight LLM for converting text to structured data - Amazon Science",
-      "url": "https://www.amazon.science/blog/lightweight-llm-for-converting-text-to-structured-data"
+      "source": "Flat -Earthers going to Antarctica seeking 'truth' about our ' flat ' ...",
+      "url": "https://www.ancient-code.com/flat-earthers-going-to-antarctica-seeking-truth-about-our-flat-earth"
     },
     {
-      "source": "GitHub - tstanislawek/awesome-document-understanding: A curated list of resources for Document Understanding (DU) topic",
-      "url": "https://github.com/tstanislawek/awesome-document-understanding"
+      "source": "Lauren Boebert says ' Earth is flat ' at UFO hearing but Internet...",
+      "url": "https://news.meaww.com/lauren-boebert-says-earth-is-flat-at-ufo-hearing-but-internet-isnt-sure-if-shes-trolling-or-serious"
     }
   ],
   "scraped_pages": [],
   "evidence_selected": [
     {
-      "url": "https://www.width.ai/post/convert-unstructured-text-to-structured-data",
-      "sentence": "\u200d We used spaCy + a number of other deep learning based models to build an entity extraction pipeline for legal document cover sheets.",
-      "relevance": 0.385,
+      "url": "https://metro.co.uk/2016/07/19/here-are-10-proofs-that-the-earth-is-actually-flat-not-round-6016710/",
+      "sentence": "The reality is, however, that the Moon is observably not a solid body, it is clearly circular.\u2019 Here are some of Dubay\u2019s proofs that the Earth is flat\u2026 The horizon always appears perfectly flat \u2013 except in NASA and other government pictures, which are obviously faked (as part of the global conspiracy) You never have to look down to see the horizon, no matter how hard you rise.",
+      "relevance": 1.0,
+      "quality": 0.7
+    },
+    {
+      "url": "https://www.popsci.com/10-ways-you-can-prove-earth-is-round/",
+      "sentence": "Humanity has known the world is not flat for a few millennia, and I\u2019ve been meaning to show more methods on how to prove the Earth is round.",
+      "relevance": 1.0,
       "quality": 0.3
     },
     {
-      "url": "https://www.multimodal.dev/post/how-to-convert-unstructured-data-to-structured-data",
-      "sentence": "The biggest pro of using specialized, AI-powered data conversion tools is that you don\u2019t need any data science, AI, or similar expertise to convert unstructured data into structured formats successfully.",
-      "relevance": 0.385,
+      "url": "https://flatearthdave.com/",
+      "sentence": "Our mission is to help those seeking to break free from the constraints of both the faith-based heliocentric, globular Earth model and the faith-based atheistic worldview.",
+      "relevance": 0.75,
       "quality": 0.3
+    },
+    {
+      "url": "https://www.huffpost.com/entry/the-earth-is-flat_b_598b61a7e4b08a4c247f27dc",
+      "sentence": "Chief Photo and Video Analyst MUFON  Clem thinks the world is flat So the Earth is flat... At least that is what our buddy Clem above believes... Why is it that we are seeing a resurgence in those who believe the Earth is flat?",
+      "relevance": 1.0,
+      "quality": 0.7
+    },
+    {
+      "url": "https://www.ancient-code.com/flat-earthers-going-to-antarctica-seeking-truth-about-our-flat-earth",
+      "sentence": "A group of people known as \"Flat Earthers\" actually believe that the Earth is flat, regardless of what science \u2013 or their eyes \u2013 tell them.",
+      "relevance": 0.75,
+      "quality": 0.3
+    },
+    {
+      "url": "https://news.meaww.com/lauren-boebert-says-earth-is-flat-at-ufo-hearing-but-internet-isnt-sure-if-shes-trolling-or-serious",
+      "sentence": "The Earth is flat, birds are government drones, and we've never set foot on the moon, and Joe Biden received 81 million votes in the 2020 election.",
+      "relevance": 0.75,
+      "quality": 0.5
     }
   ],
   "stance_predictions": [
     {
-      "url": "https://www.width.ai/post/convert-unstructured-text-to-structured-data",
+      "url": "https://metro.co.uk/2016/07/19/here-are-10-proofs-that-the-earth-is-actually-flat-not-round-6016710/",
+      "stance": "REFUTE",
+      "confidence": 0.62
+    },
+    {
+      "url": "https://www.huffpost.com/entry/the-earth-is-flat_b_598b61a7e4b08a4c247f27dc",
       "stance": "NEUTRAL",
       "confidence": 0.5
     },
     {
-      "url": "https://www.multimodal.dev/post/how-to-convert-unstructured-data-to-structured-data",
+      "url": "https://news.meaww.com/lauren-boebert-says-earth-is-flat-at-ufo-hearing-but-internet-isnt-sure-if-shes-trolling-or-serious",
+      "stance": "NEUTRAL",
+      "confidence": 0.5
+    },
+    {
+      "url": "https://www.popsci.com/10-ways-you-can-prove-earth-is-round/",
+      "stance": "REFUTE",
+      "confidence": 0.75
+    },
+    {
+      "url": "https://flatearthdave.com/",
       "stance": "NEUTRAL",
       "confidence": 0.5
     }
   ],
   "final_verdict": {
-    "verdict": "NEUTRAL",
-    "confidence": 0
+    "verdict": "FALSE",
+    "confidence": 1.0
   },
   "claim_type": {
-    "type": "opinion",
-    "confidence": 0.8909875154495239,
-    "reasoning": "Opinion-leaning language",
+    "type": "factual",
+    "confidence": 0.9997556805610657,
+    "reasoning": "Factual-leaning language",
     "scores": {
-      "factual": 0.10901246219873428,
-      "opinion": 0.8909875154495239
+      "factual": 0.9997556805610657,
+      "opinion": 0.0002442742697894573
     }
   }
 }
