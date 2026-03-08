@@ -100,3 +100,7 @@ batch_results.json
 __init__.py
 
 *.json
+*.pdf
+*png
+*.jpg
+*.jpeg
