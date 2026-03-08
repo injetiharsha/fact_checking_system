@@ -104,3 +104,6 @@ __init__.py
 *png
 *.jpg
 *.jpeg
+
+pipeline_trace.json
+parallel_test_results.json
