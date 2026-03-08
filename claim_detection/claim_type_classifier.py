@@ -14,6 +14,8 @@ class ClaimType(Enum):
 
 class ClaimTypeClassifier:
     """Claim type classifier with offline-safe fallback."""
+    MODEL_CONFIDENCE_THRESHOLD = 0.65
+    MIXED_BAND = 0.15
 
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,7 +46,10 @@ class ClaimTypeClassifier:
 
     def classify(self, claim: str) -> dict:
         if self.model is None or self.tokenizer is None:
-            return self._heuristic_classify(claim)
+            return self._heuristic_classify(
+                claim,
+                decision_source="heuristic_no_model",
+            )
 
         inputs = self.tokenizer(
             claim,
@@ -59,14 +64,30 @@ class ClaimTypeClassifier:
             probabilities = torch.nn.functional.softmax(logits, dim=-1)
 
         if probabilities.shape[-1] < 2:
-            return self._heuristic_classify(claim)
+            return self._heuristic_classify(
+                claim,
+                decision_source="heuristic_invalid_model_output",
+            )
 
         factual_prob = probabilities[0][0].item()
         opinion_prob = probabilities[0][1].item()
+        model_confidence = max(factual_prob, opinion_prob)
 
-        if abs(factual_prob - opinion_prob) < 0.15:
+        # Low-confidence model predictions are routed through conservative heuristics.
+        if model_confidence < self.MODEL_CONFIDENCE_THRESHOLD:
+            return self._heuristic_classify(
+                claim,
+                decision_source="heuristic_low_model_confidence",
+                model_scores={
+                    "factual": float(factual_prob),
+                    "opinion": float(opinion_prob),
+                    "model_confidence": float(model_confidence),
+                },
+            )
+
+        if abs(factual_prob - opinion_prob) < self.MIXED_BAND:
             claim_type = ClaimType.MIXED
-            confidence = 0.65
+            confidence = model_confidence
             reasoning = "Mixed factual and opinion elements"
         elif opinion_prob > factual_prob:
             claim_type = ClaimType.OPINION
@@ -85,10 +106,12 @@ class ClaimTypeClassifier:
             "type": claim_type,
             "confidence": float(confidence),
             "reasoning": reasoning,
+            "decision_source": "model",
             "scores": {"factual": float(factual_prob), "opinion": float(opinion_prob)},
+            "model_confidence": float(model_confidence),
         }
 
-    def _heuristic_classify(self, claim: str) -> dict:
+    def _heuristic_classify(self, claim: str, decision_source="heuristic", model_scores=None) -> dict:
         text = (claim or "").lower()
 
         opinion_markers = [
@@ -115,34 +138,50 @@ class ClaimTypeClassifier:
         factual_hits = sum(1 for w in factual_markers if w in text)
 
         if self._has_numerical_content(text):
-            return {
+            result = {
                 "type": ClaimType.NUMERICAL,
                 "confidence": 0.75,
                 "reasoning": "Contains numerical/statistical markers",
                 "scores": {"factual": 0.75, "opinion": 0.25},
+                "decision_source": decision_source,
             }
+            if model_scores:
+                result["model_scores"] = model_scores
+            return result
 
         if opinion_hits > factual_hits:
-            return {
+            result = {
                 "type": ClaimType.OPINION,
                 "confidence": 0.7,
                 "reasoning": "Opinion markers detected",
                 "scores": {"factual": 0.3, "opinion": 0.7},
+                "decision_source": decision_source,
             }
+            if model_scores:
+                result["model_scores"] = model_scores
+            return result
         if factual_hits > opinion_hits:
-            return {
+            result = {
                 "type": ClaimType.FACTUAL,
                 "confidence": 0.7,
                 "reasoning": "Factual markers detected",
                 "scores": {"factual": 0.7, "opinion": 0.3},
+                "decision_source": decision_source,
             }
+            if model_scores:
+                result["model_scores"] = model_scores
+            return result
 
-        return {
+        result = {
             "type": ClaimType.MIXED,
             "confidence": 0.6,
             "reasoning": "Insufficient signals; treating as mixed",
             "scores": {"factual": 0.5, "opinion": 0.5},
+            "decision_source": decision_source,
         }
+        if model_scores:
+            result["model_scores"] = model_scores
+        return result
 
     @staticmethod
     def _has_numerical_content(text: str) -> bool:

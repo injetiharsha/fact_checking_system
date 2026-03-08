@@ -410,6 +410,7 @@ function renderClaimResult(data) {
 
 function claimResultHtml(data, index = null, includeSourcePreview = false) {
   const filteredEvidence = filterEvidence(data.evidence || []);
+  const transparency = (data && data.transparency) || {};
   const verdict = (data.final_verdict || "NEUTRAL").toUpperCase();
   const verdictClass = verdict === "SUPPORT" ? "support" : verdict === "REFUTE" ? "refute" : "neutral";
   const header = index ? `Claim ${index}` : "Claim Result";
@@ -418,6 +419,7 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
   const englishExplanation = buildEnglishExplanation(data, filteredEvidence, cleanExplanationText);
   const claimTextLine = data.claim ? escapeHtml(data.claim) : "N/A";
   const summaryDetails = buildSummaryDetails(data, filteredEvidence, cleanConflictText);
+  const transparencyBlock = renderTransparency(transparency);
   const citations = (data.citations || [])
     .filter((c) => !String(c).includes("internal://logic_engine") && !String(c).includes("logic_engine"))
     .map((c) => `<li>${escapeHtml(String(c))}</li>`)
@@ -468,6 +470,8 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
       </div>
       <h4>Explanation</h4>
       <p>${escapeHtml(englishExplanation)}</p>
+      <h4>Decision Transparency</h4>
+      ${transparencyBlock}
       ${includeSourcePreview ? `<h4>Strong Source Preview</h4>${renderSourceMedia(filteredEvidence)}` : ""}
       <h4>Evidence</h4>
       <div class="evidence-list">${evidenceItems || "<p>No evidence returned.</p>"}</div>
@@ -477,6 +481,51 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
       ${citations ? `<ol>${citations}</ol>` : "<p>No citations returned.</p>"}
     `
   );
+}
+
+function renderTransparency(meta) {
+  if (!meta || typeof meta !== "object" || !Object.keys(meta).length) {
+    return "<p>No transparency metadata returned.</p>";
+  }
+
+  const claimType = meta.claim_type || {};
+  const stats = meta.evidence_stats || {};
+  const flags = meta.policy_flags || {};
+
+  const lines = [];
+  if (meta.language_detected) lines.push(`<p><strong>Detected language:</strong> ${escapeHtml(normalizeLanguageLabel(meta.language_detected))}</p>`);
+  if (claimType.label) {
+    const source = claimType.decision_source ? ` (${escapeHtml(claimType.decision_source)})` : "";
+    lines.push(`<p><strong>Claim type:</strong> ${escapeHtml(claimType.label)}${source}</p>`);
+  }
+  if (typeof claimType.confidence === "number") {
+    lines.push(`<p><strong>Claim-type confidence:</strong> ${formatPct(claimType.confidence)}</p>`);
+  }
+
+  const statLine = [
+    `retrieved ${num(stats.retrieved)}`,
+    `cleaned ${num(stats.cleaned)}`,
+    `scored ${num(stats.scored)}`,
+    `strong ${num(stats.strong)}`,
+    `soft ${num(stats.soft)}`,
+  ].join(" | ");
+  if (stats.retrieved !== undefined) {
+    lines.push(`<p><strong>Evidence flow:</strong> ${escapeHtml(statLine)}</p>`);
+  }
+
+  const stanceSourcePairs = Object.entries(meta.stance_sources || {});
+  if (stanceSourcePairs.length) {
+    const src = stanceSourcePairs.map(([k, v]) => `${k}: ${v}`).join(", ");
+    lines.push(`<p><strong>Stance source usage:</strong> ${escapeHtml(src)}</p>`);
+  }
+
+  if (flags.forced_neutral_due_to_weak_evidence !== undefined) {
+    lines.push(
+      `<p><strong>Policy flag:</strong> forced neutral due to weak evidence = ${escapeHtml(String(flags.forced_neutral_due_to_weak_evidence))}</p>`
+    );
+  }
+
+  return lines.join("") || "<p>No transparency metadata returned.</p>";
 }
 
 function sourcePreviewCard(filteredEvidence) {

@@ -5,6 +5,8 @@ from models.stance.nli_model import NLIModel
 
 
 class StanceDetector:
+    MODEL_STANCE_MIN_CONFIDENCE = 0.58
+    LEXICAL_RESCUE_MIN_OVERLAP = 2
 
     def __init__(self):
         self.model = NLIModel()
@@ -33,10 +35,11 @@ class StanceDetector:
         print("Prediction:", label, confidence)
 
         stance = stance_map.get(label, "NEUTRAL")
-        if stance != "NEUTRAL":
+        if stance != "NEUTRAL" and confidence >= self.MODEL_STANCE_MIN_CONFIDENCE:
             return {
                 "stance": stance,
                 "confidence": round(confidence, 3),
+                "source": "model",
             }
 
         # Conservative lexical fallback only for clear refutations.
@@ -53,10 +56,11 @@ class StanceDetector:
             "cannot", "can't", "no evidence", "not true", "incorrect"
         )
 
-        if overlap >= 2 and any(c in text for c in refute_cues):
-            return {"stance": "REFUTE", "confidence": 0.62}
+        if overlap >= self.LEXICAL_RESCUE_MIN_OVERLAP and any(c in text for c in refute_cues):
+            return {"stance": "REFUTE", "confidence": 0.62, "source": "heuristic_refute_rescue"}
 
         return {
             "stance": "NEUTRAL",
             "confidence": round(confidence, 3),
+            "source": "model_low_confidence_or_neutral",
         }

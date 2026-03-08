@@ -32,10 +32,21 @@ class DomainDiversityFilter:
             Filtered evidence list with max N items per domain
         """
         
+        if not evidence_list:
+            return []
+
+        dynamic_cap = self._compute_dynamic_cap(len(evidence_list))
         domain_counts = {}
         filtered_evidence = []
-        
-        for evidence in evidence_list:
+
+        # Prefer stronger evidence first, then apply domain cap.
+        ranked_evidence = sorted(
+            evidence_list,
+            key=self._evidence_priority,
+            reverse=True,
+        )
+
+        for evidence in ranked_evidence:
             # Extract domain
             url = evidence.get('url') or evidence.get('source_url', '')
             domain = self._extract_domain(url)
@@ -44,7 +55,7 @@ class DomainDiversityFilter:
             current_count = domain_counts.get(domain, 0)
             
             # Add if under limit
-            if current_count < self.max_per_domain:
+            if current_count < dynamic_cap:
                 filtered_evidence.append(evidence)
                 domain_counts[domain] = current_count + 1
         
@@ -121,10 +132,12 @@ class DomainDiversityFilter:
         selected = []
         domains_used = set()
         
-        # Sort by score descending
-        sorted_evidence = sorted(evidence_list, 
-                               key=lambda x: x.get('score', 0), 
-                               reverse=True)
+        # Sort by quality-aware evidence priority.
+        sorted_evidence = sorted(
+            evidence_list,
+            key=self._evidence_priority,
+            reverse=True
+        )
         
         for evidence in sorted_evidence:
             if len(selected) >= max_items:
@@ -142,3 +155,34 @@ class DomainDiversityFilter:
                 selected.append(evidence)
         
         return selected
+
+    def _compute_dynamic_cap(self, total_items: int) -> int:
+        """
+        Dynamic per-domain cap based on list size.
+        - small sets: allow 1/domain
+        - medium sets: allow 2/domain
+        - larger sets: allow 3/domain
+        """
+        if total_items <= 4:
+            return 1
+        if total_items <= 10:
+            return min(self.max_per_domain, 2)
+        return min(max(self.max_per_domain, 2), 3)
+
+    @staticmethod
+    def _evidence_priority(evidence: Dict) -> float:
+        """
+        Rank evidence by strongest available score signals.
+        """
+        combined = float(evidence.get("combined_score", 0) or 0)
+        relevance = float(evidence.get("relevance_score", 0) or 0)
+        quality = float(evidence.get("quality_score", 0) or 0)
+        weight = float(evidence.get("weight", 0) or 0)
+        confidence = float(evidence.get("confidence", 0) or 0)
+        fallback_score = float(evidence.get("score", 0) or 0)
+        return (
+            combined * 0.5
+            + (relevance * quality) * 0.2
+            + (weight * confidence) * 0.2
+            + fallback_score * 0.1
+        )

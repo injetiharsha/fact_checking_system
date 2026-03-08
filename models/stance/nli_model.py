@@ -64,11 +64,6 @@ class NLIModel:
             if overlap >= 0.35 and any(c in text for c in refute_cues):
                 return "REFUTE", 0.62
 
-            support_cues = ("is true", "confirmed", "proven", "fact check true", "evidence shows")
-            caution_cues = ("not", "debunk", "myth", "false", "criticized", "criticised", "disputed")
-            if overlap >= 0.9 and any(c in text for c in support_cues) and not any(c in text for c in caution_cues):
-                return "SUPPORT", 0.6
-
             return "NEUTRAL", 0.5
 
         inputs = self.tokenizer(

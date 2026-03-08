@@ -92,6 +92,68 @@ class ClaimPipeline:
         self.stance = StanceDetector()
         self.logic_engine = LogicEngine()
         self.conflict_analyzer = ConflictAnalyzer()
+        self.strong_relevance_threshold = 0.45
+        self.strong_quality_threshold = 0.4
+        self.soft_relevance_threshold = 0.3
+        self.soft_quality_threshold = 0.25
+        self.min_strong_evidence_for_forced_verdict = 2
+
+    def _build_transparency(
+        self,
+        claim_type_result,
+        language,
+        evidence_retrieved,
+        evidence_cleaned,
+        scored_evidence,
+        results,
+        strong_evidence_count,
+        forced_neutral,
+        logic_engine_injected,
+    ):
+        stance_source_counts = {}
+        for item in results:
+            source = str(item.get("stance_source") or "unknown")
+            stance_source_counts[source] = stance_source_counts.get(source, 0) + 1
+
+        support_count = sum(1 for item in results if item.get("stance") == "SUPPORT")
+        refute_count = sum(1 for item in results if item.get("stance") == "REFUTE")
+        neutral_count = sum(1 for item in results if item.get("stance") == "NEUTRAL")
+
+        soft_evidence_count = sum(
+            1 for item in scored_evidence if item.get("evidence_tier") == "soft"
+        )
+
+        return {
+            "version": "phase6-v1",
+            "language_detected": language,
+            "claim_type": {
+                "label": claim_type_result["type"].value,
+                "confidence": round(float(claim_type_result.get("confidence", 0.0)), 3),
+                "decision_source": claim_type_result.get("decision_source", "unknown"),
+            },
+            "thresholds": {
+                "strong_relevance": self.strong_relevance_threshold,
+                "strong_quality": self.strong_quality_threshold,
+                "soft_relevance": self.soft_relevance_threshold,
+                "soft_quality": self.soft_quality_threshold,
+                "min_strong_evidence_for_definitive_verdict": self.min_strong_evidence_for_forced_verdict,
+            },
+            "evidence_stats": {
+                "retrieved": evidence_retrieved,
+                "cleaned": evidence_cleaned,
+                "scored": len(scored_evidence),
+                "strong": strong_evidence_count,
+                "soft": soft_evidence_count,
+                "support": support_count,
+                "refute": refute_count,
+                "neutral": neutral_count,
+            },
+            "stance_sources": stance_source_counts,
+            "policy_flags": {
+                "forced_neutral_due_to_weak_evidence": forced_neutral,
+                "logic_engine_injected": logic_engine_injected,
+            },
+        }
 
     async def run(self, claim, source_url=None):
 
@@ -154,8 +216,15 @@ class ClaimPipeline:
                 "conflict_analysis": "Request cancelled during server reload/shutdown",
                 "citations": [],
                 "logical_analysis": logic_metadata,
-                "explanation": "Request was cancelled before evidence retrieval completed."
+                "explanation": "Request was cancelled before evidence retrieval completed.",
+                "transparency": {
+                    "version": "phase6-v1",
+                    "language_detected": language,
+                    "status": "cancelled_during_evidence_retrieval",
+                },
             }
+
+        evidence_retrieved_count = len(evidence_raw)
 
         # store search results in trace
         for ev in evidence_raw:
@@ -188,11 +257,13 @@ class ClaimPipeline:
             evidence_raw = cleaned
 
         print("Cleaned evidence:", len(evidence_raw))
+        evidence_cleaned_count = len(evidence_raw)
 
         # compute relevance and quality scores
         start = time.time()
 
         scored_evidence = []
+        strong_evidence_count = 0
 
         for ev in evidence_raw:
 
@@ -225,20 +296,37 @@ class ClaimPipeline:
             print("Relevance:", relevance_score)
             print("Quality:", quality_score)
 
-            # reject weak evidence
-            if relevance_score < 0.35 or quality_score < 0.3:
+            evidence_tier = None
+            adjusted_weight = ev["weight"]
+
+            if (
+                relevance_score >= self.strong_relevance_threshold
+                and quality_score >= self.strong_quality_threshold
+            ):
+                evidence_tier = "strong"
+                strong_evidence_count += 1
+            elif (
+                relevance_score >= self.soft_relevance_threshold
+                and quality_score >= self.soft_quality_threshold
+            ):
+                evidence_tier = "soft"
+                adjusted_weight = round(ev["weight"] * 0.8, 3)
+            else:
                 print("Rejected evidence")
                 continue
 
-            print("Accepted evidence")
+            print(f"Accepted evidence ({evidence_tier})")
 
             scored_evidence.append({
                 "source": ev["source"],
                 "url": ev["url"],
                 "text": best_sentence,
-                "weight": ev["weight"],
+                "weight": adjusted_weight,
+                "raw_weight": ev["weight"],
                 "relevance_score": relevance_score,
-                "quality_score": quality_score
+                "quality_score": quality_score,
+                "combined_score": round(relevance_score * quality_score, 4),
+                "evidence_tier": evidence_tier,
             })
 
             # store selected evidence in trace
@@ -249,23 +337,31 @@ class ClaimPipeline:
                 "quality": quality_score
             })
 
-        # fallback if no evidence passes filtering
+        # abstain early if no evidence passes filtering
         if not scored_evidence:
-
-            print("No strong evidence found - using fallback")
-
-            for ev in evidence_raw[:5]:
-
-                text = ev.get("text", "")
-
-                scored_evidence.append({
-                    "source": ev["source"],
-                    "url": ev["url"],
-                    "text": text[:300],
-                    "weight": ev["weight"],
-                    "relevance_score": 0.2,
-                    "quality_score": 0.2
-                })
+            print("No usable evidence found - abstaining")
+            return {
+                "claim": claim,
+                "language": language,
+                "evidence": [],
+                "final_verdict": "NEUTRAL",
+                "confidence": 0.45,
+                "conflict_analysis": "Insufficient evidence",
+                "citations": [],
+                "logical_analysis": logic_metadata,
+                "explanation": "No sufficiently relevant and high-quality evidence was found.",
+                "transparency": self._build_transparency(
+                    claim_type_result=claim_type_result,
+                    language=language,
+                    evidence_retrieved=evidence_retrieved_count,
+                    evidence_cleaned=evidence_cleaned_count,
+                    scored_evidence=[],
+                    results=[],
+                    strong_evidence_count=0,
+                    forced_neutral=True,
+                    logic_engine_injected=False,
+                ),
+            }
 
         # sort evidence by combined score
         scored_evidence.sort(
@@ -322,17 +418,22 @@ class ClaimPipeline:
                 "url": ev["url"],
                 "text": highlighted,
                 "weight": ev["weight"],
+                "raw_weight": ev.get("raw_weight", ev["weight"]),
                 "stance": stance_result["stance"],
                 "confidence": stance_result["confidence"],
+                "stance_source": stance_result.get("source", "model"),
                 "relevance_score": ev["relevance_score"],
-                "quality_score": ev["quality_score"]
+                "quality_score": ev["quality_score"],
+                "combined_score": ev.get("combined_score"),
+                "evidence_tier": ev.get("evidence_tier", "soft"),
             })
 
             # store stance result in trace
             trace["stance_predictions"].append({
                 "url": ev["url"],
                 "stance": stance_result["stance"],
-                "confidence": stance_result["confidence"]
+                "confidence": stance_result["confidence"],
+                "source": stance_result.get("source", "model")
             })
 
         print("Semantic + NLI:", round(time.time() - start, 3), "sec")
@@ -340,7 +441,12 @@ class ClaimPipeline:
         # logic engine reasoning pass
         logic_verdict = self.logic_engine.analyze(claim, results)
         non_neutral = [r for r in results if r.get("stance") in {"SUPPORT", "REFUTE"}]
-        if logic_verdict in {"SUPPORT", "REFUTE"} and len(non_neutral) >= 2:
+        logic_engine_injected = False
+        if (
+            logic_verdict in {"SUPPORT", "REFUTE"}
+            and len(non_neutral) >= 2
+            and strong_evidence_count >= self.min_strong_evidence_for_forced_verdict
+        ):
             results.append({
                 "source": "logic_engine",
                 "url": "internal://logic_engine",
@@ -351,19 +457,42 @@ class ClaimPipeline:
                 "relevance_score": 1.0,
                 "quality_score": 1.0
             })
+            logic_engine_injected = True
 
         # aggregate final verdict
         start = time.time()
 
         verdict, confidence = aggregate_results(results)
         conflict_summary = self.conflict_analyzer.analyze(results)
+
+        # Abstain when evidence strength is weak, even if aggregate leans one side.
+        forced_neutral = False
+        if strong_evidence_count < self.min_strong_evidence_for_forced_verdict:
+            verdict = "NEUTRAL"
+            confidence = min(confidence, 0.55)
+            conflict_summary = "Insufficient strong evidence for definitive verdict"
+            forced_neutral = True
+
         citations = format_citations(results)
 
         explanation = generate_explanation(
             claim,
             results,
             verdict,
-            confidence
+            confidence,
+            conflict_summary=conflict_summary,
+        )
+
+        transparency = self._build_transparency(
+            claim_type_result=claim_type_result,
+            language=language,
+            evidence_retrieved=evidence_retrieved_count,
+            evidence_cleaned=evidence_cleaned_count,
+            scored_evidence=scored_evidence,
+            results=results,
+            strong_evidence_count=strong_evidence_count,
+            forced_neutral=forced_neutral,
+            logic_engine_injected=logic_engine_injected,
         )
 
         trace["final_verdict"] = {
@@ -392,7 +521,8 @@ class ClaimPipeline:
             "conflict_analysis": conflict_summary,
             "citations": citations,
             "logical_analysis": logic_metadata,
-            "explanation": explanation
+            "explanation": explanation,
+            "transparency": transparency,
         }
 
 
