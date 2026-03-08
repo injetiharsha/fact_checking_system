@@ -325,7 +325,8 @@ class ClaimPipeline:
 
         # logic engine reasoning pass
         logic_verdict = self.logic_engine.analyze(claim, results)
-        if logic_verdict in {"SUPPORT", "REFUTE"}:
+        non_neutral = [r for r in results if r.get("stance") in {"SUPPORT", "REFUTE"}]
+        if logic_verdict in {"SUPPORT", "REFUTE"} and len(non_neutral) >= 2:
             results.append({
                 "source": "logic_engine",
                 "url": "internal://logic_engine",

@@ -39,11 +39,19 @@ class NLIModel:
     def predict(self, claim, evidence):
         if self.model is None or self.tokenizer is None:
             claim_words = set((claim or "").lower().split())
-            evidence_words = set((evidence or "").lower().split())
+            text = (evidence or "").lower()
+            evidence_words = set(text.split())
             if not claim_words:
                 return "NEUTRAL", 0.5
             overlap = len(claim_words & evidence_words) / max(len(claim_words), 1)
-            if overlap > 0.6:
+
+            refute_cues = (
+                "hoax", "fake", "myth", "false", "debunk", "does not", "doesn't",
+                "cannot", "can't", "no evidence"
+            )
+            if overlap >= 0.35 and any(c in text for c in refute_cues):
+                return "REFUTE", 0.62
+            if overlap >= 0.75:
                 return "SUPPORT", 0.6
             return "NEUTRAL", 0.5
 
