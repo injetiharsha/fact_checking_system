@@ -73,7 +73,11 @@ class EvidenceRouter:
             asyncio.to_thread(self.news_api.fetch, claim)
         ]
 
-        results = await asyncio.gather(*api_tasks, return_exceptions=True)
+        try:
+            results = await asyncio.gather(*api_tasks, return_exceptions=True)
+        except asyncio.CancelledError:
+            print("Evidence retrieval cancelled during structured API fetch.")
+            return evidence_list
 
         for result in results:
 
@@ -128,10 +132,14 @@ class EvidenceRouter:
             for _, url in scrape_jobs
         ]
 
-        scraped_pages = await asyncio.gather(
-            *scrape_tasks,
-            return_exceptions=True
-        )
+        try:
+            scraped_pages = await asyncio.gather(
+                *scrape_tasks,
+                return_exceptions=True
+            )
+        except asyncio.CancelledError:
+            print("Evidence retrieval cancelled during web scraping.")
+            return evidence_list
 
         # combine results
         for (result, url), content in zip(scrape_jobs, scraped_pages):

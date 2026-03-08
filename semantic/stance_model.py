@@ -1,7 +1,7 @@
-# semantic/stance_model.py
+﻿# semantic/stance_model.py
 
-from models.stance.nli_model import NLIModel
 import re
+from models.stance.nli_model import NLIModel
 
 
 class StanceDetector:
@@ -10,12 +10,11 @@ class StanceDetector:
         self.model = NLIModel()
 
     def detect(self, evidence, claim):
-        evidence = evidence[:800]
+        evidence = (evidence or "")[:800]
 
-        # Correct order: model expects (claim, evidence).
+        # Model expects (claim, evidence)
         label, confidence = self.model.predict(claim, evidence)
-
-        label = label.upper()
+        label = (label or "NEUTRAL").upper()
 
         stance_map = {
             "ENTAILMENT": "SUPPORT",
@@ -25,10 +24,8 @@ class StanceDetector:
             "LABEL_1": "NEUTRAL",
             "LABEL_2": "SUPPORT",
             "SUPPORT": "SUPPORT",
-            "REFUTE": "REFUTE"
+            "REFUTE": "REFUTE",
         }
-
-        stance = stance_map.get(label, "NEUTRAL")
 
         print("\nNLI INPUT")
         print("Claim:", claim)
@@ -39,10 +36,10 @@ class StanceDetector:
         if stance != "NEUTRAL":
             return {
                 "stance": stance,
-                "confidence": round(confidence, 3)
+                "confidence": round(confidence, 3),
             }
 
-        # Neutral fallback: use light lexical cues.
+        # Conservative lexical fallback only for clear refutations.
         text = (evidence or "").lower()
         claim_text = (claim or "").lower()
         claim_tokens = [
@@ -53,20 +50,13 @@ class StanceDetector:
 
         refute_cues = (
             "hoax", "fake", "myth", "false", "debunk", "does not", "doesn't",
-            "cannot", "can't", "no evidence"
-        )
-        support_cues = (
-            "is true", "confirmed", "proven", "fact check true", "evidence shows"
+            "cannot", "can't", "no evidence", "not true", "incorrect"
         )
 
         if overlap >= 2 and any(c in text for c in refute_cues):
             return {"stance": "REFUTE", "confidence": 0.62}
-        if claim_text in text or (overlap >= 3 and any(c in text for c in support_cues)):
-            return {"stance": "SUPPORT", "confidence": 0.6}
 
         return {
             "stance": "NEUTRAL",
-            "confidence": round(confidence, 3)
+            "confidence": round(confidence, 3),
         }
-
-    

@@ -1,4 +1,5 @@
 ﻿import time
+import asyncio
 import nltk
 import json
 from evidence.router import EvidenceRouter
@@ -138,10 +139,23 @@ class ClaimPipeline:
 
         # retrieve evidence from router
         start = time.time()
-        evidence_raw = await self.router.get_evidence(
-            claim,
-            exclude_domain=exclude_domain
-        )
+        try:
+            evidence_raw = await self.router.get_evidence(
+                claim,
+                exclude_domain=exclude_domain
+            )
+        except asyncio.CancelledError:
+            return {
+                "claim": claim,
+                "language": language,
+                "evidence": [],
+                "final_verdict": "NEUTRAL",
+                "confidence": 0.0,
+                "conflict_analysis": "Request cancelled during server reload/shutdown",
+                "citations": [],
+                "logical_analysis": logic_metadata,
+                "explanation": "Request was cancelled before evidence retrieval completed."
+            }
 
         # store search results in trace
         for ev in evidence_raw:
@@ -380,4 +394,5 @@ class ClaimPipeline:
             "logical_analysis": logic_metadata,
             "explanation": explanation
         }
+
 
