@@ -89,7 +89,18 @@ async def process_claim(i, claim):
 
         elapsed = round(time.time() - start, 3)
 
-        verdict = res["results"][0]["final_verdict"]
+        claim_result = None
+        if isinstance(res, dict):
+            out_results = res.get("results")
+            if isinstance(out_results, list) and out_results and isinstance(out_results[0], dict):
+                claim_result = out_results[0]
+            elif "final_verdict" in res:
+                claim_result = res
+
+        if not claim_result:
+            claim_result = {"final_verdict": "NEUTRAL", "logical_analysis": {}, "evidence": []}
+
+        verdict = claim_result.get("final_verdict", "NEUTRAL")
 
         print("Verdict:", verdict)
         print("Time:", elapsed, "sec")
@@ -99,7 +110,7 @@ async def process_claim(i, claim):
             "predicted_verdict": verdict,
             "expected_verdict": ground_truth[i],
             "time_seconds": elapsed,
-            "logical_analysis": res["results"][0].get("logical_analysis", {}),
+            "logical_analysis": claim_result.get("logical_analysis", {}),
             "pipeline_output": res
         }
 
@@ -233,6 +244,8 @@ def evaluate(results):
                 out_results = output.get("results")
                 if isinstance(out_results, list) and out_results and isinstance(out_results[0], dict):
                     evidence_items = out_results[0].get("evidence", []) or []
+                elif "evidence" in output:
+                    evidence_items = output.get("evidence", []) or []
 
             category = infer_failure_category(pred, truth, tags, evidence_items)
             failed_by_category[category] += 1
