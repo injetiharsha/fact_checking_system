@@ -88,7 +88,7 @@ def compare_metrics(current: Dict[str, Any], baseline: Dict[str, Any]) -> Dict[s
 
 
 def load_json(path: Path) -> Dict[str, Any]:
-    with path.open("r", encoding="utf-8") as handle:
+    with path.open("r", encoding="utf-8-sig") as handle:
         return json.load(handle)
 
 

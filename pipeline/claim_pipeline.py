@@ -2,6 +2,7 @@
 import asyncio
 import nltk
 import json
+import sys
 from evidence.router import EvidenceRouter
 from evidence.relevance import RelevanceScorer
 from evidence.quality import QualityScorer
@@ -65,11 +66,16 @@ def extract_best_sentence(claim, text, relevance_scorer):
             best_score = score
             best_sentence = sent
 
+    def _safe_console_text(value):
+        out = str(value)
+        enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+        return out.encode(enc, errors="replace").decode(enc, errors="replace")
+
     print("\n--- Sentence candidates ---")
     for s in sentences[:5]:
-        print("-", s[:120])
+        print("-", _safe_console_text(s[:120]))
 
-    print("Selected:", best_sentence)
+    print("Selected:", _safe_console_text(best_sentence))
 
     return best_sentence
 
