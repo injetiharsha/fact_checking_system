@@ -4,7 +4,7 @@ from pipeline.document_pipeline import DocumentPipeline
 
 pipeline = DocumentPipeline()
 
-claim = "Climate change is a hoax" \
+claim = "The Earth is Flat" \
 ""
 
 print("Claim length:", len(claim.split()))
