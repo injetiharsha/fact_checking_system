@@ -2,7 +2,7 @@
   "claim": "Humans can breathe in space without equipment",
   "search_results": [
     {
-      "source": "The Simple Force That Could Let Astronauts Breathe Forever in Space",
+      "source": "The Simple Force That Could Let Astronauts Breathe Forever in ...",
       "url": "https://www.sciencenewstoday.org/the-simple-force-that-could-let-astronauts-breathe-forever-in-space"
     },
     {
@@ -30,11 +30,11 @@
       "url": "https://www.syfy.com/syfy-wire/could-humans-breathe-in-alien-atmospheres"
     },
     {
-      "source": "How Long Can You Survive On Each Planet Without A Space Suit? - Science ABC",
-      "url": "https://www.scienceabc.com/nature/universe/long-can-one-survive-planet-without-space-suit.html"
+      "source": "How to Breathe in Space: The Science of Survival - Biology ...",
+      "url": "https://biologyinsights.com/how-to-breathe-in-space-the-science-of-survival/"
     },
     {
-      "source": "What would happen to the human body in the vacuum of space?",
+      "source": "What would happen to the human body in the vacuum of space? Images How long could you survive in space without a spacesuit? r/space on Reddit: Exoplanets where a human could go outside ...",
       "url": "https://www.livescience.com/human-body-no-spacesuit"
     },
     {
@@ -45,12 +45,6 @@
   "scraped_pages": [],
   "evidence_selected": [
     {
-      "url": "https://www.scienceabc.com/nature/universe/long-can-one-survive-planet-without-space-suit.html",
-      "sentence": "One would get crushed almost instantly if you attempted to stand on these planets in any condition, let alone without a space suit.",
-      "relevance": 0.429,
-      "quality": 0.3
-    },
-    {
       "url": "https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit",
       "sentence": "Thanks to science fiction, many people have wondered how long a person could survive in space without a spacesuit.",
       "relevance": 0.429,
@@ -58,11 +52,6 @@
     }
   ],
   "stance_predictions": [
-    {
-      "url": "https://www.scienceabc.com/nature/universe/long-can-one-survive-planet-without-space-suit.html",
-      "stance": "NEUTRAL",
-      "confidence": 0.5
-    },
     {
       "url": "https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit",
       "stance": "NEUTRAL",

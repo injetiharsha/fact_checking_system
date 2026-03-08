@@ -148,6 +148,32 @@ def evaluate(results):
     failed_by_predicted = Counter()
     failed_by_tag = Counter()
     failed_claims = []
+    failed_by_category = Counter()
+
+    def infer_failure_category(pred, truth, tags, evidence_items):
+        support_n = sum(1 for e in evidence_items if e.get("stance") == "SUPPORT")
+        refute_n = sum(1 for e in evidence_items if e.get("stance") == "REFUTE")
+
+        if pred == "NEUTRAL":
+            if not evidence_items:
+                return "insufficient_evidence"
+            return "neutral_despite_evidence"
+
+        if truth == "TRUE" and pred != "TRUE":
+            if "numeric" in tags:
+                return "false_negative_numeric"
+            if refute_n > support_n:
+                return "false_negative_refute_bias"
+            return "false_negative_general"
+
+        if truth == "FALSE" and pred != "FALSE":
+            if "numeric" in tags:
+                return "false_positive_numeric"
+            if support_n >= refute_n and support_n > 0:
+                return "false_positive_support_bias"
+            return "false_positive_general"
+
+        return "other"
 
     for r in results:
 
@@ -200,11 +226,22 @@ def evaluate(results):
                 tags = ["general"]
             for tag in tags:
                 failed_by_tag[tag] += 1
+
+            evidence_items = []
+            output = r.get("pipeline_output", {})
+            if isinstance(output, dict):
+                out_results = output.get("results")
+                if isinstance(out_results, list) and out_results and isinstance(out_results[0], dict):
+                    evidence_items = out_results[0].get("evidence", []) or []
+
+            category = infer_failure_category(pred, truth, tags, evidence_items)
+            failed_by_category[category] += 1
             failed_claims.append({
                 "claim": r["claim"],
                 "expected_verdict": truth,
                 "predicted_verdict": pred,
                 "logical_tags": tags,
+                "failure_category": category,
                 "time_seconds": r.get("time_seconds")
             })
 
@@ -237,6 +274,7 @@ def evaluate(results):
         "failed_by_expected_verdict": dict(failed_by_expected),
         "failed_by_predicted_verdict": dict(failed_by_predicted),
         "failed_by_claim_tag": dict(failed_by_tag),
+        "failed_by_category": dict(failed_by_category),
         "failed_claims": failed_claims
     }
 
@@ -288,6 +326,7 @@ async def main():
     print("failed_by_expected_verdict :", metrics.get("failed_by_expected_verdict"))
     print("failed_by_predicted_verdict :", metrics.get("failed_by_predicted_verdict"))
     print("failed_by_claim_tag :", metrics.get("failed_by_claim_tag"))
+    print("failed_by_category :", metrics.get("failed_by_category"))
 
     save_results(results, metrics, claim_times, total_time)
 

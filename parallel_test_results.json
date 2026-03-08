@@ -1,37 +1,53 @@
 {
   "benchmark_metrics": {
     "total_claims": 30,
-    "correct_predictions": 21,
-    "accuracy": 0.7,
+    "correct_predictions": 19,
+    "accuracy": 0.633,
     "neutral_rate": 0.133,
     "actual_positive": 22,
     "actual_negative": 8,
-    "predicted_positive": 20,
-    "predicted_negative": 10,
+    "predicted_positive": 22,
+    "predicted_negative": 8,
     "tp": 17,
-    "tn": 5,
-    "fp": 3,
+    "tn": 3,
+    "fp": 5,
     "fn": 5,
-    "false_positive_rate": 0.1,
+    "false_positive_rate": 0.167,
     "false_negative_rate": 0.167,
-    "precision_true_class": 0.85,
+    "precision_true_class": 0.773,
     "recall_true_class": 0.773,
-    "f1_true_class": 0.81,
+    "f1_true_class": 0.773,
     "failed_by_expected_verdict": {
-      "FALSE": 4,
+      "FALSE": 6,
       "TRUE": 5
     },
     "failed_by_predicted_verdict": {
-      "TRUE": 3,
+      "TRUE": 5,
       "FALSE": 2,
       "NEUTRAL": 4
     },
     "failed_by_claim_tag": {
-      "numeric": 3,
-      "general": 5,
-      "comparative": 1
+      "general": 6,
+      "numeric": 2,
+      "comparative": 3
+    },
+    "failed_by_category": {
+      "false_positive_support_bias": 3,
+      "false_positive_numeric": 2,
+      "false_negative_refute_bias": 2,
+      "neutral_despite_evidence": 4
     },
     "failed_claims": [
+      {
+        "claim": "Climate change is a hoax",
+        "expected_verdict": "FALSE",
+        "predicted_verdict": "TRUE",
+        "logical_tags": [
+          "general"
+        ],
+        "failure_category": "false_positive_support_bias",
+        "time_seconds": 30.834
+      },
       {
         "claim": "Drinking bleach cures COVID-19",
         "expected_verdict": "FALSE",
@@ -39,7 +55,8 @@
         "logical_tags": [
           "numeric"
         ],
-        "time_seconds": 25.64
+        "failure_category": "false_positive_numeric",
+        "time_seconds": 38.78
       },
       {
         "claim": "5G networks spread coronavirus",
@@ -48,7 +65,8 @@
         "logical_tags": [
           "numeric"
         ],
-        "time_seconds": 18.282
+        "failure_category": "false_positive_numeric",
+        "time_seconds": 25.183
       },
       {
         "claim": "The Amazon River is the longest river in the world",
@@ -57,7 +75,18 @@
         "logical_tags": [
           "general"
         ],
-        "time_seconds": 24.155
+        "failure_category": "false_positive_support_bias",
+        "time_seconds": 31.06
+      },
+      {
+        "claim": "Africa is the largest continent on Earth",
+        "expected_verdict": "FALSE",
+        "predicted_verdict": "TRUE",
+        "logical_tags": [
+          "comparative"
+        ],
+        "failure_category": "false_positive_support_bias",
+        "time_seconds": 25.538
       },
       {
         "claim": "Greenland is the largest island in the world",
@@ -66,7 +95,18 @@
         "logical_tags": [
           "comparative"
         ],
-        "time_seconds": 16.327
+        "failure_category": "false_negative_refute_bias",
+        "time_seconds": 22.67
+      },
+      {
+        "claim": "Lake Baikal is the deepest lake on Earth",
+        "expected_verdict": "TRUE",
+        "predicted_verdict": "NEUTRAL",
+        "logical_tags": [
+          "general"
+        ],
+        "failure_category": "neutral_despite_evidence",
+        "time_seconds": 22.7
       },
       {
         "claim": "Sound travels faster in water than in air",
@@ -75,16 +115,18 @@
         "logical_tags": [
           "general"
         ],
-        "time_seconds": 17.22
+        "failure_category": "neutral_despite_evidence",
+        "time_seconds": 37.698
       },
       {
-        "claim": "Humans share about 50 percent of their DNA with bananas",
+        "claim": "Jupiter is the largest planet in the solar system",
         "expected_verdict": "TRUE",
         "predicted_verdict": "FALSE",
         "logical_tags": [
-          "numeric"
+          "comparative"
         ],
-        "time_seconds": 27.732
+        "failure_category": "false_negative_refute_bias",
+        "time_seconds": 19.35
       },
       {
         "claim": "Saturn has rings",
@@ -93,16 +135,8 @@
         "logical_tags": [
           "general"
         ],
-        "time_seconds": 16.688
-      },
-      {
-        "claim": "The United Nations was founded after World War II",
-        "expected_verdict": "TRUE",
-        "predicted_verdict": "NEUTRAL",
-        "logical_tags": [
-          "general"
-        ],
-        "time_seconds": 23.366
+        "failure_category": "neutral_despite_evidence",
+        "time_seconds": 42.601
       },
       {
         "claim": "Humans can breathe in space without equipment",
@@ -111,18 +145,19 @@
         "logical_tags": [
           "general"
         ],
-        "time_seconds": 12.852
+        "failure_category": "neutral_despite_evidence",
+        "time_seconds": 12.523
       }
     ]
   },
-  "total_time_seconds": 117.59,
-  "average_claim_time": 21.591,
+  "total_time_seconds": 152.426,
+  "average_claim_time": 28.491,
   "claims": [
     {
       "claim": "The moon landing was faked",
       "predicted_verdict": "FALSE",
       "expected_verdict": "FALSE",
-      "time_seconds": 25.93,
+      "time_seconds": 35.57,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -144,17 +179,17 @@
             "language": "en",
             "evidence": [
               {
-                "source": "Moon landing conspiracy theories | Communication and Mass Media | Research Starters",
-                "url": "https://www.ebsco.com/research-starters/communication-and-mass-media/moon-landing-conspiracy-theories?utm_source=chatgpt.com",
-                "text": "Proponents of these theories argue that the U.S. government faked the moon landing to win the Space Race against the Soviet Union, citing perceived inconsistencies in the photographs taken during the mission.",
+                "source": "Was the Moon landing faked? Conspiracy theorists point to key",
+                "url": "https://au.news.yahoo.com/was-the-moon-landing-faked-060426606.html",
+                "text": "Conspiracy theorists, however, maintain that the Moon landing was faked to help stabilise a war-panicked public, solidify the President\u2019s authority, and help the US remain a world leader in space aviation.",
                 "weight": 0.5,
                 "stance": "REFUTE",
                 "confidence": 0.62,
-                "relevance_score": 0.8,
+                "relevance_score": 1.0,
                 "quality_score": 0.7
               },
               {
-                "source": "The Wildest Apollo 11 Moon Landing Conspiracy Theories, Debunked",
+                "source": "The Wildest Apollo 11 Moon Landing Conspiracy Theories ...",
                 "url": "https://www.history.com/articles/moon-landing-fake-conspiracy-theories",
                 "text": "The Apollo 11 moon landing on July 20, 1969 was one of the most astonishing achievements in human history.",
                 "weight": 0.5,
@@ -162,6 +197,26 @@
                 "confidence": 0.6,
                 "relevance_score": 0.8,
                 "quality_score": 0.5
+              },
+              {
+                "source": "6 Apollo Moonlanding conspiracy theories and how to defeat them",
+                "url": "https://www.skyatnightmagazine.com/space-missions/apollo-moon-landing-conspiracy-theories-crushed",
+                "text": "The Apollo 11 Moonlanding remains our finest hour, yet some believe it was faked to convince the world the US had beaten the Soviets in the Space Race.",
+                "weight": 0.5,
+                "stance": "REFUTE",
+                "confidence": 0.62,
+                "relevance_score": 0.6,
+                "quality_score": 0.5
+              },
+              {
+                "source": "Was the Moon landing fake? Debunking the Apollo 11 conspiracy ...",
+                "url": "https://www.bbc.co.uk/bitesize/articles/z3x6b7h",
+                "text": "Conspiracy theorists claim that the Moon landing was faked because Neil Armstrong\u00e2\u0080\u0099s preserved space suit doesn\u00e2\u0080\u0099t match the footprint pictured on the Moon.",
+                "weight": 0.5,
+                "stance": "REFUTE",
+                "confidence": 0.62,
+                "relevance_score": 1.0,
+                "quality_score": 0.3
               },
               {
                 "source": "Was the Moon Landing Fake? Debunking 5 Common Myths",
@@ -172,37 +227,17 @@
                 "confidence": 0.5,
                 "relevance_score": 0.6,
                 "quality_score": 0.5
-              },
-              {
-                "source": "Was the Moon landing fake? Debunking the Apollo 11 conspiracy ... - BBC",
-                "url": "https://www.bbc.co.uk/bitesize/articles/z3x6b7h",
-                "text": "Conspiracy theorists claim that the Moon landing was faked because Neil Armstrong\u00e2\u0080\u0099s preserved space suit doesn\u00e2\u0080\u0099t match the footprint pictured on the Moon.",
-                "weight": 0.5,
-                "stance": "REFUTE",
-                "confidence": 0.62,
-                "relevance_score": 1.0,
-                "quality_score": 0.3
-              },
-              {
-                "source": "How we know the Apollo moonlandings weren't a hoax. 10 of the biggest ...",
-                "url": "https://www.skyatnightmagazine.com/space-missions/how-we-know-apollo-moonlandings-werent-hoax",
-                "text": "Let\u2019s address some of the most popular\u2026 With no wind to spread the flag it was actually hung from a horizontal crossbar.",
-                "weight": 0.5,
-                "stance": "NEUTRAL",
-                "confidence": 0.5,
-                "relevance_score": 0.4,
-                "quality_score": 0.3
               }
             ],
             "final_verdict": "FALSE",
-            "confidence": 0.3478260869565218,
+            "confidence": 0.5121951219512196,
             "conflict_analysis": "Strong Contradictory Evidence",
             "citations": [
-              "[1] Moon landing conspiracy theories | Communication and Mass Media | Research Starters - https://www.ebsco.com/research-starters/communication-and-mass-media/moon-landing-conspiracy-theories?utm_source=chatgpt.com",
-              "[2] The Wildest Apollo 11 Moon Landing Conspiracy Theories, Debunked - https://www.history.com/articles/moon-landing-fake-conspiracy-theories",
-              "[3] Was the Moon Landing Fake? Debunking 5 Common Myths - https://starwalk.space/en/news/was-the-moon-landing-fake",
-              "[4] Was the Moon landing fake? Debunking the Apollo 11 conspiracy ... - BBC - https://www.bbc.co.uk/bitesize/articles/z3x6b7h",
-              "[5] How we know the Apollo moonlandings weren't a hoax. 10 of the biggest ... - https://www.skyatnightmagazine.com/space-missions/how-we-know-apollo-moonlandings-werent-hoax"
+              "[1] Was the Moon landing faked? Conspiracy theorists point to key - https://au.news.yahoo.com/was-the-moon-landing-faked-060426606.html",
+              "[2] The Wildest Apollo 11 Moon Landing Conspiracy Theories ... - https://www.history.com/articles/moon-landing-fake-conspiracy-theories",
+              "[3] 6 Apollo Moonlanding conspiracy theories and how to defeat them - https://www.skyatnightmagazine.com/space-missions/apollo-moon-landing-conspiracy-theories-crushed",
+              "[4] Was the Moon landing fake? Debunking the Apollo 11 conspiracy ... - https://www.bbc.co.uk/bitesize/articles/z3x6b7h",
+              "[5] Was the Moon Landing Fake? Debunking 5 Common Myths - https://starwalk.space/en/news/was-the-moon-landing-fake"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -211,16 +246,16 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"the moon landing was faked\"\n\nVerdict: FALSE\nConfidence: 34.78%\n\nCredible sources including Moon landing conspiracy theories | Communication and Mass Media | Research Starters, Was the Moon landing fake? Debunking the Apollo 11 conspiracy ... - BBC contradict the claim. The supporting evidence is weak or unreliable."
+            "explanation": "Claim: \"the moon landing was faked\"\n\nVerdict: FALSE\nConfidence: 51.22%\n\nCredible sources including Was the Moon landing faked? Conspiracy theorists point to key, 6 Apollo Moonlanding conspiracy theories and how to defeat them, Was the Moon landing fake? Debunking the Apollo 11 conspiracy ... contradict the claim. The supporting evidence is weak or unreliable."
           }
         ]
       }
     },
     {
       "claim": "Climate change is a hoax",
-      "predicted_verdict": "FALSE",
+      "predicted_verdict": "TRUE",
       "expected_verdict": "FALSE",
-      "time_seconds": 13.709,
+      "time_seconds": 30.834,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -231,40 +266,40 @@
       "pipeline_output": {
         "source_url": null,
         "claims_analyzed": 1,
-        "true_claims": 0,
-        "false_claims": 1,
+        "true_claims": 1,
+        "false_claims": 0,
         "neutral_claims": 0,
-        "document_credibility_score": -1.0,
-        "document_verdict": "Highly Misleading",
+        "document_credibility_score": 1.0,
+        "document_verdict": "Highly Reliable",
         "results": [
           {
             "claim": "climate change is a hoax",
             "language": "en",
             "evidence": [
               {
-                "source": "Climate Change Described as \u201cHoax\u201d by Louisiana Attorney-General | Sabin Center for Climate Change Law",
-                "url": "https://climate.law.columbia.edu/content/climate-change-described-hoax-louisiana-attorney-general-0",
-                "text": "During a speech at the Heartland Institute\u2019s America First Energy\u00a0Conference\u00a0on August 7, 2017, Louisiana Attorney General Jeff Landry\u00a0described\u00a0climate change as a hoax.",
+                "source": "Is \u201cClimate Change\u201d A Hoax? | Don Boyd Blog",
+                "url": "https://donboydblog.com/2010/11/29/is-climate-change-a-hoax/",
+                "text": "I know a number of you are 100% believers that the climate is going to change and both coasts of America will be 20 feet underwater within the next few years.",
                 "weight": 0.5,
-                "stance": "REFUTE",
-                "confidence": 0.62,
-                "relevance_score": 0.6,
-                "quality_score": 0.5
-              },
-              {
-                "source": "Climate change, hoax or imminent catastrophe?",
-                "url": "https://www.dnv.com/article/climate-change-hoax-or-imminent-catastrophe--179622/",
-                "text": "Climate change is not a hoax, if we don\u2019t act humanity will face a planetary catastrophe.",
-                "weight": 0.5,
-                "stance": "REFUTE",
-                "confidence": 0.62,
+                "stance": "SUPPORT",
+                "confidence": 0.6,
                 "relevance_score": 0.8,
-                "quality_score": 0.3
+                "quality_score": 0.9000000000000001
               },
               {
-                "source": "10 Climate Change Myths Debunked \u2014 Covering Climate Now",
-                "url": "https://coveringclimatenow.org/resource/10-climate-change-myths-debunked/",
-                "text": "Scientists the world over agree that climate change is real, it\u2019s happening now, and it\u2019s caused by the burning of fossil fuels.",
+                "source": "Climate Change Hoax Exposed - Cal Thomas",
+                "url": "https://calthomas.com/2018/03/climate-change-hoax-exposed/",
+                "text": "It is a mark of Morano\u2019s dark humor that he features as an \u201cendorsement\u201d of the book a comment by the liberal Daily Kos, which calls Morano \u201cevil personified.\u201d The book is a point-by-point takedown of the predictions of disaster made by the climate change movement, none of which have materialized, but when one is part of a cult, facts don\u2019t matter.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.6,
+                "relevance_score": 0.8,
+                "quality_score": 0.7
+              },
+              {
+                "source": "Climate change is a hoax and other myths debunked by ...",
+                "url": "https://www.augustachronicle.com/story/news/environment/2025/11/19/climate-change-myths-debunked-by-scientific-evidence/87322607007/",
+                "text": "Earth\u2019s climate has changed throughout history, causing a number of climate change impacts affecting human life and the ecosystem, experts say.",
                 "weight": 0.5,
                 "stance": "NEUTRAL",
                 "confidence": 0.5,
@@ -272,24 +307,24 @@
                 "quality_score": 0.3
               },
               {
-                "source": "logic_engine",
-                "url": "internal://logic_engine",
-                "text": "Structured reasoning signal",
-                "weight": 0.8,
+                "source": "Climate Change is a Hoax | ManicBeancounter",
+                "url": "https://manicbeancounter.com/tag/climate-change-is-a-hoax/",
+                "text": "The title of the Hoax paper is \u201cNASA faked the moon landing|Therefore (Climate) Science is a Hoax: An Anatomy of the Motivated Rejection of Science\u201c.",
+                "weight": 0.5,
                 "stance": "REFUTE",
-                "confidence": 0.8,
-                "relevance_score": 1.0,
-                "quality_score": 1.0
+                "confidence": 0.62,
+                "relevance_score": 0.6,
+                "quality_score": 0.3
               }
             ],
-            "final_verdict": "FALSE",
-            "confidence": 1.0,
-            "conflict_analysis": "Strong Contradictory Evidence",
+            "final_verdict": "TRUE",
+            "confidence": 0.3186813186813187,
+            "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
-              "[1] Climate Change Described as \u201cHoax\u201d by Louisiana Attorney-General | Sabin Center for Climate Change Law - https://climate.law.columbia.edu/content/climate-change-described-hoax-louisiana-attorney-general-0",
-              "[2] Climate change, hoax or imminent catastrophe? - https://www.dnv.com/article/climate-change-hoax-or-imminent-catastrophe--179622/",
-              "[3] 10 Climate Change Myths Debunked \u2014 Covering Climate Now - https://coveringclimatenow.org/resource/10-climate-change-myths-debunked/",
-              "[4] logic_engine - internal://logic_engine"
+              "[1] Is \u201cClimate Change\u201d A Hoax? | Don Boyd Blog - https://donboydblog.com/2010/11/29/is-climate-change-a-hoax/",
+              "[2] Climate Change Hoax Exposed - Cal Thomas - https://calthomas.com/2018/03/climate-change-hoax-exposed/",
+              "[3] Climate change is a hoax and other myths debunked by ... - https://www.augustachronicle.com/story/news/environment/2025/11/19/climate-change-myths-debunked-by-scientific-evidence/87322607007/",
+              "[4] Climate Change is a Hoax | ManicBeancounter - https://manicbeancounter.com/tag/climate-change-is-a-hoax/"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -298,7 +333,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"climate change is a hoax\"\n\nVerdict: FALSE\nConfidence: 100.0%\n\nCredible sources including Climate Change Described as \u201cHoax\u201d by Louisiana Attorney-General | Sabin Center for Climate Change Law, Climate change, hoax or imminent catastrophe?, logic_engine contradict the claim. The supporting evidence is weak or unreliable."
+            "explanation": "Claim: \"climate change is a hoax\"\n\nVerdict: TRUE\nConfidence: 31.87%\n\nMultiple high-credibility sources including Is \u201cClimate Change\u201d A Hoax? | Don Boyd Blog, Climate Change Hoax Exposed - Cal Thomas support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -307,7 +342,7 @@
       "claim": "Drinking bleach cures COVID-19",
       "predicted_verdict": "TRUE",
       "expected_verdict": "FALSE",
-      "time_seconds": 25.64,
+      "time_seconds": 38.78,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -329,7 +364,27 @@
             "language": "en",
             "evidence": [
               {
-                "source": "Drinking Bleach Is No Cure for Coronavirus and Poses Serious Risks",
+                "source": "The FDA, but again warned the public not to drink bleach as",
+                "url": "https://ehealthquotes.org/the-fda-but-again-warned-the-public-not-to-drink-bleach-as-covid-19-treatment/",
+                "text": "ehealth quotes\n Health News & Tips \n                                        The FDA, but again warned the public not to drink bleach as Covid-19 treatment                                      Among other things, the FDA claims OCLO has been offering chlorine dioxide as \u2018unapproved and misbranded\u2019 COVID-19 cures and prevention products in the US via an eCrater storefront.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.99,
+                "relevance_score": 0.75,
+                "quality_score": 0.9000000000000001
+              },
+              {
+                "source": "Bleach touted as 'miracle cure' for COVID-19 sold on Amazon:",
+                "url": "https://nypost.com/2020/09/19/bleach-touted-as-miracle-cure-for-covid-19-sold-on-amazon-report/",
+                "text": "Industrial bleach is being sold on\u00a0Amazon through its product pages which consumers are buying under the mistaken belief that it is a \u201cmiracle cure\u201d for COVID-19, despite health warnings from the US Food and Drug Administration that drinking the fluid can kill you.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.99,
+                "relevance_score": 0.5,
+                "quality_score": 0.9000000000000001
+              },
+              {
+                "source": "Drinking Bleach Is No Cure for Coronavirus and Poses Serious",
                 "url": "https://www.healthline.com/health/drinking-bleach",
                 "text": "There is no evidence that drinking bleach will help with COVID-19 or any other condition.",
                 "weight": 0.5,
@@ -339,14 +394,14 @@
                 "quality_score": 0.5
               },
               {
-                "source": "Drinking, bathing in, or injecting yourself with bleach can be deadly\u2014and it won\u2019t cure COVID-19",
-                "url": "https://www.popsci.com/story/health/bleach-coronavirus-cure-detox-mms/",
-                "text": "Meanwhile, the Food and Drug Administration (FDA) has had to crack down on groups repackaging bleach as an ingestible COVID-19 cure.",
+                "source": "Coronavirus Cannot be Cured by Drinking Bleach - Scottsdale",
+                "url": "https://scottsdalerecovery.com/coronavirus-cannot-be-cured-by-drinking-bleach-or-snorting-cocaine-despite-social-media-rumors/",
+                "text": "Sadly, drinking bleach isn\u2019t the only dangerous \u201ccure\u201d that these scammers / bad actors are marketing online to a huge population very anxious about the current outbreak.",
                 "weight": 0.5,
-                "stance": "SUPPORT",
-                "confidence": 0.99,
+                "stance": "NEUTRAL",
+                "confidence": 0.5,
                 "relevance_score": 0.5,
-                "quality_score": 0.5
+                "quality_score": 0.3
               },
               {
                 "source": "logic_engine",
@@ -363,9 +418,11 @@
             "confidence": 1.0,
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
-              "[1] Drinking Bleach Is No Cure for Coronavirus and Poses Serious Risks - https://www.healthline.com/health/drinking-bleach",
-              "[2] Drinking, bathing in, or injecting yourself with bleach can be deadly\u2014and it won\u2019t cure COVID-19 - https://www.popsci.com/story/health/bleach-coronavirus-cure-detox-mms/",
-              "[3] logic_engine - internal://logic_engine"
+              "[1] The FDA, but again warned the public not to drink bleach as - https://ehealthquotes.org/the-fda-but-again-warned-the-public-not-to-drink-bleach-as-covid-19-treatment/",
+              "[2] Bleach touted as 'miracle cure' for COVID-19 sold on Amazon: - https://nypost.com/2020/09/19/bleach-touted-as-miracle-cure-for-covid-19-sold-on-amazon-report/",
+              "[3] Drinking Bleach Is No Cure for Coronavirus and Poses Serious - https://www.healthline.com/health/drinking-bleach",
+              "[4] Coronavirus Cannot be Cured by Drinking Bleach - Scottsdale - https://scottsdalerecovery.com/coronavirus-cannot-be-cured-by-drinking-bleach-or-snorting-cocaine-despite-social-media-rumors/",
+              "[5] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -374,7 +431,7 @@
               "has_numeric_value": true,
               "is_opinion": false
             },
-            "explanation": "Claim: \"drinking bleach cures covid-19\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Drinking Bleach Is No Cure for Coronavirus and Poses Serious Risks, Drinking, bathing in, or injecting yourself with bleach can be deadly\u2014and it won\u2019t cure COVID-19, logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"drinking bleach cures covid-19\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including The FDA, but again warned the public not to drink bleach as, Bleach touted as 'miracle cure' for COVID-19 sold on Amazon:, Drinking Bleach Is No Cure for Coronavirus and Poses Serious, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -383,7 +440,7 @@
       "claim": "5G networks spread coronavirus",
       "predicted_verdict": "TRUE",
       "expected_verdict": "FALSE",
-      "time_seconds": 18.282,
+      "time_seconds": 25.183,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -405,9 +462,19 @@
             "language": "en",
             "evidence": [
               {
-                "source": "Can 5G spread coronavirus? Here's what govt says",
-                "url": "https://www.livemint.com/industry/telecom/can-5g-spread-coronavirus-here-s-what-govt-says-11623942107464.html",
-                "text": "The Centre has rejected the claim that 5G mobile networks spread or transmit Covid-19.",
+                "source": "What Is The 5G Coronavirus Conspiracy Theory ... - Bustle",
+                "url": "https://www.bustle.com/p/what-is-the-5g-coronavirus-conspiracy-theory-scientists-have-weighed-in-22761613",
+                "text": "Stranger still is the influx of 5G coronavirus conspiracies linking wireless networks to the spread of COVID-19.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.6,
+                "relevance_score": 1.0,
+                "quality_score": 0.5
+              },
+              {
+                "source": "Clearing up the myths around 5G and the coronavirus - Ofcom",
+                "url": "https://www.ofcom.org.uk/spectrum/electromagnetic-fields/clearing-up-myths-5g-and-coronavirus",
+                "text": "There is a conspiracy theory that claims 5G is connected to the spread of the coronavirus (Covid-19).",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.6,
@@ -415,9 +482,19 @@
                 "quality_score": 0.5
               },
               {
-                "source": "5G has no link to COVID-19 but false conspiracy theories persist - CNET",
-                "url": "https://www.cnet.com/tech/mobile/5g-has-no-link-to-covid-19-as-false-conspiracy-theories-persist/",
-                "text": "One that's persisted online is that 5G networks caused the disease.",
+                "source": "Coronavirus fake news debunked: 5G mobile networks do not",
+                "url": "https://www.mirror.co.uk/tech/coronavirus-fake-news-debunked-5g-21884776",
+                "text": "The World Health Organisation (WHO) has thoroughly debunked the \"crazy conspiracy theory\" that coronavirus can be spread by 5G.",
+                "weight": 0.5,
+                "stance": "REFUTE",
+                "confidence": 0.62,
+                "relevance_score": 0.5,
+                "quality_score": 0.5
+              },
+              {
+                "source": "5G and coronavirus \u2014 are the phone networks trying to kill",
+                "url": "https://crberryauthor.com/2020/04/09/5g-and-coronavirus-are-the-phone-networks-trying-to-kill-us/",
+                "text": "Brits are literally setting fire to 5G towers in Birmingham, Belfast and Liverpool because they believe 5G is linked to the spread of COVID-19.",
                 "weight": 0.5,
                 "stance": "NEUTRAL",
                 "confidence": 0.5,
@@ -425,23 +502,25 @@
                 "quality_score": 0.5
               },
               {
-                "source": "Coronavirus: 5G and microchip conspiracies around the world",
-                "url": "https://www.bbc.com/news/53191523",
-                "text": "Some of the most persistent conspiracy theories surrounding the coronavirus pandemic have continued to spread around the world.",
-                "weight": 0.85,
-                "stance": "NEUTRAL",
-                "confidence": 0.5,
-                "relevance_score": 0.5,
-                "quality_score": 0.3
+                "source": "logic_engine",
+                "url": "internal://logic_engine",
+                "text": "Structured reasoning signal",
+                "weight": 0.8,
+                "stance": "SUPPORT",
+                "confidence": 0.8,
+                "relevance_score": 1.0,
+                "quality_score": 1.0
               }
             ],
             "final_verdict": "TRUE",
-            "confidence": 1.0,
+            "confidence": 0.6,
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
-              "[1] Can 5G spread coronavirus? Here's what govt says - https://www.livemint.com/industry/telecom/can-5g-spread-coronavirus-here-s-what-govt-says-11623942107464.html",
-              "[2] 5G has no link to COVID-19 but false conspiracy theories persist - CNET - https://www.cnet.com/tech/mobile/5g-has-no-link-to-covid-19-as-false-conspiracy-theories-persist/",
-              "[3] Coronavirus: 5G and microchip conspiracies around the world - https://www.bbc.com/news/53191523"
+              "[1] What Is The 5G Coronavirus Conspiracy Theory ... - Bustle - https://www.bustle.com/p/what-is-the-5g-coronavirus-conspiracy-theory-scientists-have-weighed-in-22761613",
+              "[2] Clearing up the myths around 5G and the coronavirus - Ofcom - https://www.ofcom.org.uk/spectrum/electromagnetic-fields/clearing-up-myths-5g-and-coronavirus",
+              "[3] Coronavirus fake news debunked: 5G mobile networks do not - https://www.mirror.co.uk/tech/coronavirus-fake-news-debunked-5g-21884776",
+              "[4] 5G and coronavirus \u2014 are the phone networks trying to kill - https://crberryauthor.com/2020/04/09/5g-and-coronavirus-are-the-phone-networks-trying-to-kill-us/",
+              "[5] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -450,7 +529,7 @@
               "has_numeric_value": true,
               "is_opinion": false
             },
-            "explanation": "Claim: \"5g networks spread coronavirus\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Can 5G spread coronavirus? Here's what govt says support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"5g networks spread coronavirus\"\n\nVerdict: TRUE\nConfidence: 60.0%\n\nMultiple high-credibility sources including What Is The 5G Coronavirus Conspiracy Theory ... - Bustle, Clearing up the myths around 5G and the coronavirus - Ofcom, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -459,7 +538,7 @@
       "claim": "The Great Wall of China is visible from space",
       "predicted_verdict": "FALSE",
       "expected_verdict": "FALSE",
-      "time_seconds": 26.584,
+      "time_seconds": 31.019,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -481,42 +560,12 @@
             "language": "en",
             "evidence": [
               {
-                "source": "Artificial structures visible from space - Wikipedia",
-                "url": "https://en.wikipedia.org/wiki/Artificial_structures_visible_from_space",
-                "text": "[10]\n The claim that the Great Wall of China is the only man-made object visible from the Moon or outer space has been debunked many times, but remains a common misconception in popular culture.",
-                "weight": 0.9,
-                "stance": "REFUTE",
-                "confidence": 0.62,
-                "relevance_score": 1.0,
-                "quality_score": 0.9000000000000001
-              },
-              {
-                "source": "What makes the Great Wall of China the only man-made object visible from space? | Science Questions with Surprising Answers",
-                "url": "https://www.wtamu.edu/~cbaird/sq/2012/12/11/what-makes-the-great-wall-of-china-the-only-man-made-object-visible-from-space/",
-                "text": "Category: Space \u00a0\u00a0\u00a0\u00a0\u00a0Published: December 11, 2012 By: Christopher S. Baird, author of The Top 50 Science Questions with Surprising Answers and Associate Professor of Physics at West Texas A&M University The Great Wall of China is not visible to the naked eye from space, even in low-earth orbit, according to NASA.",
+                "source": "Can You Really See the Great Wall of China from Space? - Daily",
+                "url": "https://dailypostal.com/2024/08/30/can-you-really-see-the-great-wall-of-china-from-space/",
+                "text": "The notion that the Great Wall of China is visible from space likely dates back to the early 20th century, long before humans ever ventured into orbit.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.6,
-                "relevance_score": 1.0,
-                "quality_score": 0.9000000000000001
-              },
-              {
-                "source": "Is it Really Possible to See the Great Wall of China from Space with a Naked Eye? - PMC",
-                "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3972694/",
-                "text": "The problem arose a few months later when the American astronaut Eugene Cernan stated at a conference that according to the news from the European Space Agency (ESA) issued on the last 11th of May, in an orbit between 160 and 320 km, the Great Wall is visible to the naked eye.",
-                "weight": 0.5,
-                "stance": "SUPPORT",
-                "confidence": 0.6,
-                "relevance_score": 0.889,
-                "quality_score": 0.9000000000000001
-              },
-              {
-                "source": "How many of these 15 'facts' do you believe? Most people get the...",
-                "url": "https://www.hertfordshiremercury.co.uk/whats-on/whats-on-news/how-many-15-facts-you-8564911",
-                "text": "More than half also falsely believe the Great Wall of China is visible from space (55%) and we use only 10% of our brains (54%).",
-                "weight": 0.5,
-                "stance": "REFUTE",
-                "confidence": 0.62,
                 "relevance_score": 1.0,
                 "quality_score": 0.5
               },
@@ -529,17 +578,47 @@
                 "confidence": 0.5,
                 "relevance_score": 0.667,
                 "quality_score": 0.5
+              },
+              {
+                "source": "Can You See the Great Wall of China from Space? - Universe Today",
+                "url": "https://www.universetoday.com/articles/can-you-see-the-great-wall-of-china-from-space",
+                "text": "One popular myth about space exploration is that the Great Wall of China is the only human-built structure that can be seen from space.",
+                "weight": 0.5,
+                "stance": "REFUTE",
+                "confidence": 0.62,
+                "relevance_score": 0.889,
+                "quality_score": 0.3
+              },
+              {
+                "source": "Can you see the Great Wall of China from space?",
+                "url": "https://www.skyatnightmagazine.com/space-science/can-you-see-great-wall-china-from-space",
+                "text": "One space-based myth that we all have heard is the idea the Great Wall of China is the only human-made structure that can be seen from space.",
+                "weight": 0.5,
+                "stance": "REFUTE",
+                "confidence": 0.62,
+                "relevance_score": 0.778,
+                "quality_score": 0.3
+              },
+              {
+                "source": "The myth that the Great Wall of China is visible from space",
+                "url": "https://www.thevintagenews.com/2017/02/12/the-myth-that-the-great-wall-of-china-is-visible-from-space-originated-before-anyone-had-ever-been-into-space/",
+                "text": "He is known\u00a0for many great accomplishments, including the Great Wall of China that was built to consolidate his empire and to defend the northern borders from\u00a0barbarian nomads.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.6,
+                "relevance_score": 0.778,
+                "quality_score": 0.3
               }
             ],
             "final_verdict": "FALSE",
-            "confidence": 0.18256130790190736,
-            "conflict_analysis": "Strong Contradictory Evidence",
+            "confidence": 0.016393442622950834,
+            "conflict_analysis": "Conflicting Evidence Present",
             "citations": [
-              "[1] Artificial structures visible from space - Wikipedia - https://en.wikipedia.org/wiki/Artificial_structures_visible_from_space",
-              "[2] What makes the Great Wall of China the only man-made object visible from space? | Science Questions with Surprising Answers - https://www.wtamu.edu/~cbaird/sq/2012/12/11/what-makes-the-great-wall-of-china-the-only-man-made-object-visible-from-space/",
-              "[3] Is it Really Possible to See the Great Wall of China from Space with a Naked Eye? - PMC - https://pmc.ncbi.nlm.nih.gov/articles/PMC3972694/",
-              "[4] How many of these 15 'facts' do you believe? Most people get the... - https://www.hertfordshiremercury.co.uk/whats-on/whats-on-news/how-many-15-facts-you-8564911",
-              "[5] Great Wall - NASA - https://www.nasa.gov/image-article/great-wall/"
+              "[1] Can You Really See the Great Wall of China from Space? - Daily - https://dailypostal.com/2024/08/30/can-you-really-see-the-great-wall-of-china-from-space/",
+              "[2] Great Wall - NASA - https://www.nasa.gov/image-article/great-wall/",
+              "[3] Can You See the Great Wall of China from Space? - Universe Today - https://www.universetoday.com/articles/can-you-see-the-great-wall-of-china-from-space",
+              "[4] Can you see the Great Wall of China from space? - https://www.skyatnightmagazine.com/space-science/can-you-see-great-wall-china-from-space",
+              "[5] The myth that the Great Wall of China is visible from space - https://www.thevintagenews.com/2017/02/12/the-myth-that-the-great-wall-of-china-is-visible-from-space-originated-before-anyone-had-ever-been-into-space/"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -548,7 +627,7 @@
               "has_numeric_value": false,
               "is_opinion": true
             },
-            "explanation": "Claim: \"the great wall of china is visible from space\"\n\nVerdict: FALSE\nConfidence: 18.26%\n\nCredible sources including Artificial structures visible from space - Wikipedia, How many of these 15 'facts' do you believe? Most people get the... contradict the claim. The supporting evidence is weak or unreliable."
+            "explanation": "Claim: \"the great wall of china is visible from space\"\n\nVerdict: FALSE\nConfidence: 1.64%\n\nCredible sources including Can You See the Great Wall of China from Space? - Universe Today, Can you see the Great Wall of China from space? contradict the claim. The supporting evidence is weak or unreliable."
           }
         ]
       }
@@ -557,7 +636,7 @@
       "claim": "Australia is both a country and a continent",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 25.575,
+      "time_seconds": 30.786,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -578,16 +657,6 @@
             "claim": "australia is both a country and a continent",
             "language": "en",
             "evidence": [
-              {
-                "source": "Why Australia is known as country and a continent",
-                "url": "https://askfilo.com/user-question-answers-smart-solutions/why-australia-is-known-as-country-and-a-continent-3235353937353736",
-                "text": "Question asked by Filo student Views: 5,471 students Updated on: Feb 22, 2025 Add an Image Geography, Continents, Countries Australia is known as both a country and a continent due to its unique geographical and political characteristics.",
-                "weight": 0.5,
-                "stance": "SUPPORT",
-                "confidence": 0.6,
-                "relevance_score": 1.0,
-                "quality_score": 0.9000000000000001
-              },
               {
                 "source": "Why Is Australia Both a Country And a Continent?",
                 "url": "https://www.mentalfloss.com/posts/why-is-australia-country-and-continent",
@@ -619,13 +688,23 @@
                 "quality_score": 0.3
               },
               {
-                "source": "Why Is Australia Both a Country And a Continent?",
+                "source": "Why Is Australia Both a Country And a Continent? - Mental Floss",
                 "url": "https://www.mentalfloss.com/geography/why-is-australia-country-and-continent",
                 "text": "The fact that Australia is both a country and a continent is widely known.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.6,
                 "relevance_score": 1.0,
+                "quality_score": 0.3
+              },
+              {
+                "source": "Is Australia A Country Or A Continent? - WorldAtlas Is Australia A Continent And Country? | Unpacking Global ... Australia - Wikipedia Is Australia an Island? | Britannica Why is Australia both a country and a continent? Why is Australia a country and a continent? - CompleteEra",
+                "url": "https://www.worldatlas.com/articles/is-australia-a-country-or-a-continent.html",
+                "text": "Australia is both a continent and a country.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.6,
+                "relevance_score": 0.857,
                 "quality_score": 0.3
               },
               {
@@ -643,11 +722,11 @@
             "confidence": 1.0,
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
-              "[1] Why Australia is known as country and a continent - https://askfilo.com/user-question-answers-smart-solutions/why-australia-is-known-as-country-and-a-continent-3235353937353736",
-              "[2] Why Is Australia Both a Country And a Continent? - https://www.mentalfloss.com/posts/why-is-australia-country-and-continent",
-              "[3] Is Australia a Continent or a Country (or Both)? - Travel Tramp - https://www.travel-tramp.com/is-australia-a-continent-or-a-country/",
-              "[4] Is Columbia a continent or country? - Answers - https://www.answers.com/geography/Is_Columbia_a_continent_or_country",
-              "[5] Why Is Australia Both a Country And a Continent? - https://www.mentalfloss.com/geography/why-is-australia-country-and-continent",
+              "[1] Why Is Australia Both a Country And a Continent? - https://www.mentalfloss.com/posts/why-is-australia-country-and-continent",
+              "[2] Is Australia a Continent or a Country (or Both)? - Travel Tramp - https://www.travel-tramp.com/is-australia-a-continent-or-a-country/",
+              "[3] Is Columbia a continent or country? - Answers - https://www.answers.com/geography/Is_Columbia_a_continent_or_country",
+              "[4] Why Is Australia Both a Country And a Continent? - Mental Floss - https://www.mentalfloss.com/geography/why-is-australia-country-and-continent",
+              "[5] Is Australia A Country Or A Continent? - WorldAtlas Is Australia A Continent And Country? | Unpacking Global ... Australia - Wikipedia Is Australia an Island? | Britannica Why is Australia both a country and a continent? Why is Australia a country and a continent? - CompleteEra - https://www.worldatlas.com/articles/is-australia-a-country-or-a-continent.html",
               "[6] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
@@ -657,7 +736,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"australia is both a country and a continent\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Why Australia is known as country and a continent, Why Is Australia Both a Country And a Continent?, Is Australia a Continent or a Country (or Both)? - Travel Tramp, Is Columbia a continent or country? - Answers, Why Is Australia Both a Country And a Continent?, logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"australia is both a country and a continent\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Why Is Australia Both a Country And a Continent?, Is Australia a Continent or a Country (or Both)? - Travel Tramp, Is Columbia a continent or country? - Answers, Why Is Australia Both a Country And a Continent? - Mental Floss, Is Australia A Country Or A Continent? - WorldAtlas Is Australia A Continent And Country? | Unpacking Global ... Australia - Wikipedia Is Australia an Island? | Britannica Why is Australia both a country and a continent? Why is Australia a country and a continent? - CompleteEra, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -666,7 +745,7 @@
       "claim": "The Amazon River is the longest river in the world",
       "predicted_verdict": "TRUE",
       "expected_verdict": "FALSE",
-      "time_seconds": 24.155,
+      "time_seconds": 31.06,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -687,16 +766,6 @@
             "claim": "the amazon river is the longest river in the world",
             "language": "en",
             "evidence": [
-              {
-                "source": "Amazon vs Nile: The Debate Over the World's Longest River",
-                "url": "https://en.cultura10.com/longest-river-in-the-world/",
-                "text": "The world is home to a vast number of rivers, but when we talk about dimensions, the most common question is, What is the longest river in the world?For a long time, the debate has oscillated between two giants: the Amazon River and the Nile riverHowever, the debate is still open today, giving rise to important studies and explorations.",
-                "weight": 0.5,
-                "stance": "SUPPORT",
-                "confidence": 0.6,
-                "relevance_score": 1.0,
-                "quality_score": 0.7
-              },
               {
                 "source": "What is the Longest River in the World? - HISTORY",
                 "url": "https://www.history.com/articles/what-is-the-longest-river-in-the-world",
@@ -742,11 +811,10 @@
             "confidence": 1.0,
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
-              "[1] Amazon vs Nile: The Debate Over the World's Longest River - https://en.cultura10.com/longest-river-in-the-world/",
-              "[2] What is the Longest River in the World? - HISTORY - https://www.history.com/articles/what-is-the-longest-river-in-the-world",
-              "[3] Which is the Longest River in the World - https://usatodaynewsmagazine.com/longest-river-in-the-world/",
-              "[4] What is the longest river in the world? | Smart Water Magazine - https://smartwatermagazine.com/q-a/what-longest-river-world",
-              "[5] logic_engine - internal://logic_engine"
+              "[1] What is the Longest River in the World? - HISTORY - https://www.history.com/articles/what-is-the-longest-river-in-the-world",
+              "[2] Which is the Longest River in the World - https://usatodaynewsmagazine.com/longest-river-in-the-world/",
+              "[3] What is the longest river in the world? | Smart Water Magazine - https://smartwatermagazine.com/q-a/what-longest-river-world",
+              "[4] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -755,16 +823,16 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"the amazon river is the longest river in the world\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Amazon vs Nile: The Debate Over the World's Longest River, Which is the Longest River in the World, What is the longest river in the world? | Smart Water Magazine, logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"the amazon river is the longest river in the world\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Which is the Longest River in the World, What is the longest river in the world? | Smart Water Magazine, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
     },
     {
       "claim": "Africa is the largest continent on Earth",
-      "predicted_verdict": "FALSE",
+      "predicted_verdict": "TRUE",
       "expected_verdict": "FALSE",
-      "time_seconds": 19.616,
+      "time_seconds": 25.538,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -775,11 +843,11 @@
       "pipeline_output": {
         "source_url": null,
         "claims_analyzed": 1,
-        "true_claims": 0,
-        "false_claims": 1,
+        "true_claims": 1,
+        "false_claims": 0,
         "neutral_claims": 0,
-        "document_credibility_score": -1.0,
-        "document_verdict": "Highly Misleading",
+        "document_credibility_score": 1.0,
+        "document_verdict": "Highly Reliable",
         "results": [
           {
             "claim": "africa is the largest continent on earth",
@@ -796,19 +864,29 @@
                 "quality_score": 0.5
               },
               {
-                "source": "7 Continents of the World - Worldometer",
-                "url": "https://www.worldometers.info/geography/7-continents/",
-                "text": "In the 7 continent model in fact, it is not always clear where to place Russia.",
+                "source": "Africa - Mises Wiki, the global repository of classical-liberal",
+                "url": "https://wiki.mises.org/wiki/Africa",
+                "text": "Africa is the second largest continent on Earth.",
                 "weight": 0.5,
-                "stance": "REFUTE",
+                "stance": "SUPPORT",
                 "confidence": 0.99,
-                "relevance_score": 0.429,
-                "quality_score": 0.5
+                "relevance_score": 0.857,
+                "quality_score": 0.3
               },
               {
                 "source": "What is the largest country in Africa: 7 largest in size",
                 "url": "https://africalifestyle.com/culture/what-is-the-largest-country-in-africa/",
                 "text": "Algeria, located in North Africa, is the largest country on the continent and offers a rich tapestry of history, culture, and geography.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.99,
+                "relevance_score": 0.714,
+                "quality_score": 0.3
+              },
+              {
+                "source": "Is Africa A Country or a Continent? - WorldAtlas",
+                "url": "https://www.worldatlas.com/articles/is-africa-a-country.html",
+                "text": "Africa is the second largest continent in the world both by population and land size after Asia.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.99,
@@ -824,16 +902,28 @@
                 "confidence": 0.5,
                 "relevance_score": 0.571,
                 "quality_score": 0.3
+              },
+              {
+                "source": "logic_engine",
+                "url": "internal://logic_engine",
+                "text": "Structured reasoning signal",
+                "weight": 0.8,
+                "stance": "SUPPORT",
+                "confidence": 0.8,
+                "relevance_score": 1.0,
+                "quality_score": 1.0
               }
             ],
-            "final_verdict": "FALSE",
-            "confidence": 0.33333333333333337,
-            "conflict_analysis": "Strong Contradictory Evidence",
+            "final_verdict": "TRUE",
+            "confidence": 0.6221374045801527,
+            "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
               "[1] Africa Continent Facts, Wildlife, Geography & Culture | Africa - https://www.kidsgen.com/continents/africa.htm",
-              "[2] 7 Continents of the World - Worldometer - https://www.worldometers.info/geography/7-continents/",
+              "[2] Africa - Mises Wiki, the global repository of classical-liberal - https://wiki.mises.org/wiki/Africa",
               "[3] What is the largest country in Africa: 7 largest in size - https://africalifestyle.com/culture/what-is-the-largest-country-in-africa/",
-              "[4] Africa is the largest known continent - http://www.librarising.com/flat/flatearthafrica.html"
+              "[4] Is Africa A Country or a Continent? - WorldAtlas - https://www.worldatlas.com/articles/is-africa-a-country.html",
+              "[5] Africa is the largest known continent - http://www.librarising.com/flat/flatearthafrica.html",
+              "[6] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -842,7 +932,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"africa is the largest continent on earth\"\n\nVerdict: FALSE\nConfidence: 33.33%\n\nCredible sources including Africa Continent Facts, Wildlife, Geography & Culture | Africa, 7 Continents of the World - Worldometer contradict the claim. The supporting evidence is weak or unreliable."
+            "explanation": "Claim: \"africa is the largest continent on earth\"\n\nVerdict: TRUE\nConfidence: 62.21%\n\nMultiple high-credibility sources including Africa - Mises Wiki, the global repository of classical-liberal, What is the largest country in Africa: 7 largest in size, Is Africa A Country or a Continent? - WorldAtlas, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -851,7 +941,7 @@
       "claim": "Greenland is the largest island in the world",
       "predicted_verdict": "FALSE",
       "expected_verdict": "TRUE",
-      "time_seconds": 16.327,
+      "time_seconds": 22.67,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -873,26 +963,6 @@
             "language": "en",
             "evidence": [
               {
-                "source": "Facts about Greenland",
-                "url": "https://www.greenland-travel.com/inspiration/articles/facts-about-greenland/",
-                "text": "The Ice Sheet is covering the middle of the huge island and it is the world\u2019s largest glacier, it is several kilometers thick and, in some places, it is so heavy that it has pushed part of the mainland below sea level.",
-                "weight": 0.5,
-                "stance": "SUPPORT",
-                "confidence": 0.99,
-                "relevance_score": 0.714,
-                "quality_score": 0.7
-              },
-              {
-                "source": "Why Greenland is an Island and Australia is a Continent | UC Geography",
-                "url": "https://legacy.geog.ucsb.edu/why-greenland-is-an-island-and-australia-is-a-continent/",
-                "text": "Australia is an island in the South Pacific, roughly 7.75 million square kilometers (about 3 million square miles) and the sixth largest country in the world.",
-                "weight": 0.5,
-                "stance": "REFUTE",
-                "confidence": 0.99,
-                "relevance_score": 0.714,
-                "quality_score": 0.5
-              },
-              {
                 "source": "What Is the Largest Island In the World and How Did Greenland",
                 "url": "https://zippyfacts.com/what-is-the-largest-island-in-the-world-and-how-did-greenland-get-its-name/",
                 "text": "Karen Hill March 17, 2022 Greenland has 840,000 square miles (2,184,000 sq km), making it the largest island in the world.",
@@ -913,9 +983,29 @@
                 "quality_score": 0.5
               },
               {
-                "source": "Greenland is the largest island in the world transform to positive Degree.. - Filo",
-                "url": "https://askfilo.com/user-question-answers-smart-solutions/greenland-is-the-largest-island-in-the-world-transform-to-3133373731303038",
-                "text": "Identify that Greenland is the largest island in the world.",
+                "source": "What Is the Largest Island in the World?",
+                "url": "https://www.worldatlas.com/articles/what-is-the-largest-island-in-the-world.html",
+                "text": "With a total area of 2,166,086 square kilometers, Greenland is the world\u2019s largest island.",
+                "weight": 0.5,
+                "stance": "REFUTE",
+                "confidence": 0.99,
+                "relevance_score": 0.571,
+                "quality_score": 0.5
+              },
+              {
+                "source": "Greenland - The largest island in the world | Gigaplaces.com",
+                "url": "https://www.gigaplaces.com/en/country-greenland/",
+                "text": "Greenland is a\u00a0heavily glaciated and largest island in the world.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.99,
+                "relevance_score": 0.857,
+                "quality_score": 0.3
+              },
+              {
+                "source": "Greenland - Encyc",
+                "url": "https://encyc.org/wiki/Greenland",
+                "text": "Greenland is the largest island in the world.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.99,
@@ -927,11 +1017,11 @@
             "confidence": 0.20000000000000004,
             "conflict_analysis": "Strong Contradictory Evidence",
             "citations": [
-              "[1] Facts about Greenland - https://www.greenland-travel.com/inspiration/articles/facts-about-greenland/",
-              "[2] Why Greenland is an Island and Australia is a Continent | UC Geography - https://legacy.geog.ucsb.edu/why-greenland-is-an-island-and-australia-is-a-continent/",
-              "[3] What Is the Largest Island In the World and How Did Greenland - https://zippyfacts.com/what-is-the-largest-island-in-the-world-and-how-did-greenland-get-its-name/",
-              "[4] Greenland | The World's Largest Island - https://skjalden.com/greenland/",
-              "[5] Greenland is the largest island in the world transform to positive Degree.. - Filo - https://askfilo.com/user-question-answers-smart-solutions/greenland-is-the-largest-island-in-the-world-transform-to-3133373731303038"
+              "[1] What Is the Largest Island In the World and How Did Greenland - https://zippyfacts.com/what-is-the-largest-island-in-the-world-and-how-did-greenland-get-its-name/",
+              "[2] Greenland | The World's Largest Island - https://skjalden.com/greenland/",
+              "[3] What Is the Largest Island in the World? - https://www.worldatlas.com/articles/what-is-the-largest-island-in-the-world.html",
+              "[4] Greenland - The largest island in the world | Gigaplaces.com - https://www.gigaplaces.com/en/country-greenland/",
+              "[5] Greenland - Encyc - https://encyc.org/wiki/Greenland"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -940,16 +1030,16 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"greenland is the largest island in the world\"\n\nVerdict: FALSE\nConfidence: 20.0%\n\nCredible sources including Why Greenland is an Island and Australia is a Continent | UC Geography, What Is the Largest Island In the World and How Did Greenland, Greenland | The World's Largest Island contradict the claim. The supporting evidence is weak or unreliable."
+            "explanation": "Claim: \"greenland is the largest island in the world\"\n\nVerdict: FALSE\nConfidence: 20.0%\n\nCredible sources including What Is the Largest Island In the World and How Did Greenland, Greenland | The World's Largest Island, What Is the Largest Island in the World? contradict the claim. The supporting evidence is weak or unreliable."
           }
         ]
       }
     },
     {
       "claim": "Lake Baikal is the deepest lake on Earth",
-      "predicted_verdict": "TRUE",
+      "predicted_verdict": "NEUTRAL",
       "expected_verdict": "TRUE",
-      "time_seconds": 28.539,
+      "time_seconds": 22.7,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -960,11 +1050,11 @@
       "pipeline_output": {
         "source_url": null,
         "claims_analyzed": 1,
-        "true_claims": 1,
+        "true_claims": 0,
         "false_claims": 0,
-        "neutral_claims": 0,
-        "document_credibility_score": 1.0,
-        "document_verdict": "Highly Reliable",
+        "neutral_claims": 1,
+        "document_credibility_score": 0.0,
+        "document_verdict": "Mixed",
         "results": [
           {
             "claim": "lake baikal is the deepest lake on earth",
@@ -981,16 +1071,6 @@
                 "quality_score": 0.9000000000000001
               },
               {
-                "source": "The deepest lake on the Earth - Baikal",
-                "url": "https://www.magicbaikal.ru/en/",
-                "text": "There is no doubt that Baikal is the deepest lake on Earth, its closest rival being Lake Tanganyika, a whole 200 metres behind.",
-                "weight": 0.5,
-                "stance": "SUPPORT",
-                "confidence": 0.6,
-                "relevance_score": 0.857,
-                "quality_score": 0.5
-              },
-              {
                 "source": "Photographing Frozen Baikal: The Deepest and Oldest Lake On",
                 "url": "https://petapixel.com/2017/01/17/photographing-frozen-baikal-deepest-oldest-lake-earth/",
                 "text": "It\u2019s the deepest and the cleanest lake on Earth.",
@@ -1001,13 +1081,12 @@
                 "quality_score": 0.3
               }
             ],
-            "final_verdict": "TRUE",
-            "confidence": 1.0,
-            "conflict_analysis": "Strong Supporting Consensus",
+            "final_verdict": "NEUTRAL",
+            "confidence": 0,
+            "conflict_analysis": "Insufficient Evidence",
             "citations": [
               "[1] Lake Baikal \u2013 The Deepest Lake on Earth - https://www.lakebaikal.org/",
-              "[2] The deepest lake on the Earth - Baikal - https://www.magicbaikal.ru/en/",
-              "[3] Photographing Frozen Baikal: The Deepest and Oldest Lake On - https://petapixel.com/2017/01/17/photographing-frozen-baikal-deepest-oldest-lake-earth/"
+              "[2] Photographing Frozen Baikal: The Deepest and Oldest Lake On - https://petapixel.com/2017/01/17/photographing-frozen-baikal-deepest-oldest-lake-earth/"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -1016,7 +1095,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"lake baikal is the deepest lake on earth\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including The deepest lake on the Earth - Baikal support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"lake baikal is the deepest lake on earth\"\n\nVerdict: NEUTRAL\nConfidence: 0%\n\nThe available evidence is mixed or insufficient to confidently verify the claim."
           }
         ]
       }
@@ -1025,7 +1104,7 @@
       "claim": "Sound travels faster in water than in air",
       "predicted_verdict": "NEUTRAL",
       "expected_verdict": "TRUE",
-      "time_seconds": 17.22,
+      "time_seconds": 37.698,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1057,19 +1136,9 @@
                 "quality_score": 0.9000000000000001
               },
               {
-                "source": "How far does sound travel in the ocean?",
-                "url": "https://oceanservice.noaa.gov/facts/sound.html",
-                "text": "While sound moves at a much faster speed in the water than in air, the distance that sound waves travel is primarily dependent upon ocean temperature and pressure.",
-                "weight": 0.5,
-                "stance": "NEUTRAL",
-                "confidence": 0.5,
-                "relevance_score": 0.714,
-                "quality_score": 0.3
-              },
-              {
-                "source": "When a sound wave passes from air into water, what happens to its speed ...",
-                "url": "https://www.physicsgurus.com/66553/when-sound-passes-water-happens-speed-frequency-wavelength",
-                "text": "Water is denser and more elastic than air, which means sound waves can travel faster in water than in air.",
+                "source": "Do Sound Waves Travel Faster in Air or Water? - ScienceInsights",
+                "url": "https://scienceinsights.org/do-sound-waves-travel-faster-in-air-or-water/",
+                "text": "Sound waves travel significantly faster in water than they do in air.",
                 "weight": 0.5,
                 "stance": "NEUTRAL",
                 "confidence": 0.5,
@@ -1095,6 +1164,16 @@
                 "confidence": 0.5,
                 "relevance_score": 0.714,
                 "quality_score": 0.3
+              },
+              {
+                "source": "How fast does sound travel through water? - BBC Science Focus ...",
+                "url": "https://www.sciencefocus.com/science/how-fast-does-sound-travel-through-water",
+                "text": "Sounds travel faster through water than in air, but it takes more energy to get it going.",
+                "weight": 0.5,
+                "stance": "NEUTRAL",
+                "confidence": 0.5,
+                "relevance_score": 0.571,
+                "quality_score": 0.3
               }
             ],
             "final_verdict": "NEUTRAL",
@@ -1102,10 +1181,10 @@
             "conflict_analysis": "Insufficient Evidence",
             "citations": [
               "[1] Speed of sound - Wikipedia - https://en.wikipedia.org/wiki/Speed_of_sound",
-              "[2] How far does sound travel in the ocean? - https://oceanservice.noaa.gov/facts/sound.html",
-              "[3] When a sound wave passes from air into water, what happens to its speed ... - https://www.physicsgurus.com/66553/when-sound-passes-water-happens-speed-frequency-wavelength",
-              "[4] Sound travels at the fastest speed in: A. Water. B. Air. C. - https://riddlesans.com/sound-travels-at-the-fastest-speed-in-a-water-b-air-c-steel-d-vacuum-2809/",
-              "[5] The speed of sound in water is about four times faster than in - https://www.impressivefacts.com/fact/speed-of-sound-in-water-vs-air/"
+              "[2] Do Sound Waves Travel Faster in Air or Water? - ScienceInsights - https://scienceinsights.org/do-sound-waves-travel-faster-in-air-or-water/",
+              "[3] Sound travels at the fastest speed in: A. Water. B. Air. C. - https://riddlesans.com/sound-travels-at-the-fastest-speed-in-a-water-b-air-c-steel-d-vacuum-2809/",
+              "[4] The speed of sound in water is about four times faster than in - https://www.impressivefacts.com/fact/speed-of-sound-in-water-vs-air/",
+              "[5] How fast does sound travel through water? - BBC Science Focus ... - https://www.sciencefocus.com/science/how-fast-does-sound-travel-through-water"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -1121,9 +1200,9 @@
     },
     {
       "claim": "Humans share about 50 percent of their DNA with bananas",
-      "predicted_verdict": "FALSE",
+      "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 27.732,
+      "time_seconds": 37.719,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1134,32 +1213,54 @@
       "pipeline_output": {
         "source_url": null,
         "claims_analyzed": 1,
-        "true_claims": 0,
-        "false_claims": 1,
+        "true_claims": 1,
+        "false_claims": 0,
         "neutral_claims": 0,
-        "document_credibility_score": -1.0,
-        "document_verdict": "Highly Misleading",
+        "document_credibility_score": 1.0,
+        "document_verdict": "Highly Reliable",
         "results": [
           {
             "claim": "humans share about 50 percent of their dna with bananas",
             "language": "en",
             "evidence": [
               {
-                "source": "How Much DNA Do We Share with Bananas? - KnowYourDNA",
-                "url": "https://knowyourdna.com/humans-same-dna-as-bananas/",
-                "text": "In This Article In This Article  \u201cDid you know you\u2019re 60 percent banana?\u201d The line is memorable but muddled. What scientists actually find is that humans and bananas keep part of the same genetic toolkit handed down from a single-celled ancestor billions of years ago. Here\u2019s what that means\u2014and why ",
+                "source": "Do Humans Share 50% of Their DNA With Bananas?",
+                "url": "https://biologyinsights.com/do-humans-share-50-of-their-dna-with-bananas/",
+                "text": "The widely circulated claim that humans share 50% of their DNA with bananas often sparks curiosity about our genetic connections to other life forms.",
                 "weight": 0.5,
-                "stance": "REFUTE",
+                "stance": "SUPPORT",
                 "confidence": 0.99,
-                "relevance_score": 0.2,
-                "quality_score": 0.2
+                "relevance_score": 0.8,
+                "quality_score": 0.5
+              },
+              {
+                "source": "Do Humans Share 50% of Their DNA With Bananas?",
+                "url": "https://scienceinsights.org/do-humans-share-50-of-their-dna-with-bananas/",
+                "text": "The idea that humans and bananas share 50% of their DNA is a simplified representation of a complex genetic reality.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.99,
+                "relevance_score": 0.6,
+                "quality_score": 0.5
+              },
+              {
+                "source": "logic_engine",
+                "url": "internal://logic_engine",
+                "text": "Structured reasoning signal",
+                "weight": 0.8,
+                "stance": "SUPPORT",
+                "confidence": 0.8,
+                "relevance_score": 1.0,
+                "quality_score": 1.0
               }
             ],
-            "final_verdict": "FALSE",
+            "final_verdict": "TRUE",
             "confidence": 1.0,
-            "conflict_analysis": "Strong Contradictory Evidence",
+            "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
-              "[1] How Much DNA Do We Share with Bananas? - KnowYourDNA - https://knowyourdna.com/humans-same-dna-as-bananas/"
+              "[1] Do Humans Share 50% of Their DNA With Bananas? - https://biologyinsights.com/do-humans-share-50-of-their-dna-with-bananas/",
+              "[2] Do Humans Share 50% of Their DNA With Bananas? - https://scienceinsights.org/do-humans-share-50-of-their-dna-with-bananas/",
+              "[3] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -1168,7 +1269,7 @@
               "has_numeric_value": true,
               "is_opinion": false
             },
-            "explanation": "Claim: \"humans share about 50 percent of their dna with bananas\"\n\nVerdict: FALSE\nConfidence: 100.0%\n\nCredible sources including How Much DNA Do We Share with Bananas? - KnowYourDNA contradict the claim. The supporting evidence is weak or unreliable."
+            "explanation": "Claim: \"humans share about 50 percent of their dna with bananas\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Do Humans Share 50% of Their DNA With Bananas?, Do Humans Share 50% of Their DNA With Bananas?, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -1177,7 +1278,7 @@
       "claim": "Lightning is hotter than the surface of the Sun",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 12.582,
+      "time_seconds": 38.662,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1286,7 +1387,7 @@
       "claim": "Water expands when it freezes",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 17.008,
+      "time_seconds": 20.222,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1318,7 +1419,7 @@
                 "quality_score": 0.9000000000000001
               },
               {
-                "source": "Why Does Water Expand When It Freezes? \u00bb ScienceABC Why Does Water Expand When It Freezes - Science Facts Lesson 4- Water expands when it freezes. Ice floats Thermal Expansion and Density | EARTH 111: Water: Science and ... The Science Behind Why Water Expands When It Freezes Why Does Water Expand When It Freezes ? \u00bb ScienceABC Thermal Expansion and Density | EARTH 111: Water : Science and Society Thermal Expansion and Density | EARTH 111: Water : Science and Society Why Does Water Expand When It Freezes - Science Facts The Expansion of Water Upon Freezing - HyperPhysics How much does water expand when it's frozen? - PhysLink.com",
+                "source": "Why Does Water Expand When It Freezes? \u00bb ScienceABC Why Does Water Expand When It Freezes - Science Facts Lesson 4- Water expands when it freezes. Ice floats Thermal Expansion and Density | EARTH 111: Water: Science and ... The Science Behind Why Water Expands When It Freezes The Expansion of Water Upon Freezing - HyperPhysics How much does water expand when it's frozen? - PhysLink.com",
                 "url": "https://www.scienceabc.com/pure-sciences/why-does-water-expand-when-it-freezes.html",
                 "text": "This statement is accurate, and you can test its legitimacy with a simple experiment: if you lower the temperature of water, you will notice that the volume of the water decreases as it becomes more and more \u201cintact.\u201d You can refer to the following chart to see how much does water expand when it freezes: Now, let\u2019s talk about why the volume of water increases or why it expands when it freezes and reaches a solid form.",
                 "weight": 0.5,
@@ -1373,7 +1474,7 @@
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
               "[1] Why Does Water Expand When It Freezes - Science Facts - https://www.sciencefacts.net/why-does-water-expand-when-it-freezes.html",
-              "[2] Why Does Water Expand When It Freezes? \u00bb ScienceABC Why Does Water Expand When It Freezes - Science Facts Lesson 4- Water expands when it freezes. Ice floats Thermal Expansion and Density | EARTH 111: Water: Science and ... The Science Behind Why Water Expands When It Freezes Why Does Water Expand When It Freezes ? \u00bb ScienceABC Thermal Expansion and Density | EARTH 111: Water : Science and Society Thermal Expansion and Density | EARTH 111: Water : Science and Society Why Does Water Expand When It Freezes - Science Facts The Expansion of Water Upon Freezing - HyperPhysics How much does water expand when it's frozen? - PhysLink.com - https://www.scienceabc.com/pure-sciences/why-does-water-expand-when-it-freezes.html",
+              "[2] Why Does Water Expand When It Freezes? \u00bb ScienceABC Why Does Water Expand When It Freezes - Science Facts Lesson 4- Water expands when it freezes. Ice floats Thermal Expansion and Density | EARTH 111: Water: Science and ... The Science Behind Why Water Expands When It Freezes The Expansion of Water Upon Freezing - HyperPhysics How much does water expand when it's frozen? - PhysLink.com - https://www.scienceabc.com/pure-sciences/why-does-water-expand-when-it-freezes.html",
               "[3] water expands when it freezes | concordriverlady.com - https://concordriverlady.com/tag/water-expands-when-it-freezes/",
               "[4] Why does Water Expand when it Freezes? | H2O Global News - https://h2oglobalnews.com/why-does-water-expand-when-it-freezes/",
               "[5] iapws.org/faq1/freeze.html - https://www.iapws.org/faq1/freeze.html",
@@ -1386,7 +1487,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"water expands when it freezes\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Why Does Water Expand When It Freezes - Science Facts, Why Does Water Expand When It Freezes? \u00bb ScienceABC Why Does Water Expand When It Freezes - Science Facts Lesson 4- Water expands when it freezes. Ice floats Thermal Expansion and Density | EARTH 111: Water: Science and ... The Science Behind Why Water Expands When It Freezes Why Does Water Expand When It Freezes ? \u00bb ScienceABC Thermal Expansion and Density | EARTH 111: Water : Science and Society Thermal Expansion and Density | EARTH 111: Water : Science and Society Why Does Water Expand When It Freezes - Science Facts The Expansion of Water Upon Freezing - HyperPhysics How much does water expand when it's frozen? - PhysLink.com, water expands when it freezes | concordriverlady.com, Why does Water Expand when it Freezes? | H2O Global News, iapws.org/faq1/freeze.html, logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"water expands when it freezes\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Why Does Water Expand When It Freezes - Science Facts, Why Does Water Expand When It Freezes? \u00bb ScienceABC Why Does Water Expand When It Freezes - Science Facts Lesson 4- Water expands when it freezes. Ice floats Thermal Expansion and Density | EARTH 111: Water: Science and ... The Science Behind Why Water Expands When It Freezes The Expansion of Water Upon Freezing - HyperPhysics How much does water expand when it's frozen? - PhysLink.com, water expands when it freezes | concordriverlady.com, Why does Water Expand when it Freezes? | H2O Global News, iapws.org/faq1/freeze.html, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -1395,7 +1496,7 @@
       "claim": "Venus rotates in the opposite direction to most planets",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 22.356,
+      "time_seconds": 37.845,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1416,6 +1517,16 @@
             "claim": "venus rotates in the opposite direction to most planets",
             "language": "en",
             "evidence": [
+              {
+                "source": "5 Interesting Facts About Venus | Fun Facts For Kids | Color",
+                "url": "https://www.interestingfacts.org/fact/5-interesting-facts-about-venus",
+                "text": "TBH, that fact is very surprising to most.The\ndirection of Venus\u2019 rotation is the opposite to other planetsWhile most planets rotate in the direction of the sun, Venus rotates in\nthe opposite direction, known as retrograde rotation.Venus\nis the hottest planet in our solar systemVenus is so hot that its average surface temperature is as high as 471-degree\nCelsius or 863-degree Fahrenheit.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.6,
+                "relevance_score": 1.0,
+                "quality_score": 0.9000000000000001
+              },
               {
                 "source": "Why Venus spins backwards - BBC Sky at Night Magazine",
                 "url": "https://www.skyatnightmagazine.com/space-science/venus-spins-backwards",
@@ -1455,16 +1566,28 @@
                 "confidence": 0.5,
                 "relevance_score": 0.556,
                 "quality_score": 0.3
+              },
+              {
+                "source": "logic_engine",
+                "url": "internal://logic_engine",
+                "text": "Structured reasoning signal",
+                "weight": 0.8,
+                "stance": "SUPPORT",
+                "confidence": 0.8,
+                "relevance_score": 1.0,
+                "quality_score": 1.0
               }
             ],
             "final_verdict": "TRUE",
             "confidence": 1.0,
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
-              "[1] Why Venus spins backwards - BBC Sky at Night Magazine - https://www.skyatnightmagazine.com/space-science/venus-spins-backwards",
-              "[2] Why Are Venus And Uranus Spinning in The Wrong Direction? - https://www.sciencealert.com/why-are-venus-and-uranus-spinning-in-the-wrong-direction",
-              "[3] Which Planet Rotates the Opposite Direction It Revolves? - https://biologyinsights.com/which-planet-rotates-the-opposite-direction-it-revolves/",
-              "[4] All About Venus | NASA Space Place \u2013 NASA Science for Kids - https://spaceplace.nasa.gov/all-about-venus/en/"
+              "[1] 5 Interesting Facts About Venus | Fun Facts For Kids | Color - https://www.interestingfacts.org/fact/5-interesting-facts-about-venus",
+              "[2] Why Venus spins backwards - BBC Sky at Night Magazine - https://www.skyatnightmagazine.com/space-science/venus-spins-backwards",
+              "[3] Why Are Venus And Uranus Spinning in The Wrong Direction? - https://www.sciencealert.com/why-are-venus-and-uranus-spinning-in-the-wrong-direction",
+              "[4] Which Planet Rotates the Opposite Direction It Revolves? - https://biologyinsights.com/which-planet-rotates-the-opposite-direction-it-revolves/",
+              "[5] All About Venus | NASA Space Place \u2013 NASA Science for Kids - https://spaceplace.nasa.gov/all-about-venus/en/",
+              "[6] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -1473,16 +1596,16 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"venus rotates in the opposite direction to most planets\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Why Venus spins backwards - BBC Sky at Night Magazine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"venus rotates in the opposite direction to most planets\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including 5 Interesting Facts About Venus | Fun Facts For Kids | Color, Why Venus spins backwards - BBC Sky at Night Magazine, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
     },
     {
       "claim": "Jupiter is the largest planet in the solar system",
-      "predicted_verdict": "TRUE",
+      "predicted_verdict": "FALSE",
       "expected_verdict": "TRUE",
-      "time_seconds": 21.146,
+      "time_seconds": 19.35,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1493,16 +1616,36 @@
       "pipeline_output": {
         "source_url": null,
         "claims_analyzed": 1,
-        "true_claims": 1,
-        "false_claims": 0,
+        "true_claims": 0,
+        "false_claims": 1,
         "neutral_claims": 0,
-        "document_credibility_score": 1.0,
-        "document_verdict": "Highly Reliable",
+        "document_credibility_score": -1.0,
+        "document_verdict": "Highly Misleading",
         "results": [
           {
             "claim": "jupiter is the largest planet in the solar system",
             "language": "en",
             "evidence": [
+              {
+                "source": "Jupiter: The Massive Planet - timeanddate.com",
+                "url": "https://www.timeanddate.com/astronomy/planets/jupiter/",
+                "text": "Wong (University of California, Berkeley), and the OPAL team Your March 2026 Moon guide Sky guide for March The fifth planet from the Sun, Jupiter is the largest planet in the solar system.",
+                "weight": 0.5,
+                "stance": "REFUTE",
+                "confidence": 0.99,
+                "relevance_score": 0.875,
+                "quality_score": 0.9000000000000001
+              },
+              {
+                "source": "Jupiter: Size, distance from the Sun, orbit | Astronomy.com",
+                "url": "https://www.astronomy.com/science/jupiter/",
+                "text": "So on your twelfth birthday, Jupiter is in roughly the same place of the solar system as it was on the day you were born.Rotation: Although Jupiter takes a long time to go around the Sun, it takes only 10 hours to spin on its axis one time.",
+                "weight": 0.5,
+                "stance": "REFUTE",
+                "confidence": 0.99,
+                "relevance_score": 0.75,
+                "quality_score": 0.9000000000000001
+              },
               {
                 "source": "Jupiter Largest Planet in the Solar System | Actforlibraries.org",
                 "url": "http://www.actforlibraries.org/jupiter-largest-planet-in-the-solar-system-5/",
@@ -1532,37 +1675,17 @@
                 "confidence": 0.99,
                 "relevance_score": 0.875,
                 "quality_score": 0.3
-              },
-              {
-                "source": "Jupiter - NASA Science",
-                "url": "https://science.nasa.gov/jupiter/",
-                "text": "Jupiter is the fifth planet from the Sun, and the largest in the solar system, by far \u2014 more than twice as massive as the other planets combined.",
-                "weight": 1.0,
-                "stance": "SUPPORT",
-                "confidence": 0.99,
-                "relevance_score": 0.875,
-                "quality_score": 0.3
-              },
-              {
-                "source": "Jupiter, the Largest Planet in the Solar System Wallpaper |",
-                "url": "https://www.space.com/30848-jupiter-largest-planet-in-the-solar-system.html",
-                "text": "A new snapshot of Jupiter, the largest planet in our Solar System, reveals details of the great planet.",
-                "weight": 0.5,
-                "stance": "SUPPORT",
-                "confidence": 0.99,
-                "relevance_score": 0.625,
-                "quality_score": 0.3
               }
             ],
-            "final_verdict": "TRUE",
-            "confidence": 0.6666666666666666,
-            "conflict_analysis": "Strong Supporting Consensus",
+            "final_verdict": "FALSE",
+            "confidence": 0.20000000000000004,
+            "conflict_analysis": "Strong Contradictory Evidence",
             "citations": [
-              "[1] Jupiter Largest Planet in the Solar System | Actforlibraries.org - http://www.actforlibraries.org/jupiter-largest-planet-in-the-solar-system-5/",
-              "[2] What Is The Largest Planet In The Solar System? - https://www.worldatlas.com/space/what-is-the-largest-planet-in-the-solar-system.html",
-              "[3] Facts about the Largest Planet in the Solar System Jupiter | - http://www.actforlibraries.org/facts-about-the-largest-planet-in-the-solar-system-jupiter/",
-              "[4] Jupiter - NASA Science - https://science.nasa.gov/jupiter/",
-              "[5] Jupiter, the Largest Planet in the Solar System Wallpaper | - https://www.space.com/30848-jupiter-largest-planet-in-the-solar-system.html"
+              "[1] Jupiter: The Massive Planet - timeanddate.com - https://www.timeanddate.com/astronomy/planets/jupiter/",
+              "[2] Jupiter: Size, distance from the Sun, orbit | Astronomy.com - https://www.astronomy.com/science/jupiter/",
+              "[3] Jupiter Largest Planet in the Solar System | Actforlibraries.org - http://www.actforlibraries.org/jupiter-largest-planet-in-the-solar-system-5/",
+              "[4] What Is The Largest Planet In The Solar System? - https://www.worldatlas.com/space/what-is-the-largest-planet-in-the-solar-system.html",
+              "[5] Facts about the Largest Planet in the Solar System Jupiter | - http://www.actforlibraries.org/facts-about-the-largest-planet-in-the-solar-system-jupiter/"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -1571,7 +1694,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"jupiter is the largest planet in the solar system\"\n\nVerdict: TRUE\nConfidence: 66.67%\n\nMultiple high-credibility sources including What Is The Largest Planet In The Solar System?, Facts about the Largest Planet in the Solar System Jupiter |, Jupiter - NASA Science, Jupiter, the Largest Planet in the Solar System Wallpaper | support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"jupiter is the largest planet in the solar system\"\n\nVerdict: FALSE\nConfidence: 20.0%\n\nCredible sources including Jupiter: The Massive Planet - timeanddate.com, Jupiter: Size, distance from the Sun, orbit | Astronomy.com, Jupiter Largest Planet in the Solar System | Actforlibraries.org contradict the claim. The supporting evidence is weak or unreliable."
           }
         ]
       }
@@ -1580,7 +1703,7 @@
       "claim": "Mars has two moons",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 10.268,
+      "time_seconds": 20.846,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1602,40 +1725,40 @@
             "language": "en",
             "evidence": [
               {
-                "source": "Mars has two moons. Name them. - Discussion Forum - Tiwari Academy",
-                "url": "https://discussion.tiwariacademy.com/question/mars-has-two-moons-name-them/",
-                "text": "Username or email*\n\n\n \nPassword*\n\n\n \n\n\n Mars has two moons named Phobos and Deimos.",
+                "source": "Mars may have captured and split a comet to create its two",
+                "url": "https://www.newscientist.com/article/2424218-mars-may-have-captured-and-split-a-comet-to-create-its-two-moons/",
+                "text": "Advertisement How the Red Planet acquired its two moons, Phobos and Deimos, is unknown \u2013 they could have formed after something collided with the planet, or started out as asteroids \u2013 but now there is a hint of a cometary origin By Jonathan O\u2019Callaghan \n                                    28 March 2024\n                                    \n Mars has two irregularly shaped moons, an inner moon named Phobos and an outer moon named DeimosNASA/JPL-Caltech/GSFC/Univ.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.6,
-                "relevance_score": 1.0,
-                "quality_score": 0.3
+                "relevance_score": 0.75,
+                "quality_score": 0.9000000000000001
+              },
+              {
+                "source": "Is mars the only planet with two moons? - Answers",
+                "url": "https://www.answers.com/astronomy/Is_mars_the_only_planet_with_two_moons",
+                "text": "0 Anonymous Well mars is the the only planet with TWO moons (Phobos and Deimos)other plants have a lot more moons.",
+                "weight": 0.2,
+                "stance": "SUPPORT",
+                "confidence": 0.6,
+                "relevance_score": 0.75,
+                "quality_score": 0.5
+              },
+              {
+                "source": "Why Does Mars Have Two Moons? - Biology Insights",
+                "url": "https://biologyinsights.com/why-does-mars-have-two-moons/",
+                "text": "Mars\u2019 two moons are small; Phobos measures about 22 kilometers across, and Deimos spans only about 13 kilometers.",
+                "weight": 0.5,
+                "stance": "NEUTRAL",
+                "confidence": 0.5,
+                "relevance_score": 0.5,
+                "quality_score": 0.5
               },
               {
                 "source": "Mars Moons - NASA Science",
                 "url": "https://science.nasa.gov/mars/moons/",
                 "text": "Mars has two moons, Phobos and Deimos.",
                 "weight": 1.0,
-                "stance": "SUPPORT",
-                "confidence": 0.6,
-                "relevance_score": 0.75,
-                "quality_score": 0.3
-              },
-              {
-                "source": "Mars: Facts - NASA Science",
-                "url": "https://science.nasa.gov/mars/facts/",
-                "text": "Mars has two small moons, Phobos and Deimos, that may be captured asteroids.",
-                "weight": 1.0,
-                "stance": "SUPPORT",
-                "confidence": 0.6,
-                "relevance_score": 0.75,
-                "quality_score": 0.3
-              },
-              {
-                "source": "The Moons Of Mars - WorldAtlas",
-                "url": "https://www.worldatlas.com/space/the-moons-of-mars.html",
-                "text": "Since the two Martian moons are so small, Mars never experiences a total solar eclipse.",
-                "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.6,
                 "relevance_score": 0.75,
@@ -1656,10 +1779,10 @@
             "confidence": 1.0,
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
-              "[1] Mars has two moons. Name them. - Discussion Forum - Tiwari Academy - https://discussion.tiwariacademy.com/question/mars-has-two-moons-name-them/",
-              "[2] Mars Moons - NASA Science - https://science.nasa.gov/mars/moons/",
-              "[3] Mars: Facts - NASA Science - https://science.nasa.gov/mars/facts/",
-              "[4] The Moons Of Mars - WorldAtlas - https://www.worldatlas.com/space/the-moons-of-mars.html",
+              "[1] Mars may have captured and split a comet to create its two - https://www.newscientist.com/article/2424218-mars-may-have-captured-and-split-a-comet-to-create-its-two-moons/",
+              "[2] Is mars the only planet with two moons? - Answers - https://www.answers.com/astronomy/Is_mars_the_only_planet_with_two_moons",
+              "[3] Why Does Mars Have Two Moons? - Biology Insights - https://biologyinsights.com/why-does-mars-have-two-moons/",
+              "[4] Mars Moons - NASA Science - https://science.nasa.gov/mars/moons/",
               "[5] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
@@ -1669,7 +1792,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"mars has two moons\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Mars has two moons. Name them. - Discussion Forum - Tiwari Academy, Mars Moons - NASA Science, Mars: Facts - NASA Science, The Moons Of Mars - WorldAtlas, logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"mars has two moons\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Mars may have captured and split a comet to create its two, Is mars the only planet with two moons? - Answers, Mars Moons - NASA Science, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -1678,7 +1801,7 @@
       "claim": "Neptune is the farthest planet from the Sun",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 26.622,
+      "time_seconds": 21.412,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1710,16 +1833,6 @@
                 "quality_score": 0.9000000000000001
               },
               {
-                "source": "Neptune: The Farthest Planet - timeanddate.com",
-                "url": "https://www.timeanddate.com/astronomy/planets/neptune/",
-                "text": "\u00a9NASA Your March 2026 Moon guide Sky guide for March Neptune is the eighth planet from the Sun and the farthest known planet in the solar system.",
-                "weight": 0.5,
-                "stance": "SUPPORT",
-                "confidence": 0.6,
-                "relevance_score": 1.0,
-                "quality_score": 0.5
-              },
-              {
                 "source": "Planets/Neptune - Wikiversity",
                 "url": "https://en.wikiversity.org/wiki/Planets/Neptune",
                 "text": "Neptune is the eighth and farthest known planet from the Sun in the Solar System.",
@@ -1748,17 +1861,27 @@
                 "confidence": 0.6,
                 "relevance_score": 0.857,
                 "quality_score": 0.3
+              },
+              {
+                "source": "Neptune - Science@NASA",
+                "url": "https://science.nasa.gov/neptune/",
+                "text": "Neptune is the eighth, and most distant planet from the Sun.",
+                "weight": 1.0,
+                "stance": "NEUTRAL",
+                "confidence": 0.5,
+                "relevance_score": 0.714,
+                "quality_score": 0.3
               }
             ],
             "final_verdict": "TRUE",
-            "confidence": 0.5894039735099337,
+            "confidence": 0.48760330578512406,
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
               "[1] Neptune \u00bb Resources \u00bb Surfnetkids - https://www.surfnetkids.com/resources/neptune/",
-              "[2] Neptune: The Farthest Planet - timeanddate.com - https://www.timeanddate.com/astronomy/planets/neptune/",
-              "[3] Planets/Neptune - Wikiversity - https://en.wikiversity.org/wiki/Planets/Neptune",
-              "[4] Neptune: The Farthest & Windiest Planet in the Solar System - https://starwalk.space/en/news/planet-neptune-explore-the-farthest-planet-from-the-sun",
-              "[5] Neptune, the Farthest Planet from the Sun \u2013 Astronomy Tips - https://astronomytips.com/neptune"
+              "[2] Planets/Neptune - Wikiversity - https://en.wikiversity.org/wiki/Planets/Neptune",
+              "[3] Neptune: The Farthest & Windiest Planet in the Solar System - https://starwalk.space/en/news/planet-neptune-explore-the-farthest-planet-from-the-sun",
+              "[4] Neptune, the Farthest Planet from the Sun \u2013 Astronomy Tips - https://astronomytips.com/neptune",
+              "[5] Neptune - Science@NASA - https://science.nasa.gov/neptune/"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -1767,7 +1890,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"neptune is the farthest planet from the sun\"\n\nVerdict: TRUE\nConfidence: 58.94%\n\nMultiple high-credibility sources including Neptune \u00bb Resources \u00bb Surfnetkids, Neptune: The Farthest Planet - timeanddate.com, Planets/Neptune - Wikiversity, Neptune, the Farthest Planet from the Sun \u2013 Astronomy Tips support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"neptune is the farthest planet from the sun\"\n\nVerdict: TRUE\nConfidence: 48.76%\n\nMultiple high-credibility sources including Neptune \u00bb Resources \u00bb Surfnetkids, Planets/Neptune - Wikiversity, Neptune, the Farthest Planet from the Sun \u2013 Astronomy Tips support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -1776,7 +1899,7 @@
       "claim": "The Sun is a star",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 26.599,
+      "time_seconds": 18.611,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1838,14 +1961,14 @@
                 "quality_score": 0.7
               },
               {
-                "source": "Our Sun is a Star - Facts About the Sun | Exploratorium",
-                "url": "https://www.exploratorium.edu/eclipse/our-sun-is-a-star",
-                "text": "The easiest way to see them is online through a space telescope, like NASA\u2019s Solar Dynamics Observatory, which posts images of the Sun every day.",
+                "source": "\u2018The Sun Is Also a Star\u2019 Is Basically One Long",
+                "url": "https://observer.com/2019/05/the-sun-is-also-a-star-long-vapid-instagram-story-review/",
+                "text": "Adapted from the New York Times bestseller by Nicola Yoon,\u00a0The Sun Is Also a Star\u00a0is meant to tell the story of\u00a0a seemingly fated pair (\u201cfate\u201d like \u201cdestiny\u201d are words the movie throws around like beads on Mardi Gras) who meet during a hectic day of NYC commuting.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.6,
-                "relevance_score": 0.8,
-                "quality_score": 0.3
+                "relevance_score": 1.0,
+                "quality_score": 0.7
               },
               {
                 "source": "logic_engine",
@@ -1866,7 +1989,7 @@
               "[2] The Sun Is Also A Star | OmniLibros - https://omnilibros.com/2017/07/05/the-sun-is-also-a-star/",
               "[3] THE SUN IS ALSO A STAR | Penguin Random House - https://global.penguinrandomhouse.com/tag/the-sun-is-also-a-star/",
               "[4] the sun is also a star | Eat. Read. Blog - https://shanella.com/tag/the-sun-is-also-a-star/",
-              "[5] Our Sun is a Star - Facts About the Sun | Exploratorium - https://www.exploratorium.edu/eclipse/our-sun-is-a-star",
+              "[5] \u2018The Sun Is Also a Star\u2019 Is Basically One Long - https://observer.com/2019/05/the-sun-is-also-a-star-long-vapid-instagram-story-review/",
               "[6] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
@@ -1876,7 +1999,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"the sun is a star\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including The Sun is a Star by Hydra Coil (2014), The Sun Is Also A Star | OmniLibros, THE SUN IS ALSO A STAR | Penguin Random House, the sun is also a star | Eat. Read. Blog, Our Sun is a Star - Facts About the Sun | Exploratorium, logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"the sun is a star\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including The Sun is a Star by Hydra Coil (2014), The Sun Is Also A Star | OmniLibros, THE SUN IS ALSO A STAR | Penguin Random House, the sun is also a star | Eat. Read. Blog, \u2018The Sun Is Also a Star\u2019 Is Basically One Long, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -1885,7 +2008,7 @@
       "claim": "Saturn has rings",
       "predicted_verdict": "NEUTRAL",
       "expected_verdict": "TRUE",
-      "time_seconds": 16.688,
+      "time_seconds": 42.601,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1907,9 +2030,19 @@
             "language": "en",
             "evidence": [
               {
-                "source": "Saturn's rings - ESA",
-                "url": "https://www.esa.int/Science_Exploration/Space_Science/Cassini-Huygens/Saturn_s_rings",
-                "text": "The rings of Saturn have puzzled astronomers ever since they were first seen by Galileo in 1610, during the first telescopic observations of this planet.",
+                "source": "Saturn\u2019s rings are weird and wonderful: 10 facts here",
+                "url": "https://earthsky.org/space/saturns-rings-10-weird-facts/",
+                "text": "At times when small telescopes don\u2019t show the rings \u2013 when they\u2019re edgewise to us, as they were for a few weeks last March \u2013 Saturn appears as a golden ball, just another distant gas giant world.",
+                "weight": 0.5,
+                "stance": "NEUTRAL",
+                "confidence": 0.5,
+                "relevance_score": 0.667,
+                "quality_score": 0.7
+              },
+              {
+                "source": "400 years later, astronomers finally understand Saturn's rings Saturn - Rings, Moons, Gas Giant | Britannica Images Saturn \u2014 A guide to the sixth planet from the sun | Space Saturn\u2019s Rings: Origins, Dynamics, and Their Future",
+                "url": "https://bigthink.com/starts-with-a-bang/saturns-rings-explained/",
+                "text": "Although they rotate with similar periods (9.9 hours to 10.5 hours), Saturn has a much greater axial tilt than Jupiter: 26.73\u00b0 to 3.13\u00b0.",
                 "weight": 0.5,
                 "stance": "NEUTRAL",
                 "confidence": 0.5,
@@ -1917,19 +2050,9 @@
                 "quality_score": 0.5
               },
               {
-                "source": "Saturn: Facts - NASA Science",
+                "source": "Saturn Facts - NASA Science",
                 "url": "https://science.nasa.gov/saturn/facts/",
                 "text": "Saturn also has dozens of moons.",
-                "weight": 1.0,
-                "stance": "NEUTRAL",
-                "confidence": 0.5,
-                "relevance_score": 0.667,
-                "quality_score": 0.3
-              },
-              {
-                "source": "Cassini: Saturn Rings - NASA Science",
-                "url": "https://science.nasa.gov/mission/cassini/science/rings/",
-                "text": "Scientists had never before studied the size, temperature, composition and distribution of Saturn\u2019s rings from Saturn orbit.",
                 "weight": 1.0,
                 "stance": "NEUTRAL",
                 "confidence": 0.5,
@@ -1941,9 +2064,9 @@
             "confidence": 0,
             "conflict_analysis": "Insufficient Evidence",
             "citations": [
-              "[1] Saturn's rings - ESA - https://www.esa.int/Science_Exploration/Space_Science/Cassini-Huygens/Saturn_s_rings",
-              "[2] Saturn: Facts - NASA Science - https://science.nasa.gov/saturn/facts/",
-              "[3] Cassini: Saturn Rings - NASA Science - https://science.nasa.gov/mission/cassini/science/rings/"
+              "[1] Saturn\u2019s rings are weird and wonderful: 10 facts here - https://earthsky.org/space/saturns-rings-10-weird-facts/",
+              "[2] 400 years later, astronomers finally understand Saturn's rings Saturn - Rings, Moons, Gas Giant | Britannica Images Saturn \u2014 A guide to the sixth planet from the sun | Space Saturn\u2019s Rings: Origins, Dynamics, and Their Future - https://bigthink.com/starts-with-a-bang/saturns-rings-explained/",
+              "[3] Saturn Facts - NASA Science - https://science.nasa.gov/saturn/facts/"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -1961,7 +2084,7 @@
       "claim": "World War II ended in 1945",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 36.775,
+      "time_seconds": 44.306,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2003,22 +2126,22 @@
                 "quality_score": 0.9000000000000001
               },
               {
-                "source": "End of World War II in Asia - Wikipedia",
-                "url": "https://en.wikipedia.org/wiki/End_of_World_War_II_in_Asia",
-                "text": "Second Sino-Japanese War\n World War II officially ended in Asia on September 2, 1945, at 3:24 with the surrender of Japan on the USS\u00a0Missouri.",
-                "weight": 0.9,
+                "source": "World War II Informally Ended in 1945 \u00bb Celebrate and",
+                "url": "https://www.celebrateandlearn.com/?p=6594",
+                "text": "Kissing the War Goodbye World War II informally ended in 1945.",
+                "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.95,
                 "relevance_score": 0.833,
                 "quality_score": 0.5
               },
               {
-                "source": "World War II Dates and Timeline - Holocaust Encyclopedia",
-                "url": "https://encyclopedia.ushmm.org/content/en/article/world-war-ii-key-dates",
-                "text": "World War II officially ended in most parts of Europe on May 8 (V-E Day).",
+                "source": "World War II Ends (1945) | Gun Calendars",
+                "url": "https://guncalendars.com/world-war-ii-ends-1945-2/",
+                "text": "Sept 2nd, 1945\nWorld War II Ends\nCombat ends in the Pacific\nThe Japanese Instrument of Surrender is signed and accepted aboard the battleship USS Missouri in Tokyo Bay https://www.instagram.com/p/7ImyoRqhU6/?taken-by=gunwebsites",
                 "weight": 0.5,
-                "stance": "REFUTE",
-                "confidence": 0.99,
+                "stance": "SUPPORT",
+                "confidence": 0.95,
                 "relevance_score": 0.833,
                 "quality_score": 0.5
               },
@@ -2044,13 +2167,13 @@
               }
             ],
             "final_verdict": "TRUE",
-            "confidence": 0.48099606815203144,
+            "confidence": 0.7101024890190336,
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
               "[1] How Did World War II End? - HISTORY - https://www.history.com/articles/world-war-ii-end-events",
               "[2] When Did WW2 End? Germany, Japan, and 1945 - History - https://www.historyonthenet.com/when-did-ww2-end-germany-japan-and-1945",
-              "[3] End of World War II in Asia - Wikipedia - https://en.wikipedia.org/wiki/End_of_World_War_II_in_Asia",
-              "[4] World War II Dates and Timeline - Holocaust Encyclopedia - https://encyclopedia.ushmm.org/content/en/article/world-war-ii-key-dates",
+              "[3] World War II Informally Ended in 1945 \u00bb Celebrate and - https://www.celebrateandlearn.com/?p=6594",
+              "[4] World War II Ends (1945) | Gun Calendars - https://guncalendars.com/world-war-ii-ends-1945-2/",
               "[5] End of World War II in Europe - Wikipedia - https://en.wikipedia.org/wiki/End_of_World_War_II_in_Europe",
               "[6] logic_engine - internal://logic_engine"
             ],
@@ -2061,7 +2184,7 @@
               "has_numeric_value": true,
               "is_opinion": false
             },
-            "explanation": "Claim: \"world war ii ended in 1945\"\n\nVerdict: TRUE\nConfidence: 48.1%\n\nMultiple high-credibility sources including When Did WW2 End? Germany, Japan, and 1945 - History, End of World War II in Asia - Wikipedia, End of World War II in Europe - Wikipedia, logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"world war ii ended in 1945\"\n\nVerdict: TRUE\nConfidence: 71.01%\n\nMultiple high-credibility sources including When Did WW2 End? Germany, Japan, and 1945 - History, World War II Informally Ended in 1945 \u00bb Celebrate and, World War II Ends (1945) | Gun Calendars, End of World War II in Europe - Wikipedia, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -2070,7 +2193,7 @@
       "claim": "The Roman Empire fell in 476 AD",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 19.858,
+      "time_seconds": 24.398,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2112,9 +2235,9 @@
                 "quality_score": 0.9000000000000001
               },
               {
-                "source": "Fall of the Roman Empire | History & Causes - Lesson - Study.com",
-                "url": "https://study.com/academy/lesson/the-fall-of-rome.html",
-                "text": "Odoacer, Germanic Warlord Who Sacked Rome in 476 AD   The role that the spread of Christianity played in the fall of the Roman Empire is a controversial one.",
+                "source": "When did the Roman Empire actually fall? \u2013",
+                "url": "https://selfawarepatterns.com/2016/05/30/when-did-the-roman-empire-actually-fall/",
+                "text": "Growing up, I was taught that the Roman Empire fell in 476 AD.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.99,
@@ -2122,19 +2245,19 @@
                 "quality_score": 0.5
               },
               {
-                "source": "Western Roman Empire",
-                "url": "https://en.wikipedia.org/wiki/Western_Roman_Empire",
-                "text": "[121]\n The Roman Empire was not the only Christian nation affected by the Islamic conquests, as the Visigothic Kingdom finally fell to the Umayyad Caliphate in the 720s.",
-                "weight": 0.9,
-                "stance": "REFUTE",
+                "source": "Roman Empire (27 BC - 476 AD) - History of Rome",
+                "url": "https://www.rome.net/roman-empire",
+                "text": "The Western Roman Empire fell in 476.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
                 "confidence": 0.99,
                 "relevance_score": 0.714,
                 "quality_score": 0.5
               },
               {
-                "source": "Roman Empire (27 BC - 476 AD) - History of ...",
-                "url": "https://www.rome.net/roman-empire",
-                "text": "The Western Roman Empire fell in 476.",
+                "source": "The Fall of the Western Roman Empire: 476 AD and the End of ...",
+                "url": "https://historiaromana.veertualia.com/the-fall-of-the-western-roman-empire-476-ad-and-the-end-of-an-era/",
+                "text": "The deposition of Romulus Augustulus in 476 AD marks a convenient historical endpoint to Roman dominion in the West.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.99,
@@ -2153,14 +2276,14 @@
               }
             ],
             "final_verdict": "TRUE",
-            "confidence": 0.08779114410033273,
-            "conflict_analysis": "Conflicting Evidence Present",
+            "confidence": 0.49245229279407576,
+            "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
               "[1] The Fall of Rome: When, Why, and How Did Rome Fall? Fall of the Western Roman Empire - World History Encyclopedia The Fall of Rome: How, When, and Why Did It Happen? - ThoughtCo Images The Fall of the Western Roman Empire: 476 AD and the End of ... Fall of the Roman Empire: Year, Internal & External Causes - https://historycooperative.org/the-fall-of-rome-last-days-of-empire/",
               "[2] Battle of Ravenna (476) - Wikipedia The Fall of Rome: When, Why, and How Did Rome Fall? Fall of the Western Roman Empire - World History Encyclopedia The Fall of Rome: How, When, and Why Did It Happen? - ThoughtCo Images The Fall of the Western Roman Empire: 476 AD and the End of ... Fall of the Roman Empire: Year, Internal & External Causes - https://en.wikipedia.org/wiki/Battle_of_Ravenna_(476)",
-              "[3] Fall of the Roman Empire | History & Causes - Lesson - Study.com - https://study.com/academy/lesson/the-fall-of-rome.html",
-              "[4] Western Roman Empire - https://en.wikipedia.org/wiki/Western_Roman_Empire",
-              "[5] Roman Empire (27 BC - 476 AD) - History of ... - https://www.rome.net/roman-empire",
+              "[3] When did the Roman Empire actually fall? \u2013 - https://selfawarepatterns.com/2016/05/30/when-did-the-roman-empire-actually-fall/",
+              "[4] Roman Empire (27 BC - 476 AD) - History of Rome - https://www.rome.net/roman-empire",
+              "[5] The Fall of the Western Roman Empire: 476 AD and the End of ... - https://historiaromana.veertualia.com/the-fall-of-the-western-roman-empire-476-ad-and-the-end-of-an-era/",
               "[6] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
@@ -2170,7 +2293,7 @@
               "has_numeric_value": true,
               "is_opinion": false
             },
-            "explanation": "Claim: \"the roman empire fell in 476 ad\"\n\nVerdict: TRUE\nConfidence: 8.78%\n\nMultiple high-credibility sources including The Fall of Rome: When, Why, and How Did Rome Fall? Fall of the Western Roman Empire - World History Encyclopedia The Fall of Rome: How, When, and Why Did It Happen? - ThoughtCo Images The Fall of the Western Roman Empire: 476 AD and the End of ... Fall of the Roman Empire: Year, Internal & External Causes, Fall of the Roman Empire | History & Causes - Lesson - Study.com, Roman Empire (27 BC - 476 AD) - History of ..., logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"the roman empire fell in 476 ad\"\n\nVerdict: TRUE\nConfidence: 49.25%\n\nMultiple high-credibility sources including The Fall of Rome: When, Why, and How Did Rome Fall? Fall of the Western Roman Empire - World History Encyclopedia The Fall of Rome: How, When, and Why Did It Happen? - ThoughtCo Images The Fall of the Western Roman Empire: 476 AD and the End of ... Fall of the Roman Empire: Year, Internal & External Causes, When did the Roman Empire actually fall? \u2013, Roman Empire (27 BC - 476 AD) - History of Rome, The Fall of the Western Roman Empire: 476 AD and the End of ..., logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -2179,7 +2302,7 @@
       "claim": "The printing press was invented by Johannes Gutenberg",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 29.881,
+      "time_seconds": 27.647,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2277,7 +2400,7 @@
       "claim": "The Berlin Wall fell in 1989",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 23.438,
+      "time_seconds": 25.9,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2319,16 +2442,6 @@
                 "quality_score": 0.9000000000000001
               },
               {
-                "source": "Why Did The Berlin Wall Fall in 1989? - History Hit",
-                "url": "https://www.historyhit.com/why-did-the-berlin-wall-fall-in-1989/",
-                "text": "In the following decades, the Berlin Wall grew from a simple wall topped with barbed wire to become two walls separated by an almost impassable space that came to be known as the \u2018death strip\u2019.",
-                "weight": 0.5,
-                "stance": "NEUTRAL",
-                "confidence": 0.5,
-                "relevance_score": 0.667,
-                "quality_score": 0.7
-              },
-              {
                 "source": "OTD 1989: The Berlin Wall Fell \u2013 HotAir",
                 "url": "https://hotair.com/headlines/2025/11/09/otd-1989-the-berlin-wall-fell-n3808726",
                 "text": "Germany's infamous symbol of division,\u00a0the\u00a0Berlin Wall, split West Berlin \u2014 an isolated enclave of the\u00a0Federal Republic of Germany (FRG) \u2014 from East Berlin, in the\u00a0German Democratic Republic (GDR) for 28 years.",
@@ -2339,13 +2452,23 @@
                 "quality_score": 0.9000000000000001
               },
               {
-                "source": "The Fall of the Berlin Wall: History, Meaning, Causes, | History ...",
+                "source": "The Fall of the Berlin Wall: History, Meaning, Causes ... Fall of Berlin Wall: How 1989 reshaped the modern world - BBC The Fall of the Berlin Wall: A Defining Moment in World History Opening and fall of the Berlin Wall Fall of the Berlin Wall - deutschland.de",
                 "url": "https://historycooperative.org/accidental-freedom-fall-berlin-wall/",
                 "text": "The fall of the Berlin Wall in November 1989 was part of a larger revolutionary wave across Eastern Europe.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.95,
                 "relevance_score": 0.833,
+                "quality_score": 0.5
+              },
+              {
+                "source": "Photos From the Night the Berlin Wall Fell on Nov. 9, 1989 -",
+                "url": "https://www.businessinsider.com/photos-from-the-fall-of-the-berlin-wall-2015-11",
+                "text": "The Berlin Wall was built in 1961 to divide East and West Berlin.",
+                "weight": 0.5,
+                "stance": "REFUTE",
+                "confidence": 0.95,
+                "relevance_score": 0.667,
                 "quality_score": 0.5
               },
               {
@@ -2360,14 +2483,14 @@
               }
             ],
             "final_verdict": "TRUE",
-            "confidence": 0.6975252062328139,
+            "confidence": 0.4823906083244397,
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
               "[1] Fall of the Berlin Wall - Wikipedia - https://en.wikipedia.org/wiki/Fall_of_the_Berlin_Wall",
               "[2] Fall of Berlin Wall: How 1989 reshaped the modern world - BBC - https://www.bbc.com/news/world-europe-50013048",
-              "[3] Why Did The Berlin Wall Fall in 1989? - History Hit - https://www.historyhit.com/why-did-the-berlin-wall-fall-in-1989/",
-              "[4] OTD 1989: The Berlin Wall Fell \u2013 HotAir - https://hotair.com/headlines/2025/11/09/otd-1989-the-berlin-wall-fell-n3808726",
-              "[5] The Fall of the Berlin Wall: History, Meaning, Causes, | History ... - https://historycooperative.org/accidental-freedom-fall-berlin-wall/",
+              "[3] OTD 1989: The Berlin Wall Fell \u2013 HotAir - https://hotair.com/headlines/2025/11/09/otd-1989-the-berlin-wall-fell-n3808726",
+              "[4] The Fall of the Berlin Wall: History, Meaning, Causes ... Fall of Berlin Wall: How 1989 reshaped the modern world - BBC The Fall of the Berlin Wall: A Defining Moment in World History Opening and fall of the Berlin Wall Fall of the Berlin Wall - deutschland.de - https://historycooperative.org/accidental-freedom-fall-berlin-wall/",
+              "[5] Photos From the Night the Berlin Wall Fell on Nov. 9, 1989 - - https://www.businessinsider.com/photos-from-the-fall-of-the-berlin-wall-2015-11",
               "[6] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
@@ -2377,16 +2500,16 @@
               "has_numeric_value": true,
               "is_opinion": false
             },
-            "explanation": "Claim: \"the berlin wall fell in 1989\"\n\nVerdict: TRUE\nConfidence: 69.75%\n\nMultiple high-credibility sources including Fall of the Berlin Wall - Wikipedia, Fall of Berlin Wall: How 1989 reshaped the modern world - BBC, The Fall of the Berlin Wall: History, Meaning, Causes, | History ..., logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"the berlin wall fell in 1989\"\n\nVerdict: TRUE\nConfidence: 48.24%\n\nMultiple high-credibility sources including Fall of the Berlin Wall - Wikipedia, Fall of Berlin Wall: How 1989 reshaped the modern world - BBC, The Fall of the Berlin Wall: History, Meaning, Causes ... Fall of Berlin Wall: How 1989 reshaped the modern world - BBC The Fall of the Berlin Wall: A Defining Moment in World History Opening and fall of the Berlin Wall Fall of the Berlin Wall - deutschland.de, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
     },
     {
       "claim": "The United Nations was founded after World War II",
-      "predicted_verdict": "NEUTRAL",
+      "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 23.366,
+      "time_seconds": 41.492,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2397,48 +2520,48 @@
       "pipeline_output": {
         "source_url": null,
         "claims_analyzed": 1,
-        "true_claims": 0,
+        "true_claims": 1,
         "false_claims": 0,
-        "neutral_claims": 1,
-        "document_credibility_score": 0.0,
-        "document_verdict": "Mixed",
+        "neutral_claims": 0,
+        "document_credibility_score": 1.0,
+        "document_verdict": "Highly Reliable",
         "results": [
           {
             "claim": "the united nations was founded after world war ii",
             "language": "en",
             "evidence": [
               {
-                "source": "History of the United Nations",
-                "url": "https://www.un.org/en/model-united-nations/history-united-nations",
-                "text": "We recognize fully the supreme responsibility resting upon us and all the United Nations to make a peace which will command the goodwill of the overwhelming mass of the peoples of the world and banish the scourge and terror of war for many generations.\u201d \u00a0 By 1944, many nations agreed that an international organization dedicated to maintaining peace and security was necessary.",
-                "weight": 0.95,
-                "stance": "NEUTRAL",
-                "confidence": 0.5,
-                "relevance_score": 0.667,
+                "source": "History: United Nations founded in 1945 - PosterConnection",
+                "url": "https://posterconnection.com/2023/10/24/history-united-nations-founded-in-1945/",
+                "text": "The founding 51 member countries established the UN following World War II with the idea of preventing another such conflict from happening, replacing the ineffective League of Nations that was formed after World War I.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.6,
+                "relevance_score": 0.778,
                 "quality_score": 0.9000000000000001
               },
               {
-                "source": "The Formation of the United Nations, 1945 - Milestones in the History of U.S. Foreign Relations - Office of the Historian",
-                "url": "https://history.state.gov/milestones/1937-1945/un",
-                "text": "The United States, Great Britain, Soviet Union, and\n                    China would enforce peace as \u201cthe four policemen.\u201d Meanwhile Allied\n                    representatives founded a set of task-oriented organizations: the Food and\n                    Agricultural Organization (May 1943), the United Nations Relief and\n                    Rehabilitation Administration (November 1943), the United Nations Educational,\n                    Scientific, and Cultural Organization (April 1944), the International Monetary\n                    Fund and the World Bank (July 1944), and the International Civil Aviation\n                    Organization (November 1944).",
+                "source": "History: United Nations founded in 1945 - PosterConnection",
+                "url": "https://posterconnection.com/2025/10/24/history-united-nations-founded-in-1945-2/",
+                "text": "The founding 51 member countries established the UN following World War II with the idea of preventing another such conflict from happening, replacing the ineffective League of Nations that was formed after World War I.",
                 "weight": 0.5,
-                "stance": "NEUTRAL",
-                "confidence": 0.5,
-                "relevance_score": 0.556,
+                "stance": "SUPPORT",
+                "confidence": 0.6,
+                "relevance_score": 0.778,
                 "quality_score": 0.9000000000000001
               },
               {
-                "source": "The United States and the Founding of the United Nations, August 1941 ...",
-                "url": "https://2001-2009.state.gov/r/pa/ho/pubs/fs/55407.htm",
-                "text": "Proposing the United Nations Concept\n\u00a0\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0 President Roosevelt recognized the inherent weaknesses of the League of Nations, but faced with the reality of another world war, also saw the value of planning for the creation of an international organization to maintain peace in the post-World War II era.",
+                "source": "The United Nations (UN) \u00b7 UPSCprep.com",
+                "url": "https://www.upscprep.com/what-is-the-united-nations-un-peacekeeping-upsc/",
+                "text": "The United Nations (UN) is an international organization founded on October 24, 1945, after World War II.",
                 "weight": 0.5,
-                "stance": "NEUTRAL",
-                "confidence": 0.5,
-                "relevance_score": 0.667,
-                "quality_score": 0.7
+                "stance": "SUPPORT",
+                "confidence": 0.6,
+                "relevance_score": 0.778,
+                "quality_score": 0.5
               },
               {
-                "source": "History of the United Nations | United Nations - \u0627\u0644\u0623\u0645\u0645 \u0627\u0644\u0645\u062a\u062d\u062f\u0629",
+                "source": "History of the United Nations | United Nations",
                 "url": "https://www.un.org/en/about-us/history-of-the-un",
                 "text": "As World War II was about to end in 1945, nations were in ruins, and the world wanted peace.",
                 "weight": 0.95,
@@ -2448,25 +2571,36 @@
                 "quality_score": 0.5
               },
               {
-                "source": "History of the United Nations | United Nations - unonline.org",
-                "url": "https://www.unonline.org/en/about-us/history-of-the-un.html",
-                "text": "As World War II was about to end in 1945, nations were in ruins, and\n                                the world wanted peace.",
+                "source": "The United Nations - International Organizations in History",
+                "url": "https://www.worldatlas.com/articles/the-united-nations-international-organizations-in-history.html",
+                "text": "Prior to the formation of the United Nations (UN), the League of Nations, founded in 1919, was responsible for promoting international cooperation and peace.",
                 "weight": 0.5,
                 "stance": "NEUTRAL",
                 "confidence": 0.5,
-                "relevance_score": 0.667,
+                "relevance_score": 0.556,
                 "quality_score": 0.5
+              },
+              {
+                "source": "logic_engine",
+                "url": "internal://logic_engine",
+                "text": "Structured reasoning signal",
+                "weight": 0.8,
+                "stance": "SUPPORT",
+                "confidence": 0.8,
+                "relevance_score": 1.0,
+                "quality_score": 1.0
               }
             ],
-            "final_verdict": "NEUTRAL",
-            "confidence": 0,
-            "conflict_analysis": "Insufficient Evidence",
+            "final_verdict": "TRUE",
+            "confidence": 1.0,
+            "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
-              "[1] History of the United Nations - https://www.un.org/en/model-united-nations/history-united-nations",
-              "[2] The Formation of the United Nations, 1945 - Milestones in the History of U.S. Foreign Relations - Office of the Historian - https://history.state.gov/milestones/1937-1945/un",
-              "[3] The United States and the Founding of the United Nations, August 1941 ... - https://2001-2009.state.gov/r/pa/ho/pubs/fs/55407.htm",
-              "[4] History of the United Nations | United Nations - \u0627\u0644\u0623\u0645\u0645 \u0627\u0644\u0645\u062a\u062d\u062f\u0629 - https://www.un.org/en/about-us/history-of-the-un",
-              "[5] History of the United Nations | United Nations - unonline.org - https://www.unonline.org/en/about-us/history-of-the-un.html"
+              "[1] History: United Nations founded in 1945 - PosterConnection - https://posterconnection.com/2023/10/24/history-united-nations-founded-in-1945/",
+              "[2] History: United Nations founded in 1945 - PosterConnection - https://posterconnection.com/2025/10/24/history-united-nations-founded-in-1945-2/",
+              "[3] The United Nations (UN) \u00b7 UPSCprep.com - https://www.upscprep.com/what-is-the-united-nations-un-peacekeeping-upsc/",
+              "[4] History of the United Nations | United Nations - https://www.un.org/en/about-us/history-of-the-un",
+              "[5] The United Nations - International Organizations in History - https://www.worldatlas.com/articles/the-united-nations-international-organizations-in-history.html",
+              "[6] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -2475,7 +2609,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"the united nations was founded after world war ii\"\n\nVerdict: NEUTRAL\nConfidence: 0%\n\nThe available evidence is mixed or insufficient to confidently verify the claim."
+            "explanation": "Claim: \"the united nations was founded after world war ii\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including History: United Nations founded in 1945 - PosterConnection, History: United Nations founded in 1945 - PosterConnection, The United Nations (UN) \u00b7 UPSCprep.com, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -2484,7 +2618,7 @@
       "claim": "Bats are the only mammals capable of true flight",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 23.403,
+      "time_seconds": 27.136,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2505,16 +2639,6 @@
             "claim": "bats are the only mammals capable of true flight",
             "language": "en",
             "evidence": [
-              {
-                "source": "Bats: The Only True-Flying Mammal - Discover Animals",
-                "url": "https://www.discoveranimals.org/index.php/animal_facts/fact/bats-the-only-mammal-capable-of-true-flight",
-                "text": "By: staff \u00a0 Date: 04/6/2018 Bats, the only mammal capable of true flight, are not blind - their eyes are just fine, thank you very much.",
-                "weight": 0.5,
-                "stance": "NEUTRAL",
-                "confidence": 0.5,
-                "relevance_score": 0.667,
-                "quality_score": 0.5
-              },
               {
                 "source": "How Bats Fly - Bats (U.S. National Park Service)",
                 "url": "https://www.nps.gov/subjects/bats/how-bats-fly.htm",
@@ -2546,6 +2670,16 @@
                 "quality_score": 0.3
               },
               {
+                "source": "What Is the Only Mammal Capable of True Flight? - Biology ...",
+                "url": "https://biologyinsights.com/what-is-the-only-mammal-capable-of-true-flight/",
+                "text": "Bats are the only mammals in the world capable of true, sustained flight.",
+                "weight": 0.5,
+                "stance": "SUPPORT",
+                "confidence": 0.6,
+                "relevance_score": 0.778,
+                "quality_score": 0.3
+              },
+              {
                 "source": "logic_engine",
                 "url": "internal://logic_engine",
                 "text": "Structured reasoning signal",
@@ -2560,10 +2694,10 @@
             "confidence": 1.0,
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
-              "[1] Bats: The Only True-Flying Mammal - Discover Animals - https://www.discoveranimals.org/index.php/animal_facts/fact/bats-the-only-mammal-capable-of-true-flight",
-              "[2] How Bats Fly - Bats (U.S. National Park Service) - https://www.nps.gov/subjects/bats/how-bats-fly.htm",
-              "[3] Interesting Facts About Bats - https://storage.googleapis.com/cloudlocal/Interesting-Facts-About-Bats.html",
-              "[4] Interesting Facts About the Species We Call Bats | Virginia Bat - https://www.virginiabatpros.com/blog/interesting-facts-about-the-species-we-call-bats/",
+              "[1] How Bats Fly - Bats (U.S. National Park Service) - https://www.nps.gov/subjects/bats/how-bats-fly.htm",
+              "[2] Interesting Facts About Bats - https://storage.googleapis.com/cloudlocal/Interesting-Facts-About-Bats.html",
+              "[3] Interesting Facts About the Species We Call Bats | Virginia Bat - https://www.virginiabatpros.com/blog/interesting-facts-about-the-species-we-call-bats/",
+              "[4] What Is the Only Mammal Capable of True Flight? - Biology ... - https://biologyinsights.com/what-is-the-only-mammal-capable-of-true-flight/",
               "[5] logic_engine - internal://logic_engine"
             ],
             "logical_analysis": {
@@ -2573,7 +2707,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"bats are the only mammals capable of true flight\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including How Bats Fly - Bats (U.S. National Park Service), Interesting Facts About Bats, Interesting Facts About the Species We Call Bats | Virginia Bat, logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"bats are the only mammals capable of true flight\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including How Bats Fly - Bats (U.S. National Park Service), Interesting Facts About Bats, Interesting Facts About the Species We Call Bats | Virginia Bat, What Is the Only Mammal Capable of True Flight? - Biology ..., logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -2582,7 +2716,7 @@
       "claim": "Sharks are older than trees",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 24.657,
+      "time_seconds": 20.554,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2604,9 +2738,9 @@
             "language": "en",
             "evidence": [
               {
-                "source": "Are Sharks Older Than Trees? The Truth About Earth\u2019s Oldest ...",
-                "url": "https://www.scientificworldinfo.com/2025/08/are-sharks-older-than-trees-the-truth.html",
-                "text": "So, sharks are older than trees by 50 million years.",
+                "source": "Mindblowing fact of the day: sharks are older than trees",
+                "url": "https://www.zmescience.com/feature-post/natural-sciences/animals/animal-facts/sharks-older-trees/",
+                "text": "You might be surprised to learn that sharks are older than trees as they\u2019ve been around for at least 400 million years.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.6,
@@ -2614,9 +2748,9 @@
                 "quality_score": 0.5
               },
               {
-                "source": "Mindblowing fact of the day: sharks are older than trees",
-                "url": "https://www.zmescience.com/feature-post/natural-sciences/animals/animal-facts/sharks-older-trees/",
-                "text": "You might be surprised to learn that sharks are older than trees as they\u2019ve been around for at least 400 million years.",
+                "source": "Are Sharks Older Than Trees? The Truth About Earth\u2019s Oldest ...",
+                "url": "https://www.scientificworldinfo.com/2025/08/are-sharks-older-than-trees-the-truth.html",
+                "text": "So, sharks are older than trees by 50 million years.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.6,
@@ -2668,8 +2802,8 @@
             "confidence": 1.0,
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
-              "[1] Are Sharks Older Than Trees? The Truth About Earth\u2019s Oldest ... - https://www.scientificworldinfo.com/2025/08/are-sharks-older-than-trees-the-truth.html",
-              "[2] Mindblowing fact of the day: sharks are older than trees - https://www.zmescience.com/feature-post/natural-sciences/animals/animal-facts/sharks-older-trees/",
+              "[1] Mindblowing fact of the day: sharks are older than trees - https://www.zmescience.com/feature-post/natural-sciences/animals/animal-facts/sharks-older-trees/",
+              "[2] Are Sharks Older Than Trees? The Truth About Earth\u2019s Oldest ... - https://www.scientificworldinfo.com/2025/08/are-sharks-older-than-trees-the-truth.html",
               "[3] How Old Are Sharks? Are Sharks Older Than Trees - Shark Truth - https://www.sharktruth.com/how-old-are-sharks/",
               "[4] Sharks Are Older Than Trees, Which Seems Wrong - https://www.popularmechanics.com/science/animals/a65775651/sharks-are-old/",
               "[5] Are Sharks Older Than Trees \u2013 sharksinfo.com - https://sharksinfo.com/are-sharks-older-than-trees/",
@@ -2682,7 +2816,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"sharks are older than trees\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Are Sharks Older Than Trees? The Truth About Earth\u2019s Oldest ..., Mindblowing fact of the day: sharks are older than trees, Are Sharks Older Than Trees \u2013 sharksinfo.com, logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"sharks are older than trees\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Mindblowing fact of the day: sharks are older than trees, Are Sharks Older Than Trees? The Truth About Earth\u2019s Oldest ..., Are Sharks Older Than Trees \u2013 sharksinfo.com, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -2691,7 +2825,7 @@
       "claim": "Octopuses have three hearts",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 16.731,
+      "time_seconds": 19.203,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2800,7 +2934,7 @@
       "claim": "Bananas are berries",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 14.196,
+      "time_seconds": 22.454,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2842,7 +2976,7 @@
                 "quality_score": 0.7
               },
               {
-                "source": "Why Bananas Are Berries But Strawberries Aren't Explained",
+                "source": "Why Bananas Are Berries But Strawberries Aren\u2019t Explained",
                 "url": "https://foodiosity.com/bananas-are-berries/",
                 "text": "The conclusion is that yes, bananas are berries and strawberries aren\u2019t, but this is just from a botanical point of view.",
                 "weight": 0.5,
@@ -2852,9 +2986,9 @@
                 "quality_score": 0.3
               },
               {
-                "source": "Are Banana Berries? | Fruit Facts That Clear It Up",
-                "url": "https://gardeningbeyond.com/are-banana-berries/",
-                "text": "Yes, bananas are berries in botanical terms, even though many people still treat bananas as ordinary fruit in everyday language.",
+                "source": "Unpeeling the Truth: Are Bananas Really Berries, and What ...",
+                "url": "https://panflavor.com/is-it-true-that-bananas-are-berries-but-strawberries-arent/",
+                "text": "The assertion that bananas are berries but strawberries are not may seem surprising at first, but it is grounded in the botanical definitions of fruits and berries.",
                 "weight": 0.5,
                 "stance": "SUPPORT",
                 "confidence": 0.6,
@@ -2888,8 +3022,8 @@
             "citations": [
               "[1] Are Bananas Berries? The Surprising Truth - https://wentbananas.com/are-bananas-berries/",
               "[2] People are baffled to discover that bananas are actually - https://www.mirror.co.uk/news/people-baffled-discover-bananas-actually-31245586",
-              "[3] Why Bananas Are Berries But Strawberries Aren't Explained - https://foodiosity.com/bananas-are-berries/",
-              "[4] Are Banana Berries? | Fruit Facts That Clear It Up - https://gardeningbeyond.com/are-banana-berries/",
+              "[3] Why Bananas Are Berries But Strawberries Aren\u2019t Explained - https://foodiosity.com/bananas-are-berries/",
+              "[4] Unpeeling the Truth: Are Bananas Really Berries, and What ... - https://panflavor.com/is-it-true-that-bananas-are-berries-but-strawberries-arent/",
               "[5] Bananas Are Berries? | STANFORD magazine - https://stanfordmag.org/contents/bananas-are-berries",
               "[6] logic_engine - internal://logic_engine"
             ],
@@ -2900,7 +3034,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "Claim: \"bananas are berries\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Are Bananas Berries? The Surprising Truth, Why Bananas Are Berries But Strawberries Aren't Explained, Are Banana Berries? | Fruit Facts That Clear It Up, Bananas Are Berries? | STANFORD magazine, logic_engine support the claim. No strong contradictory evidence was found."
+            "explanation": "Claim: \"bananas are berries\"\n\nVerdict: TRUE\nConfidence: 100.0%\n\nMultiple high-credibility sources including Are Bananas Berries? The Surprising Truth, Why Bananas Are Berries But Strawberries Aren\u2019t Explained, Unpeeling the Truth: Are Bananas Really Berries, and What ..., Bananas Are Berries? | STANFORD magazine, logic_engine support the claim. No strong contradictory evidence was found."
           }
         ]
       }
@@ -2909,7 +3043,7 @@
       "claim": "Humans can breathe in space without equipment",
       "predicted_verdict": "NEUTRAL",
       "expected_verdict": "FALSE",
-      "time_seconds": 12.852,
+      "time_seconds": 12.523,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2931,16 +3065,6 @@
             "language": "en",
             "evidence": [
               {
-                "source": "How Long Can You Survive On Each Planet Without A Space Suit? - Science ABC",
-                "url": "https://www.scienceabc.com/nature/universe/long-can-one-survive-planet-without-space-suit.html",
-                "text": "One would get crushed almost instantly if you attempted to stand on these planets in any condition, let alone without a space suit.",
-                "weight": 0.5,
-                "stance": "NEUTRAL",
-                "confidence": 0.5,
-                "relevance_score": 0.429,
-                "quality_score": 0.3
-              },
-              {
                 "source": "How long could you survive in space without a spacesuit?",
                 "url": "https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit",
                 "text": "Thanks to science fiction, many people have wondered how long a person could survive in space without a spacesuit.",
@@ -2955,8 +3079,7 @@
             "confidence": 0,
             "conflict_analysis": "Insufficient Evidence",
             "citations": [
-              "[1] How Long Can You Survive On Each Planet Without A Space Suit? - Science ABC - https://www.scienceabc.com/nature/universe/long-can-one-survive-planet-without-space-suit.html",
-              "[2] How long could you survive in space without a spacesuit? - https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit"
+              "[1] How long could you survive in space without a spacesuit? - https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit"
             ],
             "logical_analysis": {
               "is_future_claim": false,
