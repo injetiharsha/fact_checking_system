@@ -1,11 +1,10 @@
-import time
+﻿import time
 import nltk
 import json
 from evidence.router import EvidenceRouter
 from evidence.relevance import RelevanceScorer
 from evidence.quality import QualityScorer
 from evidence.citation_formatter import format_citations
-from utils.pipeline_trace import PipelineTrace
 from semantic.stance_model import StanceDetector
 
 from reasoning.logical_analyzer import LogicalAnalyzer
@@ -20,8 +19,13 @@ from verdict.explanation_generator import generate_explanation
 from nlp.language import detect_language
 from nlp.translate import translate_to_english
 from claim_detection.normalizer import normalize_claim
+from claim_detection.claim_type_classifier import ClaimTypeClassifier
+from evidence.domain_diversity_filter import DomainDiversityFilter
 
-nltk.download("punkt")
+try:
+    nltk.data.find("tokenizers/punkt")
+except LookupError:
+    nltk.download("punkt", quiet=True)
 
 
 # ----------------------------------------------------------
@@ -80,6 +84,8 @@ class ClaimPipeline:
         # initialize core components
         self.router = EvidenceRouter()
         self.logical_analyzer = LogicalAnalyzer()
+        self.claim_type_classifier = ClaimTypeClassifier()
+        self.domain_diversity_filter = DomainDiversityFilter(max_per_domain=2)
         self.relevance_scorer = RelevanceScorer()
         self.quality_scorer = QualityScorer()
         self.stance = StanceDetector()
@@ -114,6 +120,16 @@ class ClaimPipeline:
         claim = translate_to_english(claim, language)
         claim = normalize_claim(claim)
         print("Language + normalization:", round(time.time() - start, 3), "sec")
+
+        # classify claim type (FACTUAL, OPINION, NUMERICAL, MIXED)
+        start = time.time()
+        claim_type_result = self.claim_type_classifier.classify(claim)
+        trace["claim_type"] = {
+            **claim_type_result,
+            "type": claim_type_result["type"].value,
+        }
+        print(f"Claim type: {claim_type_result['type'].value} (confidence: {claim_type_result['confidence']:.2f})")
+        print("Claim type classification:", round(time.time() - start, 3), "sec")
 
         # extract domain to exclude original source
         exclude_domain = None
@@ -222,7 +238,7 @@ class ClaimPipeline:
         # fallback if no evidence passes filtering
         if not scored_evidence:
 
-            print("No strong evidence found — using fallback")
+            print("No strong evidence found - using fallback")
 
             for ev in evidence_raw[:5]:
 
@@ -242,6 +258,13 @@ class ClaimPipeline:
             key=lambda x: x["relevance_score"] * x["quality_score"],
             reverse=True
         )
+
+        # apply domain diversity filter - ensure evidence from diverse sources
+        start_diversity = time.time()
+        scored_evidence = self.domain_diversity_filter.filter(scored_evidence)
+        diversity_score = self.domain_diversity_filter.get_diversity_score(scored_evidence)
+        print(f"Domain diversity filter - score: {diversity_score:.2f}")
+        print("Domain diversity filtering:", round(time.time() - start_diversity, 3), "sec")
 
         scored_evidence = scored_evidence[:5]
 
@@ -342,10 +365,6 @@ class ClaimPipeline:
         print("TOTAL PIPELINE TIME:", round(time.time() - total_start, 3), "sec")
 
 
-        trace["final_verdict"] = {
-    "verdict": verdict,
-    "confidence": confidence
-}
         with open("pipeline_trace.json", "w", encoding="utf-8") as f:
             json.dump(trace, f, indent=2)
 
@@ -360,3 +379,4 @@ class ClaimPipeline:
             "logical_analysis": logic_metadata,
             "explanation": explanation
         }
+

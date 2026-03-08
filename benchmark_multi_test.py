@@ -1,6 +1,7 @@
 import asyncio
 import json
 import time
+from collections import Counter
 
 from pipeline.document_pipeline import DocumentPipeline
 
@@ -98,6 +99,7 @@ async def process_claim(i, claim):
             "predicted_verdict": verdict,
             "expected_verdict": ground_truth[i],
             "time_seconds": elapsed,
+            "logical_analysis": res["results"][0].get("logical_analysis", {}),
             "pipeline_output": res
         }
 
@@ -132,33 +134,110 @@ async def run_benchmark():
 # ------------------------------------------------
 
 def evaluate(results):
-
     correct = 0
-    false_positive = 0
     neutral = 0
+    tp = 0
+    tn = 0
+    fp = 0
+    fn = 0
+    predicted_positive = 0
+    predicted_negative = 0
+    actual_positive = 0
+    actual_negative = 0
+    failed_by_expected = Counter()
+    failed_by_predicted = Counter()
+    failed_by_tag = Counter()
+    failed_claims = []
 
     for r in results:
 
         pred = r["predicted_verdict"]
         truth = r["expected_verdict"]
+        analysis = r.get("logical_analysis", {})
+        is_pos = truth == "TRUE"
+        pred_pos = pred == "TRUE"
 
         if pred == truth:
             correct += 1
 
-        if pred == "TRUE" and truth == "FALSE":
-            false_positive += 1
-
         if pred == "NEUTRAL":
             neutral += 1
 
+        if is_pos:
+            actual_positive += 1
+        else:
+            actual_negative += 1
+
+        if pred_pos:
+            predicted_positive += 1
+        else:
+            predicted_negative += 1
+
+        if pred_pos and is_pos:
+            tp += 1
+        elif pred_pos and not is_pos:
+            fp += 1
+        elif not pred_pos and is_pos:
+            fn += 1
+        else:
+            tn += 1
+
+        if pred != truth:
+            failed_by_expected[truth] += 1
+            failed_by_predicted[pred] += 1
+            tags = []
+            if analysis.get("is_opinion"):
+                tags.append("opinion")
+            if analysis.get("has_numeric_value"):
+                tags.append("numeric")
+            if analysis.get("is_comparative"):
+                tags.append("comparative")
+            if analysis.get("is_projection"):
+                tags.append("projection")
+            if analysis.get("is_future_claim"):
+                tags.append("future")
+            if not tags:
+                tags = ["general"]
+            for tag in tags:
+                failed_by_tag[tag] += 1
+            failed_claims.append({
+                "claim": r["claim"],
+                "expected_verdict": truth,
+                "predicted_verdict": pred,
+                "logical_tags": tags,
+                "time_seconds": r.get("time_seconds")
+            })
+
     total = len(results)
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    f1 = (
+        2 * precision * recall / (precision + recall)
+        if (precision + recall) else 0.0
+    )
 
     return {
         "total_claims": total,
         "correct_predictions": correct,
         "accuracy": round(correct / total, 3),
-        "false_positive_rate": round(false_positive / total, 3),
-        "neutral_rate": round(neutral / total, 3)
+        "neutral_rate": round(neutral / total, 3),
+        "actual_positive": actual_positive,
+        "actual_negative": actual_negative,
+        "predicted_positive": predicted_positive,
+        "predicted_negative": predicted_negative,
+        "tp": tp,
+        "tn": tn,
+        "fp": fp,
+        "fn": fn,
+        "false_positive_rate": round(fp / total, 3),
+        "false_negative_rate": round(fn / total, 3),
+        "precision_true_class": round(precision, 3),
+        "recall_true_class": round(recall, 3),
+        "f1_true_class": round(f1, 3),
+        "failed_by_expected_verdict": dict(failed_by_expected),
+        "failed_by_predicted_verdict": dict(failed_by_predicted),
+        "failed_by_claim_tag": dict(failed_by_tag),
+        "failed_claims": failed_claims
     }
 
 
@@ -195,8 +274,20 @@ async def main():
     print("BENCHMARK METRICS")
     print("==============================")
 
-    for k,v in metrics.items():
-        print(k,":",v)
+    summary_keys = [
+        "total_claims", "correct_predictions", "accuracy", "neutral_rate",
+        "actual_positive", "actual_negative",
+        "predicted_positive", "predicted_negative",
+        "tp", "tn", "fp", "fn",
+        "false_positive_rate", "false_negative_rate",
+        "precision_true_class", "recall_true_class", "f1_true_class"
+    ]
+    for key in summary_keys:
+        print(key, ":", metrics.get(key))
+
+    print("failed_by_expected_verdict :", metrics.get("failed_by_expected_verdict"))
+    print("failed_by_predicted_verdict :", metrics.get("failed_by_predicted_verdict"))
+    print("failed_by_claim_tag :", metrics.get("failed_by_claim_tag"))
 
     save_results(results, metrics, claim_times, total_time)
 

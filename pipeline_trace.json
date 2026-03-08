@@ -1,139 +1,81 @@
 {
-  "claim": "Mount Everest is the tallest mountain on Earth",
+  "claim": "Humans can breathe in space without equipment",
   "search_results": [
     {
-      "source": "Mount Everest - Wikipedia",
-      "url": "https://en.wikipedia.org/wiki/Mount_Everest"
+      "source": "Effect of spaceflight on the human body - Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Effect_of_spaceflight_on_the_human_body"
     },
     {
-      "source": "List of highest mountains on Earth - Wikipedia",
-      "url": "https://en.wikipedia.org/wiki/List_of_highest_mountains_on_Earth"
+      "source": "Why can\u2019t we breathe in space? | Ask Dr. Universe | Washington State University",
+      "url": "https://askdruniverse.wsu.edu/2021/10/08/cant-breathe-space/"
     },
     {
-      "source": "Is Mount Everest really the tallest mountain on Earth? What is the tallest mountain in the world? No, it's not Mount ... Mount Everest Isn't Really The Tallest Mountain on Earth Images Is Mount Everest Really The Tallest Mountain On Earth ... The Highest Point on Earth - Geology In",
-      "url": "https://www.livescience.com/tallest-mountain-on-earth"
+      "source": "How long could you survive in space without a spacesuit? | Space",
+      "url": "https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit"
     },
     {
-      "source": "What is the highest point on Earth as measured from Earth's center?",
-      "url": "https://oceanservice.noaa.gov/facts/highestpoint.html"
+      "source": "Ep 85 - What Would Happen If You Tried to Breathe in Space?",
+      "url": "https://www.tidbitswithtitus.com/p/ep-85-what-would-happen-if-you-tried"
     },
     {
-      "source": "Is Mount Everest Really The Tallest Mountain On Earth ...",
-      "url": "https://www.scienceabc.com/eyeopeners/is-mount-everest-really-the-tallest-mountain-on-earth.html"
+      "source": "Could people breathe the air on Mars?",
+      "url": "https://theconversation.com/could-people-breathe-the-air-on-mars-180504"
     },
     {
-      "source": "Mount Everest Isn't Really The Tallest Mountain on Earth",
-      "url": "https://www.sciencealert.com/mount-everest-isn-t-really-the-tallest-mountain-earth-science"
+      "source": "The Human Body in Space - NASA",
+      "url": "https://www.nasa.gov/humans-in-space/the-human-body-in-space/"
     },
     {
-      "source": "What is the tallest mountain in the world? No, it's not Mount ...",
-      "url": "https://www.sciencefocus.com/planet-earth/what-is-the-tallest-mountain-in-the-world"
+      "source": "How do astronauts breathe? | Feature | RSC Education",
+      "url": "https://edu.rsc.org/feature/how-do-astronauts-breathe/3009797.article"
     },
     {
-      "source": "Will Mount Everest always be the world's tallest mountain? |",
-      "url": "https://www.livescience.com/planet-earth/geology/will-mount-everest-always-be-the-worlds-tallest-mountain"
+      "source": "ESA - Space for Kids - Astronauts get a breath of fresh air",
+      "url": "https://www.esa.int/kids/en/learn/Life_in_Space/Living_in_space/Astronauts_get_a_breath_of_fresh_air"
     },
     {
-      "source": "Is Mount Everest Really the Tallest Mountain on Earth?",
-      "url": "https://www.wisegeek.com/is-mount-everest-really-the-tallest-mountain-on-earth.htm"
-    },
-    {
-      "source": "Is Mount Everest Really the Tallest Mountain on Earth?",
-      "url": "https://www.wariat.org/is-mount-everest-really-the-tallest-mountain-on-earth/"
-    },
-    {
-      "source": "Mount Everest: The world's highest peak - Earth.com",
-      "url": "https://www.earth.com/image/mount-everest-the-worlds-highest-peak/"
-    },
-    {
-      "source": "The Highest Point on Earth - Geology In",
-      "url": "https://www.geologyin.com/2025/01/the-highest-point-on-earth.html"
-    },
-    {
-      "source": "Why Mount Everest is the world\u2019s tallest mountain",
-      "url": "https://www.nature.com/articles/d41586-024-03164-0"
+      "source": "Ask Dr. Universe: Why can't we breathe in space?",
+      "url": "https://www.spokesman.com/stories/2021/oct/07/ask-dr-universe-why-cant-we-breathe-in-space/"
     }
   ],
   "scraped_pages": [],
   "evidence_selected": [
     {
-      "url": "https://en.wikipedia.org/wiki/List_of_highest_mountains_on_Earth",
-      "sentence": "There is no precise definition of surrounding base, but Denali,[2] Mount Kilimanjaro[3] and Nanga Parbat[4] are possible candidates for the tallest mountain on land by this measure.",
-      "relevance": 0.546,
-      "quality": 0.5
-    },
-    {
-      "url": "https://oceanservice.noaa.gov/facts/highestpoint.html",
-      "sentence": "Mount  Everest, located in Nepal and Tibet, is usually said to be the highest mountain  on Earth.",
-      "relevance": 0.865,
+      "url": "https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit",
+      "sentence": "Thanks to science fiction, many people have wondered how long a person could survive in space without a spacesuit.",
+      "relevance": 0.429,
       "quality": 0.3
     },
     {
-      "url": "https://www.scienceabc.com/eyeopeners/is-mount-everest-really-the-tallest-mountain-on-earth.html",
-      "sentence": "Everest has a height of 8,848 m and is considered to be the tallest mountain on Earth.",
-      "relevance": 0.801,
-      "quality": 0.5
-    },
-    {
-      "url": "https://www.sciencealert.com/mount-everest-isn-t-really-the-tallest-mountain-earth-science",
-      "sentence": "Everest owes its popularity to\u00a0the impressive title of 'highest mountain in the world', but in reality, it isn't - not according to science.",
-      "relevance": 0.709,
-      "quality": 0.3
-    },
-    {
-      "url": "https://www.sciencefocus.com/planet-earth/what-is-the-tallest-mountain-in-the-world",
-      "sentence": "Mount Everest is the world's tallest mountain above sea level.",
-      "relevance": 0.887,
-      "quality": 0.3
-    },
-    {
-      "url": "https://www.wisegeek.com/is-mount-everest-really-the-tallest-mountain-on-earth.htm",
-      "sentence": "If you really want to bicker about what constitutes the \"highest point,\" consider this: The summit of Ecuador's Mount Chimborazo is 6,800 feet (2,072 m) farther from the center of the Earth than Everest's peak, although Chimborazo only rises 20,564 feet (6,268 m) above sea level.",
-      "relevance": 0.617,
-      "quality": 0.9000000000000001
-    },
-    {
-      "url": "https://www.earth.com/image/mount-everest-the-worlds-highest-peak/",
-      "sentence": "Previous Image Next Image Today\u2019s Image of the Day from NASA Earth Observatory features an astronaut view of Mount Everest, the world\u2019s tallest mountain.",
-      "relevance": 0.779,
-      "quality": 0.3
-    },
-    {
-      "url": "https://www.geologyin.com/2025/01/the-highest-point-on-earth.html",
-      "sentence": "Mount Everest is part of the Himalayan mountain range, situated on the border between Nepal and the Tibet Autonomous Region of China.",
-      "relevance": 0.675,
+      "url": "https://www.tidbitswithtitus.com/p/ep-85-what-would-happen-if-you-tried",
+      "sentence": "Right now, humans can\u2019t breathe in space without help.",
+      "relevance": 0.714,
       "quality": 0.3
     }
   ],
   "stance_predictions": [
     {
-      "url": "https://www.wisegeek.com/is-mount-everest-really-the-tallest-mountain-on-earth.htm",
+      "url": "https://www.tidbitswithtitus.com/p/ep-85-what-would-happen-if-you-tried",
       "stance": "REFUTE",
-      "confidence": 0.99
+      "confidence": 0.9
     },
     {
-      "url": "https://www.scienceabc.com/eyeopeners/is-mount-everest-really-the-tallest-mountain-on-earth.html",
-      "stance": "REFUTE",
-      "confidence": 0.99
-    },
-    {
-      "url": "https://en.wikipedia.org/wiki/List_of_highest_mountains_on_Earth",
-      "stance": "REFUTE",
-      "confidence": 0.99
-    },
-    {
-      "url": "https://www.sciencefocus.com/planet-earth/what-is-the-tallest-mountain-in-the-world",
-      "stance": "SUPPORT",
-      "confidence": 0.99
-    },
-    {
-      "url": "https://oceanservice.noaa.gov/facts/highestpoint.html",
-      "stance": "REFUTE",
-      "confidence": 0.835
+      "url": "https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit",
+      "stance": "NEUTRAL",
+      "confidence": 0.5
     }
   ],
   "final_verdict": {
     "verdict": "FALSE",
-    "confidence": 0.6455424274973146
+    "confidence": 1.0
+  },
+  "claim_type": {
+    "type": "factual",
+    "confidence": 0.7,
+    "reasoning": "Factual markers detected",
+    "scores": {
+      "factual": 0.7,
+      "opinion": 0.3
+    }
   }
 }
