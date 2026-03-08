@@ -102,7 +102,7 @@ class ClaimPipeline:
         self.strong_quality_threshold = 0.4
         self.soft_relevance_threshold = 0.3
         self.soft_quality_threshold = 0.25
-        self.min_strong_evidence_for_forced_verdict = 2
+        self.min_strong_evidence_for_forced_verdict = 1
 
     def _build_transparency(
         self,
@@ -471,12 +471,16 @@ class ClaimPipeline:
         verdict, confidence = aggregate_results(results)
         conflict_summary = self.conflict_analyzer.analyze(results)
 
-        # Abstain when evidence strength is weak, even if aggregate leans one side.
+        # Abstain when there is no reliable non-neutral signal.
         forced_neutral = False
-        if strong_evidence_count < self.min_strong_evidence_for_forced_verdict:
+        non_neutral_count = len([r for r in results if r.get("stance") in {"SUPPORT", "REFUTE"}])
+        if (
+            strong_evidence_count < self.min_strong_evidence_for_forced_verdict
+            or non_neutral_count == 0
+        ):
             verdict = "NEUTRAL"
             confidence = min(confidence, 0.55)
-            conflict_summary = "Insufficient strong evidence for definitive verdict"
+            conflict_summary = "Insufficient decisive evidence for definitive verdict"
             forced_neutral = True
 
         citations = format_citations(results)

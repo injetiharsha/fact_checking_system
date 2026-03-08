@@ -5,7 +5,7 @@ from models.stance.nli_model import NLIModel
 
 
 class StanceDetector:
-    MODEL_STANCE_MIN_CONFIDENCE = 0.58
+    MODEL_STANCE_MIN_CONFIDENCE = 0.55
     LEXICAL_RESCUE_MIN_OVERLAP = 2
 
     def __init__(self):

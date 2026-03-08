@@ -48,10 +48,24 @@ class NLIModel:
                 return "NEUTRAL", 0.5
 
             overlap = len(claim_words & evidence_words) / max(len(claim_words), 1)
+            stop = {
+                "the", "and", "for", "with", "from", "that", "this", "there", "their",
+                "have", "has", "had", "are", "was", "were", "can", "could", "will",
+                "would", "about", "into", "than", "over", "under", "your", "our",
+            }
+            claim_key = {w for w in claim_words if len(w) > 3 and w not in stop}
+            key_overlap = (
+                len(claim_key & evidence_words) / max(len(claim_key), 1)
+                if claim_key else overlap
+            )
 
             refute_cues = (
                 "hoax", "fake", "myth", "false", "debunk", "does not", "doesn't",
                 "cannot", "can't", "no evidence", "not true", "incorrect", "misleading"
+            )
+            support_blockers = (
+                "whether", "might", "maybe", "could", "question", "rumor", "alleged",
+                "conspiracy theory", "is it true", "?"
             )
             shape_refute = (
                 ("flat" in claim_words and any(t in evidence_words for t in {"sphere", "spherical", "round", "globe"}))
@@ -61,8 +75,11 @@ class NLIModel:
 
             if shape_refute:
                 return "REFUTE", 0.75
-            if overlap >= 0.35 and any(c in text for c in refute_cues):
+            if key_overlap >= 0.3 and any(c in text for c in refute_cues):
                 return "REFUTE", 0.62
+
+            if key_overlap >= 0.72 and not any(c in text for c in support_blockers):
+                return "SUPPORT", 0.59
 
             return "NEUTRAL", 0.5
 
