@@ -12,7 +12,7 @@ class LLMGenerator:
 
         self.generator = pipeline(
             "text-generation",
-            model="mistralai/Mistral-7B-Instruct-v0.2",
+            model="microsoft/phi-2",
             device=device
         )
 

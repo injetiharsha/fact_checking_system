@@ -2,6 +2,7 @@ import asyncio
 import time
 import os
 import uuid
+import sys
 
 from evidence.international.worldbank import WorldBankAPI
 from evidence.international.un_data import UNDataAPI
@@ -24,6 +25,12 @@ BLOCKED_DOMAINS = [
     "reddit.com",
     "pinterest.com"
 ]
+
+
+def _safe_console_text(value):
+    text = str(value)
+    enc = sys.stdout.encoding or "utf-8"
+    return text.encode(enc, errors="replace").decode(enc, errors="replace")
 
 
 class EvidenceRouter:
@@ -93,8 +100,8 @@ class EvidenceRouter:
 
         print("\n--- SEARCH RESULTS ---")
         for r in search_results:
-            print(r["title"])
-            print(r["url"])
+            print(_safe_console_text(r.get("title", "")))
+            print(_safe_console_text(r.get("url", "")))
 
         scrape_jobs = []
 
@@ -139,7 +146,7 @@ class EvidenceRouter:
 
             print("\nScraped:", url)
             print("Words:", word_count)
-            print("Preview:", content[:200])
+            print("Preview:", _safe_console_text(content[:200]))
 
             # save page to file
             page_id = str(uuid.uuid4())[:8]
