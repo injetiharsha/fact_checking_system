@@ -1,94 +1,61 @@
 {
-  "claim": "Climate change is a hoax",
+  "claim": "Humans can breathe in space without equipment",
   "search_results": [
     {
-      "source": "Climate change denial - Wikipedia",
-      "url": "https://en.wikipedia.org/wiki/Climate_change_denial"
+      "source": "Effect of spaceflight on the human body - Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Effect_of_spaceflight_on_the_human_body"
     },
     {
-      "source": "10 Climate Change Myths Debunked \u2014 Covering Climate Now",
-      "url": "https://coveringclimatenow.org/resource/10-climate-change-myths-debunked/"
+      "source": "Survival in Space Unprotected Is Possible--Briefly | Scientific American",
+      "url": "https://www.scientificamerican.com/article/survival-in-space-unprotected-possible/"
     },
     {
-      "source": "Climate change myths debunked by scientific evidence",
-      "url": "https://www.augustachronicle.com/story/news/environment/2025/11/19/climate-change-myths-debunked-by-scientific-evidence/87322607007/"
+      "source": "How Do Astronauts Breathe In Space? - LunarSail.com",
+      "url": "https://www.lunarsail.com/how-do-astronauts-breathe-in-space/"
     },
     {
-      "source": "False claims global warming is a hoax due to failure to understand ...",
-      "url": "https://www.aap.com.au/factcheck/false-claims-global-warming-is-a-hoax-due-to-failure-to-understand-research/"
+      "source": "What Do Astronauts Need To Survive In Space? - LunarSail.com",
+      "url": "https://www.lunarsail.com/what-do-astronauts-need-to-survive-in-space/"
     },
     {
-      "source": "Did 1,609 scientists sign a declaration saying 'there is no climate ...",
-      "url": "https://www.politifact.com/factchecks/2023/oct/09/tweets/did-1609-scientists-sign-a-declaration-saying-ther/"
+      "source": "Humans in space - Curious",
+      "url": "https://www.science.org.au/curious/space-time/humans-space"
     },
     {
-      "source": "Climate Change Described as \u201cHoax\u201d by Louisiana Attorney-General | Sabin Center for Climate Change Law",
-      "url": "https://climate.law.columbia.edu/content/climate-change-described-hoax-louisiana-attorney-general-0"
+      "source": "The Simple Force That Could Let Astronauts Breathe Forever in",
+      "url": "https://www.sciencenewstoday.org/the-simple-force-that-could-let-astronauts-breathe-forever-in-space"
     },
     {
-      "source": "HKS Misinformation ReviewUnderstanding climate change conspiracy beliefs: A comparative outlook | HKS Misinformation Review",
-      "url": "https://misinforeview.hks.harvard.edu/article/understanding-climate-change-conspiracy-beliefs-a-comparative-outlook/"
+      "source": "How Astronauts Eat, Sleep, and Use the Toilet in Space",
+      "url": "https://techvortex.net/space-travel-101-how-astronauts-eat-sleep-and-use-the-toilet-in-space/"
     },
     {
-      "source": "What is climate change and is it really a hoax? - BBC Bitesize",
-      "url": "https://www.bbc.co.uk/bitesize/articles/zc3tvj6"
+      "source": "Could you breathe underwater?",
+      "url": "https://moviecultists.com/could-you-breathe-underwater"
     },
     {
-      "source": "Climate change, hoax or imminent catastrophe?",
-      "url": "https://www.dnv.com/article/climate-change-hoax-or-imminent-catastrophe--179622/"
+      "source": "Humans might be able to breathe alien atmospheres under the",
+      "url": "https://www.syfy.com/syfy-wire/could-humans-breathe-in-alien-atmospheres"
     }
   ],
   "scraped_pages": [],
   "evidence_selected": [
     {
-      "url": "https://coveringclimatenow.org/resource/10-climate-change-myths-debunked/",
-      "sentence": "Scientists the world over agree that climate change is real, it\u2019s happening now, and it\u2019s caused by the burning of fossil fuels.",
-      "relevance": 0.764,
-      "quality": 0.3
-    },
-    {
-      "url": "https://www.augustachronicle.com/story/news/environment/2025/11/19/climate-change-myths-debunked-by-scientific-evidence/87322607007/",
-      "sentence": "There are a number of myths surrounding climate change and its impacts.",
-      "relevance": 0.684,
-      "quality": 0.3
-    },
-    {
-      "url": "https://climate.law.columbia.edu/content/climate-change-described-hoax-louisiana-attorney-general-0",
-      "sentence": "That\u2019s the face of climate change hoax believers.\u201d",
-      "relevance": 0.811,
-      "quality": 0.3
-    },
-    {
-      "url": "https://www.dnv.com/article/climate-change-hoax-or-imminent-catastrophe--179622/",
-      "sentence": "Climate change is not a hoax, if we don\u2019t act humanity will face a planetary catastrophe.",
-      "relevance": 0.82,
+      "url": "https://www.lunarsail.com/what-do-astronauts-need-to-survive-in-space/",
+      "sentence": "Unfortunately, contrary to the Earth\u2019s atmosphere, which offers an abundant supply of this life-sustaining gas, space is devoid of any such provision.",
+      "relevance": 0.573,
       "quality": 0.3
     }
   ],
   "stance_predictions": [
     {
-      "url": "https://www.dnv.com/article/climate-change-hoax-or-imminent-catastrophe--179622/",
-      "stance": "REFUTE",
-      "confidence": 0.9
-    },
-    {
-      "url": "https://climate.law.columbia.edu/content/climate-change-described-hoax-louisiana-attorney-general-0",
-      "stance": "NEUTRAL",
-      "confidence": 0.956
-    },
-    {
-      "url": "https://coveringclimatenow.org/resource/10-climate-change-myths-debunked/",
-      "stance": "REFUTE",
-      "confidence": 0.9
-    },
-    {
-      "url": "https://www.augustachronicle.com/story/news/environment/2025/11/19/climate-change-myths-debunked-by-scientific-evidence/87322607007/",
+      "url": "https://www.lunarsail.com/what-do-astronauts-need-to-survive-in-space/",
       "stance": "SUPPORT",
-      "confidence": 0.533
+      "confidence": 0.942
     }
   ],
   "final_verdict": {
-    "verdict": "FALSE",
-    "confidence": 0.5424164524421594
+    "verdict": "TRUE",
+    "confidence": 1.0
   }
 }

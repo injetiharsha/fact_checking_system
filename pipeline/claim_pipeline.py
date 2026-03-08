@@ -9,6 +9,7 @@ from utils.pipeline_trace import PipelineTrace
 from semantic.stance_model import StanceDetector
 
 from reasoning.logical_analyzer import LogicalAnalyzer
+from reasoning.logic_engine import LogicEngine
 from reasoning.rank_reasoner import numeric_rank_reasoning
 from reasoning.year_reasoner import year_reasoning
 from reasoning.contradiction_detector import ConflictAnalyzer
@@ -82,6 +83,7 @@ class ClaimPipeline:
         self.relevance_scorer = RelevanceScorer()
         self.quality_scorer = QualityScorer()
         self.stance = StanceDetector()
+        self.logic_engine = LogicEngine()
         self.conflict_analyzer = ConflictAnalyzer()
 
     async def run(self, claim, source_url=None):
@@ -297,6 +299,20 @@ class ClaimPipeline:
             })
 
         print("Semantic + NLI:", round(time.time() - start, 3), "sec")
+
+        # logic engine reasoning pass
+        logic_verdict = self.logic_engine.analyze(claim, results)
+        if logic_verdict in {"SUPPORT", "REFUTE"}:
+            results.append({
+                "source": "logic_engine",
+                "url": "internal://logic_engine",
+                "text": "Structured reasoning signal",
+                "weight": 0.8,
+                "stance": logic_verdict,
+                "confidence": 0.8,
+                "relevance_score": 1.0,
+                "quality_score": 1.0
+            })
 
         # aggregate final verdict
         start = time.time()
