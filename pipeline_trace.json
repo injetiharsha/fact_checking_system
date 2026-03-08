@@ -1,132 +1,81 @@
 {
-  "claim": "The Earth is flat",
+  "claim": "Humans can breathe in sapce without equipment",
   "search_results": [
     {
-      "source": "The earth is flat",
-      "url": "https://en.wikipedia.org/wiki/The_earth_is_flat"
+      "source": "Effect of spaceflight on the human body - Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Effect_of_spaceflight_on_the_human_body"
     },
     {
-      "source": "Flat Earth - Wikipedia",
-      "url": "https://en.wikipedia.org/wiki/Flat_Earth"
+      "source": "The Silent Suffocation of Space: Why Can\u2019t We Breathe in the ...",
+      "url": "https://smallusefultips.com/why-cant-i-breathe-in-space/"
     },
     {
-      "source": "Flat Earth 'theory': Why do some people think the Earth ... | Live Scie...",
-      "url": "https://www.livescience.com/24310-flat-earth-belief.html"
+      "source": "Why can\u2019t we breathe in space? | Ask Dr. Universe | Washington State University",
+      "url": "https://askdruniverse.wsu.edu/2021/10/08/cant-breathe-space/"
     },
     {
-      "source": "How to debate a flat -Earther - Proven scientific arguments and... | Space",
-      "url": "https://www.space.com/how-to-debate-flat-earther.html"
+      "source": "Ep 85 - What Would Happen If You Tried to Breathe in Space?",
+      "url": "https://www.tidbitswithtitus.com/p/ep-85-what-would-happen-if-you-tried"
     },
     {
-      "source": "Here are 10 \u2018proofs\u2019 that the Earth is actually flat , not... | Metro News",
-      "url": "https://metro.co.uk/2016/07/19/here-are-10-proofs-that-the-earth-is-actually-flat-not-round-6016710/"
+      "source": "Could people breathe the air on Mars?",
+      "url": "https://theconversation.com/could-people-breathe-the-air-on-mars-180504"
     },
     {
-      "source": "How to prove the Earth is round | Popular Science",
-      "url": "https://www.popsci.com/10-ways-you-can-prove-earth-is-round/"
+      "source": "How do astronauts breathe? | Feature | RSC Education",
+      "url": "https://edu.rsc.org/feature/how-do-astronauts-breathe/3009797.article"
     },
     {
-      "source": "Home - The Flat Earth Podcast - DITRH",
-      "url": "https://flatearthdave.com/"
+      "source": "Ask Dr. Universe: Why can't we breathe in space?",
+      "url": "https://www.spokesman.com/stories/2021/oct/07/ask-dr-universe-why-cant-we-breathe-in-space/"
     },
     {
-      "source": "Flat earth Stock Videos & Footage - HD and 4K Video Clips - Alamy",
-      "url": "https://www.alamy.com/stock-video/flat-earth.html"
-    },
-    {
-      "source": "The Earth is Flat ! | HuffPost Contributor",
-      "url": "https://www.huffpost.com/entry/the-earth-is-flat_b_598b61a7e4b08a4c247f27dc"
-    },
-    {
-      "source": "Earth Curvature Calculator",
-      "url": "https://www.omnicalculator.com/physics/earth-curvature"
-    },
-    {
-      "source": "Flat -Earthers going to Antarctica seeking 'truth' about our ' flat ' ...",
-      "url": "https://www.ancient-code.com/flat-earthers-going-to-antarctica-seeking-truth-about-our-flat-earth"
-    },
-    {
-      "source": "Lauren Boebert says ' Earth is flat ' at UFO hearing but Internet...",
-      "url": "https://news.meaww.com/lauren-boebert-says-earth-is-flat-at-ufo-hearing-but-internet-isnt-sure-if-shes-trolling-or-serious"
+      "source": "How long could you survive in space without a spacesuit? | Space",
+      "url": "https://www.space.com/how-long-could-you-survive-in-space-without-spacesuit"
     }
   ],
   "scraped_pages": [],
   "evidence_selected": [
     {
-      "url": "https://metro.co.uk/2016/07/19/here-are-10-proofs-that-the-earth-is-actually-flat-not-round-6016710/",
-      "sentence": "The reality is, however, that the Moon is observably not a solid body, it is clearly circular.\u2019 Here are some of Dubay\u2019s proofs that the Earth is flat\u2026 The horizon always appears perfectly flat \u2013 except in NASA and other government pictures, which are obviously faked (as part of the global conspiracy) You never have to look down to see the horizon, no matter how hard you rise.",
-      "relevance": 1.0,
-      "quality": 0.7
-    },
-    {
-      "url": "https://www.popsci.com/10-ways-you-can-prove-earth-is-round/",
-      "sentence": "Humanity has known the world is not flat for a few millennia, and I\u2019ve been meaning to show more methods on how to prove the Earth is round.",
-      "relevance": 1.0,
-      "quality": 0.3
-    },
-    {
-      "url": "https://flatearthdave.com/",
-      "sentence": "Our mission is to help those seeking to break free from the constraints of both the faith-based heliocentric, globular Earth model and the faith-based atheistic worldview.",
-      "relevance": 0.75,
-      "quality": 0.3
-    },
-    {
-      "url": "https://www.huffpost.com/entry/the-earth-is-flat_b_598b61a7e4b08a4c247f27dc",
-      "sentence": "Chief Photo and Video Analyst MUFON  Clem thinks the world is flat So the Earth is flat... At least that is what our buddy Clem above believes... Why is it that we are seeing a resurgence in those who believe the Earth is flat?",
-      "relevance": 1.0,
-      "quality": 0.7
-    },
-    {
-      "url": "https://www.ancient-code.com/flat-earthers-going-to-antarctica-seeking-truth-about-our-flat-earth",
-      "sentence": "A group of people known as \"Flat Earthers\" actually believe that the Earth is flat, regardless of what science \u2013 or their eyes \u2013 tell them.",
-      "relevance": 0.75,
-      "quality": 0.3
-    },
-    {
-      "url": "https://news.meaww.com/lauren-boebert-says-earth-is-flat-at-ufo-hearing-but-internet-isnt-sure-if-shes-trolling-or-serious",
-      "sentence": "The Earth is flat, birds are government drones, and we've never set foot on the moon, and Joe Biden received 81 million votes in the 2020 election.",
-      "relevance": 0.75,
+      "url": "https://smallusefultips.com/why-cant-i-breathe-in-space/",
+      "sentence": "An astronaut can survive for around 15-30 seconds in space without a suit before the lack of oxygen causes them to lose consciousness.",
+      "relevance": 0.429,
       "quality": 0.5
+    },
+    {
+      "url": "https://www.tidbitswithtitus.com/p/ep-85-what-would-happen-if-you-tried",
+      "sentence": "Right now, humans can\u2019t breathe in space without help.",
+      "relevance": 0.571,
+      "quality": 0.3
     }
   ],
   "stance_predictions": [
     {
-      "url": "https://metro.co.uk/2016/07/19/here-are-10-proofs-that-the-earth-is-actually-flat-not-round-6016710/",
-      "stance": "REFUTE",
-      "confidence": 0.62
-    },
-    {
-      "url": "https://www.huffpost.com/entry/the-earth-is-flat_b_598b61a7e4b08a4c247f27dc",
+      "url": "https://smallusefultips.com/why-cant-i-breathe-in-space/",
       "stance": "NEUTRAL",
-      "confidence": 0.5
+      "confidence": 0.5,
+      "source": "model_low_confidence_or_neutral"
     },
     {
-      "url": "https://news.meaww.com/lauren-boebert-says-earth-is-flat-at-ufo-hearing-but-internet-isnt-sure-if-shes-trolling-or-serious",
+      "url": "https://www.tidbitswithtitus.com/p/ep-85-what-would-happen-if-you-tried",
       "stance": "NEUTRAL",
-      "confidence": 0.5
-    },
-    {
-      "url": "https://www.popsci.com/10-ways-you-can-prove-earth-is-round/",
-      "stance": "REFUTE",
-      "confidence": 0.75
-    },
-    {
-      "url": "https://flatearthdave.com/",
-      "stance": "NEUTRAL",
-      "confidence": 0.5
+      "confidence": 0.5,
+      "source": "model_low_confidence_or_neutral"
     }
   ],
   "final_verdict": {
-    "verdict": "FALSE",
-    "confidence": 1.0
+    "verdict": "NEUTRAL",
+    "confidence": 0
   },
   "claim_type": {
     "type": "factual",
-    "confidence": 0.9997556805610657,
+    "confidence": 0.9695260524749756,
     "reasoning": "Factual-leaning language",
+    "decision_source": "model",
     "scores": {
-      "factual": 0.9997556805610657,
-      "opinion": 0.0002442742697894573
-    }
+      "factual": 0.9695260524749756,
+      "opinion": 0.030473964288830757
+    },
+    "model_confidence": 0.9695260524749756
   }
 }
