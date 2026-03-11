@@ -2,23 +2,16 @@ import re
 
 
 def extract_year(text):
-    match = re.search(r'(19|20)\d{2}', text)
-    if match:
-        return int(match.group())
-    return None
+    years = re.findall(r'(?:19|20)\d{2}', text or "")
+    return [int(year) for year in years]
 
 
 def year_reasoning(claim, evidence_text):
+    claim_years = extract_year(claim)
+    evidence_years = extract_year(evidence_text)
 
-    claim_year = extract_year(claim)
-    evidence_year = extract_year(evidence_text)
-
-    if claim_year and evidence_year:
-
-        if claim_year == evidence_year:
+    if len(claim_years) == 1 and len(evidence_years) == 1:
+        if claim_years[0] == evidence_years[0]:
             return "SUPPORT"
-
-        else:
-            return "REFUTE"
 
     return None

@@ -13,6 +13,12 @@ class ClaimExtractor:
         clean_text = re.sub(r'\[\d+\]', '', document_text)
         clean_text = re.sub(r"\s+", " ", clean_text).strip()
 
+        # Treat short direct inputs as standalone claims instead of forcing
+        # sentence-style document extraction rules.
+        short_words = clean_text.split()
+        if 3 <= len(short_words) <= 20:
+            return [clean_text]
+
         # Split on sentence boundaries, newlines, and semicolons.
         parts = re.split(r'(?<=[.!?])\s+|;\s+|\n+', clean_text)
 
@@ -27,7 +33,7 @@ class ClaimExtractor:
 
             # Drop boilerplate/navigation-like fragments.
             words = part.split()
-            if len(words) < 5 or len(words) > 45:
+            if len(words) < 4 or len(words) > 45:
                 continue
             if sum(ch.isdigit() for ch in part) > 12:
                 continue

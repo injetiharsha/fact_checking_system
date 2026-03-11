@@ -45,7 +45,4 @@ def numeric_rank_reasoning(claim, evidence_text):
     evidence_rank = evidence_ranks[0]
     if evidence_rank == claim_rank:
         return "SUPPORT"
-
-    if evidence_rank != claim_rank:
-        return "REFUTE"
     return None

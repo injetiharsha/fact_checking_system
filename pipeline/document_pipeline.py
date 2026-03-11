@@ -31,7 +31,11 @@ class DocumentPipeline:
         if not text:
             return {"error": "Could not extract text"}
 
-        main_claim = self.extractor.extract_main_claim(text)
+        words = (text or "").strip().split()
+        if source_url is None and 3 <= len(words) <= 20:
+            main_claim = (text or "").strip()
+        else:
+            main_claim = self.extractor.extract_main_claim(text)
         if not main_claim:
             return {
                 "error": (
