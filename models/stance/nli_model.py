@@ -1,4 +1,9 @@
 import re
+import threading
+import json
+import subprocess
+import sys
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -9,27 +14,30 @@ from training.common.config import runtime_model_settings
 
 class NLIModel:
     def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._lock = threading.Lock()
+        runtime = runtime_model_settings("stance")
+        requested_device = runtime.get("device")
+        if requested_device:
+            selected_device = requested_device
+        else:
+            selected_device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = torch.device(selected_device)
         print("Using device:", self.device)
 
         self.model = None
         self.tokenizer = None
         self.model_name = None
+        self.trained_checkpoint = None
+        self.trained_device = requested_device or "cpu"
+        self.helper_script = Path(__file__).with_name("subprocess_infer.py")
 
-        runtime = runtime_model_settings("stance")
         checkpoint = runtime.get("checkpoint")
         if runtime.get("enabled") and checkpoint is not None:
-            try:
-                print(f"Loading trained NLI checkpoint: {checkpoint}")
-                self.tokenizer = AutoTokenizer.from_pretrained(str(checkpoint))
-                self.model = AutoModelForSequenceClassification.from_pretrained(
-                    str(checkpoint)
-                ).to(self.device)
-                self.model_name = str(checkpoint)
-                print(f"Loaded trained NLI checkpoint: {checkpoint}")
-                return
-            except Exception as exc:
-                print(f"Trained NLI checkpoint load failed: {exc}")
+            self.trained_checkpoint = Path(checkpoint)
+            print(
+                "Configured trained NLI checkpoint for isolated inference:",
+                self.trained_checkpoint,
+            )
 
         candidates = [
             "cross-encoder/nli-deberta-v3-small",
@@ -40,11 +48,12 @@ class NLIModel:
             try:
                 print(f"Loading NLI model from cache: {model_name}")
                 self.tokenizer = AutoTokenizer.from_pretrained(
-                    model_name, local_files_only=True
+                    model_name, local_files_only=True, use_fast=False
                 )
                 self.model = AutoModelForSequenceClassification.from_pretrained(
                     model_name, local_files_only=True
                 ).to(self.device)
+                self.model.eval()
                 self.model_name = model_name
                 print(f"Loaded cached NLI model: {model_name}")
                 break
@@ -55,6 +64,11 @@ class NLIModel:
             print("NLIModel fallback: heuristic mode (no cached model)")
 
     def predict(self, claim, evidence):
+        if self.trained_checkpoint is not None:
+            trained_result = self._predict_with_subprocess(claim, evidence)
+            if trained_result is not None:
+                return trained_result
+
         if self.model is None or self.tokenizer is None:
             claim_text = (claim or "").lower()
             text = (evidence or "").lower()
@@ -107,11 +121,66 @@ class NLIModel:
             padding=True,
         ).to(self.device)
 
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            probs = F.softmax(outputs.logits, dim=1)
+        with self._lock:
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                probs = F.softmax(outputs.logits, dim=1)
 
         predicted = torch.argmax(probs, dim=1).item()
         confidence = probs[0][predicted].item()
         label = self.model.config.id2label.get(predicted, f"LABEL_{predicted}")
         return label, confidence
+
+    def _predict_with_subprocess(self, claim, evidence):
+        if not self.helper_script.exists():
+            return None
+
+        command = [
+            sys.executable,
+            str(self.helper_script),
+            "--checkpoint",
+            str(self.trained_checkpoint),
+            "--device",
+            self.trained_device,
+            "--claim",
+            claim,
+            "--evidence",
+            evidence,
+        ]
+
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=45,
+                check=False,
+            )
+        except Exception as exc:
+            print(f"Trained NLI subprocess failed to start: {exc}")
+            return None
+
+        if completed.returncode != 0:
+            stderr = (completed.stderr or "").strip()
+            if stderr:
+                print(f"Trained NLI subprocess failed: {stderr[:300]}")
+            return None
+
+        stdout = (completed.stdout or "").strip().splitlines()
+        if not stdout:
+            return None
+
+        try:
+            payload = json.loads(stdout[-1])
+        except Exception as exc:
+            print(f"Invalid trained NLI subprocess output: {exc}")
+            return None
+
+        label = payload.get("label")
+        confidence = payload.get("confidence")
+        if label is None or confidence is None:
+            return None
+
+        self.model_name = f"trained_subprocess:{self.trained_checkpoint}"
+        return label, float(confidence)

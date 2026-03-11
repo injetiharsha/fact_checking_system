@@ -15,6 +15,7 @@ from evidence.trusted_news.news_api import TrustedNewsAPI
 from evidence.general_search import SearchEngine
 from evidence.scraper import WebScraper
 from evidence.credibility_weights import get_weight
+from evidence.reference_fallback import ReferenceFallback
 
 
 # domains that should never be scraped
@@ -49,6 +50,7 @@ class EvidenceRouter:
         # search + scraping
         self.search_engine = SearchEngine()
         self.scraper = WebScraper()
+        self.reference_fallback = ReferenceFallback()
 
         # ensure log directory exists
         os.makedirs("logs/scraped_pages", exist_ok=True)
@@ -182,6 +184,15 @@ class EvidenceRouter:
             })
 
         print("Search results:", round(time.time() - search_start, 3), "sec")
+
+        if len(evidence_list) < 2:
+            reference_hit = self.reference_fallback.fetch_wikipedia(claim)
+            if reference_hit and not any(
+                ev.get("url") == reference_hit["url"] for ev in evidence_list
+            ):
+                print("\nReference fallback:", _safe_console_text(reference_hit["source"]))
+                print(_safe_console_text(reference_hit["url"]))
+                evidence_list.append(reference_hit)
 
         # ----------------------------
         # 3. Remove duplicate URLs

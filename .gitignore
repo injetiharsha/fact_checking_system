@@ -68,12 +68,21 @@ baseline_prev.json
 data/claim_type/
 data/stance/
 data/relevance/
+data/**/train.jsonl
+data/**/validation.jsonl
+data/**/test.jsonl
+data/**/dataset.jsonl
+data/**/review_queue.json
+training_artifacts/**/*
+checkpoints/**/*
 
 # =========================
 # DATASETS
 # =========================
 data/
 datasets/
+.cache/huggingface/
+.cache/datasets/
 *.csv
 *.tsv
 *.jsonl

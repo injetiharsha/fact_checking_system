@@ -3,6 +3,7 @@ import asyncio
 import nltk
 import json
 import sys
+import re
 from evidence.router import EvidenceRouter
 from evidence.relevance import RelevanceScorer
 from evidence.quality import QualityScorer
@@ -34,7 +35,55 @@ except LookupError:
 # Sentence Extraction
 # ----------------------------------------------------------
 
-def extract_best_sentence(claim, text, relevance_scorer):
+def _normalize_token(token):
+    token = (token or "").lower().strip(".,;:!?()[]{}\"'")
+    if token.endswith("ies") and len(token) > 4:
+        return token[:-3] + "y"
+    if token.endswith("es") and len(token) > 4:
+        return token[:-2]
+    if token.endswith("s") and len(token) > 3:
+        return token[:-1]
+    return token
+
+
+def _token_set(text):
+    tokens = set()
+    for raw in (text or "").lower().split():
+        normalized = _normalize_token(raw)
+        if normalized:
+            tokens.add(normalized)
+    return tokens
+
+
+def _relation_bonus(claim, sentence):
+    claim_text = (claim or "").lower().strip()
+    sent_text = (sentence or "").lower()
+    sent_tokens = _token_set(sentence)
+    bonus = 0.0
+
+    years = re.findall(r"\b(\d{3,4})\b", claim_text)
+    if years and any(year in sent_text for year in years):
+        bonus += 0.2
+
+    for pattern in (
+        r"(.+?)\s+has\s+(.+)$",
+        r"(.+?)\s+is\s+(?:an?|the)?\s*(.+)$",
+        r"(.+?)\s+are\s+(.+)$",
+    ):
+        match = re.match(pattern, claim_text)
+        if not match:
+            continue
+        subject = _token_set(match.group(1))
+        predicate = _token_set(match.group(2))
+        if subject and predicate:
+            if len(subject & sent_tokens) >= 1 and len(predicate & sent_tokens) >= 1:
+                bonus += 0.08
+        break
+
+    return bonus
+
+
+def extract_best_sentences(claim, text, relevance_scorer, max_sentences=2):
 
     if not text:
         return None
@@ -44,10 +93,9 @@ def extract_best_sentence(claim, text, relevance_scorer):
     if not sentences:
         return None
 
-    claim_words = set(claim.lower().split())
+    claim_words = _token_set(claim)
 
-    best_sentence = None
-    best_score = 0
+    sentence_candidates = []
 
     for sent in sentences:
 
@@ -57,14 +105,31 @@ def extract_best_sentence(claim, text, relevance_scorer):
         if len(words) < 6 or len(words) > 80:
             continue
 
-        score = relevance_scorer.score(claim, sent)
+        overlap = len(claim_words & _token_set(sent))
+        fast_score = relevance_scorer.fast_score(claim, sent)
+        semantic_score = relevance_scorer.semantic_score(claim, sent)
+        relation_bonus = _relation_bonus(claim, sent)
+        base_score = (semantic_score * 0.75) + (fast_score * 0.2) + (overlap * 0.02) + relation_bonus
+        sentence_candidates.append((sent, base_score, semantic_score, fast_score))
 
-        overlap = len(claim_words & set(sent.lower().split()))
-        score += overlap * 0.05
+    selected_candidates = []
 
-        if score > best_score:
-            best_score = score
-            best_sentence = sent
+    if relevance_scorer.has_trained_reranker and sentence_candidates:
+        ranked = sorted(sentence_candidates, key=lambda item: item[1], reverse=True)
+        shortlist = ranked[:5]
+        rescored = []
+        for sent, base_score, semantic_score, fast_score in shortlist:
+            trained_score = relevance_scorer.score(claim, sent)
+            combined = (trained_score * 0.8) + (semantic_score * 0.15) + (fast_score * 0.05)
+            rescored.append((sent, combined, trained_score, semantic_score, fast_score))
+        rescored.sort(key=lambda item: item[1], reverse=True)
+        selected_candidates = rescored[:max_sentences]
+    else:
+        ranked = sorted(sentence_candidates, key=lambda item: item[1], reverse=True)
+        selected_candidates = [
+            (sent, score, score, semantic_score, fast_score)
+            for sent, score, semantic_score, fast_score in ranked[:max_sentences]
+        ]
 
     def _safe_console_text(value):
         out = str(value)
@@ -75,9 +140,17 @@ def extract_best_sentence(claim, text, relevance_scorer):
     for s in sentences[:5]:
         print("-", _safe_console_text(s[:120]))
 
-    print("Selected:", _safe_console_text(best_sentence))
+    print("Selected:")
+    for sent, score, _, _, _ in selected_candidates:
+        print("-", _safe_console_text(sent[:180]), f"(score={round(score,3)})")
 
-    return best_sentence
+    return [
+        {
+            "text": sent,
+            "selector_score": round(float(score), 3),
+        }
+        for sent, score, _, _, _ in selected_candidates
+    ]
 
 
 # ----------------------------------------------------------
@@ -93,9 +166,9 @@ class ClaimPipeline:
         self.logical_analyzer = LogicalAnalyzer()
         self.claim_type_classifier = ClaimTypeClassifier()
         self.domain_diversity_filter = DomainDiversityFilter(max_per_domain=2)
-        self.relevance_scorer = RelevanceScorer()
         self.quality_scorer = QualityScorer()
-        self.stance = StanceDetector()
+        self._relevance_scorer = None
+        self._stance = None
         self.logic_engine = LogicEngine()
         self.conflict_analyzer = ConflictAnalyzer()
         self.strong_relevance_threshold = 0.45
@@ -103,6 +176,20 @@ class ClaimPipeline:
         self.soft_relevance_threshold = 0.3
         self.soft_quality_threshold = 0.25
         self.min_strong_evidence_for_forced_verdict = 1
+        self.single_source_decisive_confidence = 0.85
+        self.single_source_min_weight = 0.7
+
+    @property
+    def relevance_scorer(self):
+        if self._relevance_scorer is None:
+            self._relevance_scorer = RelevanceScorer()
+        return self._relevance_scorer
+
+    @property
+    def stance(self):
+        if self._stance is None:
+            self._stance = StanceDetector()
+        return self._stance
 
     def _build_transparency(
         self,
@@ -286,62 +373,62 @@ class ClaimPipeline:
                 continue
 
             # extract best sentence from document
-            best_sentence = extract_best_sentence(
+            best_sentences = extract_best_sentences(
                 claim,
                 text,
-                self.relevance_scorer
+                self.relevance_scorer,
             )
 
-            if not best_sentence:
+            if not best_sentences:
                 continue
 
-            # compute scores
-            relevance_score = self.relevance_scorer.score(claim, best_sentence)
-            quality_score = self.quality_scorer.score(best_sentence)
+            for index, candidate in enumerate(best_sentences):
+                best_sentence = candidate["text"]
+                relevance_score = self.relevance_scorer.score(claim, best_sentence)
+                quality_score = self.quality_scorer.score(best_sentence)
 
-            print("Relevance:", relevance_score)
-            print("Quality:", quality_score)
+                print("Relevance:", relevance_score)
+                print("Quality:", quality_score)
 
-            evidence_tier = None
-            adjusted_weight = ev["weight"]
+                evidence_tier = None
+                adjusted_weight = ev["weight"]
 
-            if (
-                relevance_score >= self.strong_relevance_threshold
-                and quality_score >= self.strong_quality_threshold
-            ):
-                evidence_tier = "strong"
-                strong_evidence_count += 1
-            elif (
-                relevance_score >= self.soft_relevance_threshold
-                and quality_score >= self.soft_quality_threshold
-            ):
-                evidence_tier = "soft"
-                adjusted_weight = round(ev["weight"] * 0.8, 3)
-            else:
-                print("Rejected evidence")
-                continue
+                if (
+                    relevance_score >= self.strong_relevance_threshold
+                    and quality_score >= self.strong_quality_threshold
+                ):
+                    evidence_tier = "strong"
+                    strong_evidence_count += 1
+                elif (
+                    relevance_score >= self.soft_relevance_threshold
+                    and quality_score >= self.soft_quality_threshold
+                ):
+                    evidence_tier = "soft"
+                    adjusted_weight = round(ev["weight"] * (0.8 if index == 0 else 0.72), 3)
+                else:
+                    print("Rejected evidence")
+                    continue
 
-            print(f"Accepted evidence ({evidence_tier})")
+                print(f"Accepted evidence ({evidence_tier})")
 
-            scored_evidence.append({
-                "source": ev["source"],
-                "url": ev["url"],
-                "text": best_sentence,
-                "weight": adjusted_weight,
-                "raw_weight": ev["weight"],
-                "relevance_score": relevance_score,
-                "quality_score": quality_score,
-                "combined_score": round(relevance_score * quality_score, 4),
-                "evidence_tier": evidence_tier,
-            })
+                scored_evidence.append({
+                    "source": ev["source"],
+                    "url": ev["url"],
+                    "text": best_sentence,
+                    "weight": adjusted_weight,
+                    "raw_weight": ev["weight"],
+                    "relevance_score": relevance_score,
+                    "quality_score": quality_score,
+                    "combined_score": round(relevance_score * quality_score, 4),
+                    "evidence_tier": evidence_tier,
+                })
 
-            # store selected evidence in trace
-            trace["evidence_selected"].append({
-                "url": ev["url"],
-                "sentence": best_sentence,
-                "relevance": relevance_score,
-                "quality": quality_score
-            })
+                trace["evidence_selected"].append({
+                    "url": ev["url"],
+                    "sentence": best_sentence,
+                    "relevance": relevance_score,
+                    "quality": quality_score
+                })
 
         # abstain early if no evidence passes filtering
         if not scored_evidence:
@@ -399,23 +486,24 @@ class ClaimPipeline:
             print("Evidence:", highlighted)
 
             stance_result = None
+            stance_result = self.stance.detect(highlighted, claim)
 
-            # apply year reasoning
-            year_check = year_reasoning(claim, highlighted)
-
-            if year_check:
-                stance_result = {"stance": year_check, "confidence": 0.95}
-
-            else:
-
-                # apply rank reasoning
-                rank_check = numeric_rank_reasoning(claim, highlighted)
-
-                if rank_check:
-                    stance_result = {"stance": rank_check, "confidence": 0.99}
-
+            if stance_result.get("stance") == "NEUTRAL":
+                year_check = year_reasoning(claim, highlighted)
+                if year_check:
+                    stance_result = {
+                        "stance": year_check,
+                        "confidence": 0.88,
+                        "source": "heuristic_year_rescue",
+                    }
                 else:
-                    stance_result = self.stance.detect(highlighted, claim)
+                    rank_check = numeric_rank_reasoning(claim, highlighted)
+                    if rank_check:
+                        stance_result = {
+                            "stance": rank_check,
+                            "confidence": 0.9 if rank_check == "REFUTE" else 0.86,
+                            "source": "heuristic_rank_rescue",
+                        }
 
             print("Stance:", stance_result)
 
@@ -474,8 +562,17 @@ class ClaimPipeline:
         # Abstain when there is no reliable non-neutral signal.
         forced_neutral = False
         non_neutral_count = len([r for r in results if r.get("stance") in {"SUPPORT", "REFUTE"}])
+        decisive_single = any(
+            r.get("stance") in {"SUPPORT", "REFUTE"}
+            and float(r.get("confidence", 0.0)) >= self.single_source_decisive_confidence
+            and float(r.get("weight", 0.0)) >= self.single_source_min_weight
+            for r in results
+        )
         if (
-            strong_evidence_count < self.min_strong_evidence_for_forced_verdict
+            (
+                strong_evidence_count < self.min_strong_evidence_for_forced_verdict
+                and not decisive_single
+            )
             or non_neutral_count == 0
         ):
             verdict = "NEUTRAL"

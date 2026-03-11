@@ -1,5 +1,9 @@
 import re
+import json
+import subprocess
+import sys
 from enum import Enum
+from pathlib import Path
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -25,21 +29,20 @@ class ClaimTypeClassifier:
         self.tokenizer = None
         self.model = None
         self.model_mode = "heuristic"
+        self.trained_checkpoint = None
+        self.trained_device = "cpu"
+        self.helper_script = Path(__file__).with_name("subprocess_infer.py")
 
         runtime = runtime_model_settings("claim_type")
         checkpoint = runtime.get("checkpoint")
         if runtime.get("enabled") and checkpoint is not None:
-            try:
-                self.tokenizer = AutoTokenizer.from_pretrained(str(checkpoint))
-                self.model = AutoModelForSequenceClassification.from_pretrained(
-                    str(checkpoint)
-                ).to(self.device)
-                self.model.eval()
-                self.model_mode = "trained_multiclass"
-                print(f"ClaimTypeClassifier using trained checkpoint: {checkpoint}")
-                return
-            except Exception as exc:
-                print(f"ClaimTypeClassifier checkpoint load failed: {exc}")
+            self.trained_checkpoint = Path(checkpoint)
+            self.trained_device = runtime.get("device") or "cpu"
+            self.model_mode = "trained_multiclass"
+            print(
+                "ClaimTypeClassifier using trained checkpoint via isolated inference:",
+                checkpoint,
+            )
 
         candidates = [
             "distilbert-base-uncased-finetuned-sst-2-english",
@@ -65,6 +68,11 @@ class ClaimTypeClassifier:
             print("ClaimTypeClassifier fallback: heuristic mode (no cached model)")
 
     def classify(self, claim: str) -> dict:
+        if self.trained_checkpoint is not None:
+            trained_result = self._classify_with_subprocess(claim)
+            if trained_result is not None:
+                return trained_result
+
         if self.model is None or self.tokenizer is None:
             return self._heuristic_classify(
                 claim,
@@ -89,6 +97,21 @@ class ClaimTypeClassifier:
             raw_label = str(
                 self.model.config.id2label.get(predicted_idx, "FACTUAL")
             ).lower()
+            score_map = {
+                str(self.model.config.id2label.get(idx, idx)).lower(): float(
+                    probabilities[0][idx].item()
+                )
+                for idx in range(probabilities.shape[-1])
+            }
+            if confidence < self.MODEL_CONFIDENCE_THRESHOLD:
+                return self._heuristic_classify(
+                    claim,
+                    decision_source="heuristic_low_trained_model_confidence",
+                    model_scores={
+                        **score_map,
+                        "model_confidence": float(confidence),
+                    },
+                )
             label_map = {
                 "factual": ClaimType.FACTUAL,
                 "opinion": ClaimType.OPINION,
@@ -101,12 +124,7 @@ class ClaimTypeClassifier:
                 "confidence": float(confidence),
                 "reasoning": "Fine-tuned claim type model prediction",
                 "decision_source": "trained_model",
-                "scores": {
-                    str(self.model.config.id2label.get(idx, idx)).lower(): float(
-                        probabilities[0][idx].item()
-                    )
-                    for idx in range(probabilities.shape[-1])
-                },
+                "scores": score_map,
                 "model_confidence": float(confidence),
             }
 
@@ -170,6 +188,22 @@ class ClaimTypeClassifier:
             "terrible",
             "in my opinion",
         ]
+        mixed_markers = [
+            "according to most experts",
+            "according to experts",
+            "experts say",
+            "experts believe",
+            "evidence suggests",
+            "studies suggest",
+            "may",
+            "might",
+            "could",
+            "likely",
+            "appears to",
+            "is expected to",
+            "estimate",
+            "unclear",
+        ]
         factual_markers = [
             "according to",
             "reported",
@@ -177,11 +211,23 @@ class ClaimTypeClassifier:
             "study",
             "percent",
             "population",
-            "in ",
         ]
 
         opinion_hits = sum(1 for w in opinion_markers if w in text)
+        mixed_hits = sum(1 for w in mixed_markers if w in text)
         factual_hits = sum(1 for w in factual_markers if w in text)
+
+        if mixed_hits > 0 and (factual_hits > 0 or opinion_hits > 0 or self._has_numerical_content(text)):
+            result = {
+                "type": ClaimType.MIXED,
+                "confidence": 0.72,
+                "reasoning": "Mixed certainty/attribution markers detected",
+                "scores": {"factual": 0.4, "opinion": 0.2, "mixed": 0.72, "numerical": 0.3},
+                "decision_source": decision_source,
+            }
+            if model_scores:
+                result["model_scores"] = model_scores
+            return result
 
         if self._has_numerical_content(text):
             result = {
@@ -189,6 +235,18 @@ class ClaimTypeClassifier:
                 "confidence": 0.75,
                 "reasoning": "Contains numerical/statistical markers",
                 "scores": {"factual": 0.75, "opinion": 0.25},
+                "decision_source": decision_source,
+            }
+            if model_scores:
+                result["model_scores"] = model_scores
+            return result
+
+        if opinion_hits > 0 and factual_hits > 0:
+            result = {
+                "type": ClaimType.MIXED,
+                "confidence": 0.7,
+                "reasoning": "Both factual and opinion markers detected",
+                "scores": {"factual": 0.45, "opinion": 0.45, "mixed": 0.7},
                 "decision_source": decision_source,
             }
             if model_scores:
@@ -229,6 +287,79 @@ class ClaimTypeClassifier:
         if model_scores:
             result["model_scores"] = model_scores
         return result
+
+    def _classify_with_subprocess(self, claim: str):
+        if not self.helper_script.exists():
+            return None
+
+        command = [
+            sys.executable,
+            str(self.helper_script),
+            "--checkpoint",
+            str(self.trained_checkpoint),
+            "--device",
+            self.trained_device,
+            "--text",
+            claim,
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=45,
+                check=False,
+            )
+        except Exception as exc:
+            print(f"Claim type subprocess failed to start: {exc}")
+            return None
+
+        if completed.returncode != 0:
+            stderr = (completed.stderr or "").strip()
+            if stderr:
+                print(f"Claim type subprocess failed: {stderr[:300]}")
+            return None
+
+        stdout = (completed.stdout or "").strip().splitlines()
+        if not stdout:
+            return None
+
+        try:
+            payload = json.loads(stdout[-1])
+        except Exception as exc:
+            print(f"Invalid claim type subprocess output: {exc}")
+            return None
+
+        raw_label = str(payload.get("label", "FACTUAL")).lower()
+        confidence = float(payload.get("confidence", 0.0))
+        score_map = payload.get("scores", {})
+
+        if confidence < self.MODEL_CONFIDENCE_THRESHOLD:
+            return self._heuristic_classify(
+                claim,
+                decision_source="heuristic_low_trained_model_confidence",
+                model_scores={
+                    **score_map,
+                    "model_confidence": confidence,
+                },
+            )
+
+        label_map = {
+            "factual": ClaimType.FACTUAL,
+            "opinion": ClaimType.OPINION,
+            "mixed": ClaimType.MIXED,
+            "numerical": ClaimType.NUMERICAL,
+        }
+        claim_type = label_map.get(raw_label, ClaimType.FACTUAL)
+        return {
+            "type": claim_type,
+            "confidence": confidence,
+            "reasoning": "Fine-tuned claim type model prediction",
+            "decision_source": "trained_model",
+            "scores": score_map,
+            "model_confidence": confidence,
+        }
 
     @staticmethod
     def _has_numerical_content(text: str) -> bool:

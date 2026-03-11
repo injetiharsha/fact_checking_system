@@ -1,16 +1,22 @@
 seed: 42
 model:
   name: microsoft/deberta-v3-small
+  fallback_models:
+    - cross-encoder/nli-deberta-v3-small
+    - distilbert-base-uncased
 data:
-  train_file: data/stance/v1/train.jsonl
-  validation_file: data/stance/v1/validation.jsonl
+  train_file: data/stance/v3/train.jsonl
+  validation_file: data/stance/v3/validation.jsonl
+  test_file: data/stance/v3/test.jsonl
 training:
   batch_size: 8
   eval_batch_size: 8
   learning_rate: 2.0e-5
-  epochs: 3
+  epochs: 50
   max_length: 256
   logging_steps: 10
+  early_stopping_patience: 5
+  save_total_limit: 2
 output:
-  checkpoint_dir: checkpoints/stance/latest
+  checkpoint_dir: checkpoints/stance/v3_run1
   metrics_dir: training_artifacts/stance

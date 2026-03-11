@@ -10,6 +10,7 @@ from datasets import load_dataset
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
+    EarlyStoppingCallback,
     Trainer,
     TrainingArguments,
 )
@@ -25,12 +26,36 @@ def main() -> None:
     args = parser.parse_args()
     config = load_yaml_config(args.config)
     set_seed(int(config.get("seed", 42)))
+    model_candidates = [config["model"]["name"], *config["model"].get("fallback_models", [])]
 
     dataset = load_dataset("json", data_files={
         "train": str(Path(config["data"]["train_file"])),
         "validation": str(Path(config["data"]["validation_file"])),
+        **(
+            {"test": str(Path(config["data"]["test_file"]))}
+            if config["data"].get("test_file")
+            else {}
+        ),
     })
-    tokenizer = AutoTokenizer.from_pretrained(config["model"]["name"])
+    model_name = None
+    tokenizer = None
+    model = None
+    last_exc = None
+    for candidate in model_candidates:
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(candidate, use_fast=False)
+            model = AutoModelForSequenceClassification.from_pretrained(
+                candidate,
+                num_labels=2,
+                id2label={0: "IRRELEVANT", 1: "RELEVANT"},
+                label2id={"IRRELEVANT": 0, "RELEVANT": 1},
+            )
+            model_name = candidate
+            break
+        except Exception as exc:
+            last_exc = exc
+    if model is None or tokenizer is None:
+        raise RuntimeError(f"Unable to load any configured relevance model: {last_exc}")
 
     def preprocess(batch):
         tokens = tokenizer(
@@ -42,12 +67,10 @@ def main() -> None:
         tokens["labels"] = batch["label"]
         return tokens
 
-    encoded = dataset.map(preprocess, batched=True)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        config["model"]["name"],
-        num_labels=2,
-        id2label={0: "IRRELEVANT", 1: "RELEVANT"},
-        label2id={"IRRELEVANT": 0, "RELEVANT": 1},
+    encoded = dataset.map(
+        preprocess,
+        batched=True,
+        remove_columns=dataset["train"].column_names,
     )
     training_args = TrainingArguments(
         output_dir=config["output"]["checkpoint_dir"],
@@ -57,6 +80,7 @@ def main() -> None:
         num_train_epochs=float(config["training"].get("epochs", 3)),
         evaluation_strategy="epoch",
         save_strategy="epoch",
+        save_total_limit=int(config["training"].get("save_total_limit", 2)),
         logging_steps=int(config["training"].get("logging_steps", 10)),
         load_best_model_at_end=True,
         metric_for_best_model="accuracy",
@@ -75,14 +99,31 @@ def main() -> None:
         eval_dataset=encoded["validation"],
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
+        callbacks=[
+            EarlyStoppingCallback(
+                early_stopping_patience=int(
+                    config["training"].get("early_stopping_patience", 5)
+                )
+            )
+        ],
     )
     trainer.train()
     metrics = trainer.evaluate()
+    test_metrics = None
+    if "test" in encoded:
+        trainer.pop_callback(EarlyStoppingCallback)
+        test_metrics = trainer.evaluate(eval_dataset=encoded["test"], metric_key_prefix="test")
     trainer.save_model(config["output"]["checkpoint_dir"])
-    save_run_metrics(config["output"]["metrics_dir"], "relevance", metrics, {
+    payload = {
         "checkpoint_path": config["output"]["checkpoint_dir"],
+        "model_name": model_name,
         "validation_file": config["data"]["validation_file"],
-    })
+    }
+    if config["data"].get("test_file"):
+        payload["test_file"] = config["data"]["test_file"]
+    if test_metrics:
+        payload["test_metrics"] = test_metrics
+    save_run_metrics(config["output"]["metrics_dir"], "relevance", metrics, payload)
 
 
 if __name__ == "__main__":

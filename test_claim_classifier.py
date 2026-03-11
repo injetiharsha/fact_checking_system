@@ -53,9 +53,14 @@ def test_classifier():
         if is_correct:
             correct += 1
         
+        scores = result.get("scores", {})
+        score_text = ", ".join(
+            f"{label}={value:.2f}" for label, value in sorted(scores.items())
+        ) if scores else "n/a"
+
         print(f"\n{status} Claim: {claim[:50]}...")
         print(f"  Expected: {expected_type:10s} | Got: {pred_type:10s}")
-        print(f"  Confidence: {confidence:.2f} | Scores: factual={result['scores']['factual']:.2f}, opinion={result['scores']['opinion']:.2f}")
+        print(f"  Confidence: {confidence:.2f} | Scores: {score_text}")
     
     print("\n" + "="*60)
     accuracy = (correct / len(test_claims)) * 100

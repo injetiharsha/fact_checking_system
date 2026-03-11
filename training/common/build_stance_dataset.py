@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from training.common.utils import ensure_dir, read_json
+from training.common.utils import ensure_dir, read_json, stratified_split_records
 
 
 def build_records(benchmark_path: Path) -> List[Dict]:
@@ -38,13 +38,6 @@ def build_records(benchmark_path: Path) -> List[Dict]:
     return records
 
 
-def split_records(records: List[Dict], validation_ratio: float = 0.1) -> tuple[List[Dict], List[Dict]]:
-    if len(records) < 2:
-        return records, []
-    split_idx = max(1, int(len(records) * (1 - validation_ratio)))
-    return records[:split_idx], records[split_idx:]
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build weakly labeled stance dataset.")
     parser.add_argument("--benchmark", default="parallel_test_results.json")
@@ -53,13 +46,26 @@ def main() -> None:
 
     records = build_records(Path(args.benchmark))
     output_dir = ensure_dir(args.output_dir)
-    train_rows, val_rows = split_records(records)
-    for file_name, rows in (("train.jsonl", train_rows), ("validation.jsonl", val_rows), ("dataset.jsonl", records)):
+    train_rows, val_rows, test_rows = stratified_split_records(
+        records,
+        label_key="label",
+        validation_ratio=0.1,
+        test_ratio=0.1,
+    )
+    for file_name, rows in (
+        ("train.jsonl", train_rows),
+        ("validation.jsonl", val_rows),
+        ("test.jsonl", test_rows),
+        ("dataset.jsonl", records),
+    ):
         output_path = output_dir / file_name
         with output_path.open("w", encoding="utf-8") as handle:
             for row in rows:
                 handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-    print(f"Wrote {len(train_rows)} train and {len(val_rows)} validation stance examples to {output_dir}")
+    print(
+        f"Wrote {len(train_rows)} train, {len(val_rows)} validation, "
+        f"and {len(test_rows)} test stance examples to {output_dir}"
+    )
 
 
 if __name__ == "__main__":
