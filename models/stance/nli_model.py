@@ -1,11 +1,13 @@
-﻿import re
+import re
+
 import torch
 import torch.nn.functional as F
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from training.common.config import runtime_model_settings
+
 
 class NLIModel:
-
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print("Using device:", self.device)
@@ -13,6 +15,21 @@ class NLIModel:
         self.model = None
         self.tokenizer = None
         self.model_name = None
+
+        runtime = runtime_model_settings("stance")
+        checkpoint = runtime.get("checkpoint")
+        if runtime.get("enabled") and checkpoint is not None:
+            try:
+                print(f"Loading trained NLI checkpoint: {checkpoint}")
+                self.tokenizer = AutoTokenizer.from_pretrained(str(checkpoint))
+                self.model = AutoModelForSequenceClassification.from_pretrained(
+                    str(checkpoint)
+                ).to(self.device)
+                self.model_name = str(checkpoint)
+                print(f"Loaded trained NLI checkpoint: {checkpoint}")
+                return
+            except Exception as exc:
+                print(f"Trained NLI checkpoint load failed: {exc}")
 
         candidates = [
             "cross-encoder/nli-deberta-v3-small",
@@ -77,7 +94,6 @@ class NLIModel:
                 return "REFUTE", 0.75
             if key_overlap >= 0.3 and any(c in text for c in refute_cues):
                 return "REFUTE", 0.62
-
             if key_overlap >= 0.72 and not any(c in text for c in support_blockers):
                 return "SUPPORT", 0.59
 

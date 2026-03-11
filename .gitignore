@@ -63,6 +63,11 @@ htmlcov/
 # Training checkpoints
 checkpoints/
 runs/
+training_artifacts/
+baseline_prev.json
+data/claim_type/
+data/stance/
+data/relevance/
 
 # =========================
 # DATASETS

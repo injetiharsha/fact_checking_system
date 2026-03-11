@@ -1,8 +1,10 @@
-﻿import re
+import re
 from enum import Enum
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+from training.common.config import runtime_model_settings
 
 
 class ClaimType(Enum):
@@ -14,6 +16,7 @@ class ClaimType(Enum):
 
 class ClaimTypeClassifier:
     """Claim type classifier with offline-safe fallback."""
+
     MODEL_CONFIDENCE_THRESHOLD = 0.65
     MIXED_BAND = 0.15
 
@@ -21,6 +24,22 @@ class ClaimTypeClassifier:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.tokenizer = None
         self.model = None
+        self.model_mode = "heuristic"
+
+        runtime = runtime_model_settings("claim_type")
+        checkpoint = runtime.get("checkpoint")
+        if runtime.get("enabled") and checkpoint is not None:
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(str(checkpoint))
+                self.model = AutoModelForSequenceClassification.from_pretrained(
+                    str(checkpoint)
+                ).to(self.device)
+                self.model.eval()
+                self.model_mode = "trained_multiclass"
+                print(f"ClaimTypeClassifier using trained checkpoint: {checkpoint}")
+                return
+            except Exception as exc:
+                print(f"ClaimTypeClassifier checkpoint load failed: {exc}")
 
         candidates = [
             "distilbert-base-uncased-finetuned-sst-2-english",
@@ -36,6 +55,7 @@ class ClaimTypeClassifier:
                     model_name, local_files_only=True
                 ).to(self.device)
                 self.model.eval()
+                self.model_mode = "cached_binary"
                 print(f"ClaimTypeClassifier using cached model: {model_name}")
                 break
             except Exception:
@@ -63,6 +83,33 @@ class ClaimTypeClassifier:
             logits = outputs.logits
             probabilities = torch.nn.functional.softmax(logits, dim=-1)
 
+        if probabilities.shape[-1] >= 4 and self.model_mode == "trained_multiclass":
+            predicted_idx = torch.argmax(probabilities, dim=-1).item()
+            confidence = probabilities[0][predicted_idx].item()
+            raw_label = str(
+                self.model.config.id2label.get(predicted_idx, "FACTUAL")
+            ).lower()
+            label_map = {
+                "factual": ClaimType.FACTUAL,
+                "opinion": ClaimType.OPINION,
+                "mixed": ClaimType.MIXED,
+                "numerical": ClaimType.NUMERICAL,
+            }
+            claim_type = label_map.get(raw_label, ClaimType.FACTUAL)
+            return {
+                "type": claim_type,
+                "confidence": float(confidence),
+                "reasoning": "Fine-tuned claim type model prediction",
+                "decision_source": "trained_model",
+                "scores": {
+                    str(self.model.config.id2label.get(idx, idx)).lower(): float(
+                        probabilities[0][idx].item()
+                    )
+                    for idx in range(probabilities.shape[-1])
+                },
+                "model_confidence": float(confidence),
+            }
+
         if probabilities.shape[-1] < 2:
             return self._heuristic_classify(
                 claim,
@@ -73,7 +120,6 @@ class ClaimTypeClassifier:
         opinion_prob = probabilities[0][1].item()
         model_confidence = max(factual_prob, opinion_prob)
 
-        # Low-confidence model predictions are routed through conservative heuristics.
         if model_confidence < self.MODEL_CONFIDENCE_THRESHOLD:
             return self._heuristic_classify(
                 claim,
@@ -160,6 +206,7 @@ class ClaimTypeClassifier:
             if model_scores:
                 result["model_scores"] = model_scores
             return result
+
         if factual_hits > opinion_hits:
             result = {
                 "type": ClaimType.FACTUAL,
