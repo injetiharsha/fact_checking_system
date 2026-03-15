@@ -12,7 +12,7 @@ training:
   batch_size: 8
   eval_batch_size: 8
   learning_rate: 1.0e-5
-  epochs: 100
+  epochs: 50
   max_length: 192
   logging_steps: 20
   early_stopping_patience: 12
