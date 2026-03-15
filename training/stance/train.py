@@ -142,6 +142,15 @@ def _tokenized_cache_dir(config) -> Path | None:
     return Path(cache_dir)
 
 
+def _cuda_default(config: dict, key: str, default):
+    training = config.get("training", {})
+    if key in training:
+        return training[key]
+    if torch.cuda.is_available():
+        return default
+    return None
+
+
 def _load_or_build_encoded_dataset(config, dataset, tokenizer, progress: ProgressWriter):
     cache_dir = _tokenized_cache_dir(config)
     if cache_dir and cache_dir.exists():
@@ -207,6 +216,11 @@ def main() -> None:
     if torch.cuda.is_available():
         device_name = torch.cuda.get_device_name(0)
         print(f"CUDA device: {device_name}", flush=True)
+        if hasattr(torch.backends, "cuda") and hasattr(torch.backends.cuda, "matmul"):
+            allow_tf32 = bool(config.get("training", {}).get("tf32", True))
+            torch.backends.cuda.matmul.allow_tf32 = allow_tf32
+            torch.backends.cudnn.allow_tf32 = allow_tf32
+            print(f"TF32 enabled: {allow_tf32}", flush=True)
         progress.update("environment", cuda_available=True, cuda_device=device_name)
 
     print("Loading dataset files...", flush=True)
@@ -226,10 +240,14 @@ def main() -> None:
     progress.update("preparing_trainer")
     evaluation_strategy = str(config["training"].get("evaluation_strategy", "epoch"))
     save_strategy = str(config["training"].get("save_strategy", evaluation_strategy))
+    cuda_batch = _cuda_default(config, "batch_size", 32)
+    cuda_eval_batch = _cuda_default(config, "eval_batch_size", cuda_batch or 32)
+    cuda_fp16 = _cuda_default(config, "fp16", True)
+    cuda_workers = _cuda_default(config, "dataloader_num_workers", 2)
     training_args_kwargs = {
         "output_dir": config["output"]["checkpoint_dir"],
-        "per_device_train_batch_size": int(config["training"].get("batch_size", 8)),
-        "per_device_eval_batch_size": int(config["training"].get("eval_batch_size", 8)),
+        "per_device_train_batch_size": int(config["training"].get("batch_size", cuda_batch or 8)),
+        "per_device_eval_batch_size": int(config["training"].get("eval_batch_size", cuda_eval_batch or 8)),
         "learning_rate": float(config["training"].get("learning_rate", 2e-5)),
         "num_train_epochs": float(config["training"].get("epochs", 3)),
         "evaluation_strategy": evaluation_strategy,
@@ -241,13 +259,20 @@ def main() -> None:
         "metric_for_best_model": str(config["training"].get("metric_for_best_model", "accuracy")),
         "report_to": [],
         "disable_tqdm": bool(config["training"].get("disable_tqdm", True)),
-        "fp16": bool(config["training"].get("fp16", False)),
+        "fp16": bool(config["training"].get("fp16", cuda_fp16 if cuda_fp16 is not None else False)),
         "gradient_accumulation_steps": int(config["training"].get("gradient_accumulation_steps", 1)),
+        "dataloader_num_workers": int(config["training"].get("dataloader_num_workers", cuda_workers or 0)),
+        "dataloader_pin_memory": bool(config["training"].get("dataloader_pin_memory", torch.cuda.is_available())),
+        "group_by_length": bool(config["training"].get("group_by_length", torch.cuda.is_available())),
+        "torch_compile": bool(config["training"].get("torch_compile", False)),
+        "optim": str(config["training"].get("optim", "adamw_torch")),
     }
     if save_strategy == "steps":
         training_args_kwargs["save_steps"] = int(config["training"].get("save_steps", config["training"].get("logging_steps", 500)))
     if evaluation_strategy == "steps":
         training_args_kwargs["eval_steps"] = int(config["training"].get("eval_steps", config["training"].get("save_steps", config["training"].get("logging_steps", 500))))
+    print(f"Effective train batch: {training_args_kwargs['per_device_train_batch_size']}, eval batch: {training_args_kwargs['per_device_eval_batch_size']}, fp16: {training_args_kwargs['fp16']}, workers: {training_args_kwargs['dataloader_num_workers']}, compile: {training_args_kwargs['torch_compile']}", flush=True)
+    progress.update("trainer_config", **{k: training_args_kwargs[k] for k in ['per_device_train_batch_size', 'per_device_eval_batch_size', 'fp16', 'dataloader_num_workers', 'torch_compile']})
     training_args = TrainingArguments(**training_args_kwargs)
 
     def compute_metrics(eval_pred):

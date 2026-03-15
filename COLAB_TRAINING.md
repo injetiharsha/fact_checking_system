@@ -12,8 +12,8 @@ What the notebook now does:
 - installs Colab-safe training dependencies
 - builds `stage1_public_small`
 - creates Colab-specific configs with:
-  - `batch_size=32`
-  - `eval_batch_size=32`
+  - `batch_size=48`
+  - `eval_batch_size=48`
   - `max_length=256`
   - `fp16=true`
   - step checkpointing
@@ -47,3 +47,8 @@ ENABLE_TRAINED_STANCE=1
 STANCE_CHECKPOINT=checkpoints/stance/stage2_hardcases_small
 ENABLE_VERIFIER_V2=1
 ```
+
+
+T4 tuning note:
+- the notebook now targets `batch_size=48` on a T4
+- if Colab throws CUDA out-of-memory, lower both train/eval batch sizes to `32` in the generated config cell
