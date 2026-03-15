@@ -43,6 +43,7 @@ secrets.json
 # Local model and training artifacts
 checkpoints/
 training_artifacts/
+trained_models/
 runs/
 .gradio/
 
