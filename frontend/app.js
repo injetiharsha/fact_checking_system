@@ -392,7 +392,7 @@ function renderDocumentResult(data) {
   const sourceUrl = data.source_url ? `<p class="meta">Source: <a href="${escapeAttr(data.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(data.source_url)}</a></p>` : "";
   const primaryClaim = Array.isArray(data.results) && data.results[0] ? data.results[0] : null;
   const primary = primaryClaim ? claimResultHtml(primaryClaim, null, false) : "<p>No claim result returned.</p>";
-  const sourceEvidence = primaryClaim ? filterEvidence(primaryClaim.evidence || []) : [];
+  const sourceEvidence = primaryClaim ? getDisplayEvidence(primaryClaim) : [];
   renderInlineSourcePreview(sourceEvidence);
   resultsNode.innerHTML = [
     cardHtml("Document Summary", `${sourceUrl}${summary}`),
@@ -401,7 +401,7 @@ function renderDocumentResult(data) {
 }
 
 function renderClaimResult(data) {
-  const filteredEvidence = filterEvidence(data.evidence || []);
+  const filteredEvidence = getDisplayEvidence(data);
   renderInlineSourcePreview(filteredEvidence);
   resultsNode.innerHTML = [
     claimResultHtml(data, null, false),
@@ -409,7 +409,7 @@ function renderClaimResult(data) {
 }
 
 function claimResultHtml(data, index = null, includeSourcePreview = false) {
-  const filteredEvidence = filterEvidence(data.evidence || []);
+  const filteredEvidence = getDisplayEvidence(data);
   const transparency = (data && data.transparency) || {};
   const verdict = (data.final_verdict || "NEUTRAL").toUpperCase();
   const verdictClass = verdict === "SUPPORT" ? "support" : verdict === "REFUTE" ? "refute" : "neutral";
@@ -443,7 +443,7 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
             Confidence: ${formatPct(ev.confidence)} |
             Weight: ${num(ev.weight)}
           </p>
-          ${ev.url ? `<a href="${escapeAttr(ev.url)}" target="_blank" rel="noopener noreferrer">Open source</a>` : ""}
+          ${ev.stance === "UNSCORED" ? `<p class="meta">Retrieved and cleaned, but not strong enough to use for final scoring.</p>` : ""}\n          ${ev.url ? `<a href="${escapeAttr(ev.url)}" target="_blank" rel="noopener noreferrer">Open source</a>` : ""}
         </article>
       `;
     })
@@ -547,6 +547,12 @@ function filterEvidence(evidence) {
     if (url.startsWith("internal://")) return false;
     return true;
   });
+}
+
+function getDisplayEvidence(data) {
+  const primary = filterEvidence((data && data.evidence) || []);
+  if (primary.length) return primary;
+  return filterEvidence((((data || {}).transparency || {}).fallback_evidence_preview) || []);
 }
 
 function renderSourceMedia(evidence) {
@@ -794,3 +800,4 @@ function formatKb(bytes) {
   if (typeof bytes !== "number") return "unknown size";
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
+

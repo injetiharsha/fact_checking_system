@@ -612,6 +612,7 @@ class ClaimPipeline:
         strong_evidence_count,
         forced_neutral,
         logic_engine_injected,
+        fallback_evidence_preview=None,
         trace=None,
     ):
         stance_source_counts = {}
@@ -682,7 +683,22 @@ class ClaimPipeline:
                 "forced_neutral_due_to_weak_evidence": forced_neutral,
                 "logic_engine_injected": logic_engine_injected,
             },
+            "fallback_evidence_preview": list(fallback_evidence_preview or []),
         }
+
+    def _build_fallback_evidence_preview(self, evidence_rows, limit=5):
+        preview = []
+        for ev in evidence_rows[:limit]:
+            preview.append({
+                "source": ev.get("source", "Unknown"),
+                "url": ev.get("url"),
+                "text": ev.get("text", ""),
+                "weight": round(float(ev.get("weight", 0.0)), 3),
+                "confidence": 0.0,
+                "stance": "UNSCORED",
+                "stance_source": "retrieved_preview",
+            })
+        return preview
 
     async def run(self, claim, source_url=None):
 
@@ -940,10 +956,11 @@ class ClaimPipeline:
         # abstain early if no evidence passes filtering
         if not scored_evidence:
             print("No usable evidence found - abstaining")
+            fallback_evidence_preview = self._build_fallback_evidence_preview(evidence_raw)
             return {
                 "claim": claim,
                 "language": language,
-                "evidence": [],
+                "evidence": fallback_evidence_preview,
                 "final_verdict": "NEUTRAL",
                 "confidence": 0.45,
                 "conflict_analysis": "Insufficient evidence",
@@ -961,6 +978,7 @@ class ClaimPipeline:
                     strong_evidence_count=0,
                     forced_neutral=True,
                     logic_engine_injected=False,
+                    fallback_evidence_preview=fallback_evidence_preview,
                     trace=trace,
                 ),
                 "search_queries": list(trace.get("search_queries", [])),
@@ -1164,6 +1182,7 @@ class ClaimPipeline:
             strong_evidence_count=strong_evidence_count,
             forced_neutral=forced_neutral,
             logic_engine_injected=logic_engine_injected,
+            fallback_evidence_preview=[],
             trace=trace,
         )
 
