@@ -35,16 +35,18 @@ Recommended flow:
 What to download if you want a backup in the middle:
 - `stance_stage1_public_small.zip`
 
+Stage 2 in Colab now builds the benchmark-driven `stage2_hardcases_v2` dataset before training.
+
 What to download at the end:
-- `stance_stage2_hardcases_small.zip`
+- `stance_stage2_hardcases_v2.zip`
 
 After download, place the final checkpoint back into this repo under:
-- `checkpoints/stance/stage2_hardcases_small`
+- `checkpoints/stance/stage2_hardcases_v2`
 
 Then enable it with env like:
 ```env
 ENABLE_TRAINED_STANCE=1
-STANCE_CHECKPOINT=checkpoints/stance/stage2_hardcases_small
+STANCE_CHECKPOINT=checkpoints/stance/stage2_hardcases_v2
 ENABLE_VERIFIER_V2=1
 ```
 
