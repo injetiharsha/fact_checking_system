@@ -11,7 +11,7 @@ What the notebook now does:
 - clones the repo safely into `/content`
 - installs Colab-safe training dependencies
 - builds `stage1_public_small`
-- creates Colab-specific configs with:
+- regenerates Colab-specific configs automatically before stage 1 and stage 2 with:
   - `batch_size=48`
   - `eval_batch_size=48`
   - `max_length=256`
@@ -26,7 +26,7 @@ Why this is safer for free Colab sessions:
 - you can download a stage-1 backup before starting stage 2
 
 Recommended flow:
-1. run the notebook top to bottom
+1. run the notebook top to bottom (the train cells refresh the Colab configs automatically)
 2. finish stage 1
 3. run the stage-1 zip cell and optionally download it
 4. run stage 2
