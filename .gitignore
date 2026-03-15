@@ -1,123 +1,86 @@
-# =========================
-# OS FILES
-# =========================
+# OS files
 .DS_Store
 Thumbs.db
 Desktop.ini
 
-# =========================
-# EDITOR / IDE
-# =========================
+# Editors / IDEs
 .vscode/
 .idea/
 *.iml
 
-# =========================
-# PYTHON
-# =========================
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Virtual environments
-venv/
-env/
-ENV/
-.venv/
-
-# Python distribution
-build/
-dist/
-*.egg-info/
-.eggs/
-
-# =========================
-# LOGS
-# =========================
-*.log
-logs/
-
-# =========================
-# JUPYTER
-# =========================
-.ipynb_checkpoints/
-
-# =========================
-# TESTING / CACHE
-# =========================
 .pytest_cache/
 .mypy_cache/
 .coverage
 htmlcov/
 
-# =========================
-# MACHINE LEARNING
-# =========================
-# Model weights
-*.h5
-*.pt
-*.pth
-*.ckpt
-*.onnx
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
 
-# Training checkpoints
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs and runtime caches
+*.log
+logs/
+.cache/
+
+# Environment / secrets
+.env
+.env.*
+*.env
+secrets.json
+
+# Local model and training artifacts
 checkpoints/
-runs/
 training_artifacts/
+runs/
+.gradio/
+
+# Generated benchmark/debug outputs
+batch_results.json
+multi_test_results.json
+parallel_test_results.json
+pipeline_trace.json
+benchmark_trained.log
+benchmark_trained_stdout.log
+benchmark_trained_stderr.log
 baseline_prev.json
-data/claim_type/
-data/stance/
-data/relevance/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+temp_*.pdf
+temp_*.png
+temp_test.py
+temp_test2.py
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Downloaded / generated datasets and caches
+datasets/
 data/**/train.jsonl
 data/**/validation.jsonl
 data/**/test.jsonl
 data/**/dataset.jsonl
 data/**/review_queue.json
-training_artifacts/**/*
-checkpoints/**/*
 
-# =========================
-# DATASETS
-# =========================
-data/
-datasets/
-.cache/huggingface/
-.cache/datasets/
-*.csv
-*.tsv
-*.jsonl
+# Browser / automation
+playwright-report/
 
-# =========================
-# ENVIRONMENT VARIABLES
-# =========================
-.env
-.env.*
-*.env
-secrets.json
-config.json
-
-# =========================
-# TEMP FILES
-# =========================
-*.tmp
-*.bak
-*.swp
-
-# =========================
-# Docker (if you use later)
-# =========================
-docker-compose.override.
-
-debug_pipeline_flow.py
-temp_test.py
-batch_results.json
-__init__.py
-
-*.json
-*.pdf
-*png
-*.jpg
-*.jpeg
-
-pipeline_trace.json
-parallel_test_results.json
+# Keep source assets tracked by default:
+# - markdown corpus files
+# - checked-in JSON fixtures
+# - checked-in PDFs/images when intentionally added
