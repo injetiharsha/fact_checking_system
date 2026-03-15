@@ -166,6 +166,196 @@ HARD_CASES = [
         "evidence": "Health agencies warn that ingesting bleach can cause serious harm.",
         "label": "REFUTE",
     },
+    {
+        "claim": "Australia is both a country and a continent",
+        "evidence": "Australia is both a sovereign country and the name of a continent.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Australia is both a country and a continent",
+        "evidence": "Australia is the only country that occupies an entire continent.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Venus rotates in the opposite direction to most planets",
+        "evidence": "Venus rotates in the opposite direction from most other planets in the Solar System.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Venus rotates in the opposite direction to most planets",
+        "evidence": "Venus has retrograde rotation, unlike most planets.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Mars has two moons",
+        "evidence": "Mars has two small moons, Phobos and Deimos.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Mars has two moons",
+        "evidence": "The two natural satellites of Mars are called Phobos and Deimos.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "The Berlin Wall fell in 1989",
+        "evidence": "The Berlin Wall fell in November 1989.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "The Berlin Wall fell in 1989",
+        "evidence": "The opening of the Berlin Wall in 1989 marked the beginning of German reunification.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Sharks are older than trees",
+        "evidence": "Sharks appeared millions of years before the first trees evolved.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Sharks are older than trees",
+        "evidence": "The earliest sharks predate the earliest known trees.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Humans can breathe in space without equipment",
+        "evidence": "Humans cannot breathe in the vacuum of space without protective equipment.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "Humans can breathe in space without equipment",
+        "evidence": "In space, a person without life support would suffocate within seconds.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "Climate change is a hoax",
+        "evidence": "Climate change is real and supported by overwhelming scientific evidence.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "Climate change is a hoax",
+        "evidence": "Calling climate change a hoax contradicts the scientific consensus that global warming is occurring.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "The moon landing was faked",
+        "evidence": "The Apollo Moon landings were real, and claims that they were faked are conspiracy theories.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "The moon landing was faked",
+        "evidence": "Statements describing the Moon landing as fake are examples of conspiracy claims, not evidence that it was faked.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "Africa is the largest continent on Earth",
+        "evidence": "Asia, not Africa, is the largest continent on Earth.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "Africa is the largest continent on Earth",
+        "evidence": "Africa is the second-largest continent after Asia.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "The printing press was invented by Johannes Gutenberg",
+        "evidence": "Johannes Gutenberg invented the movable-type printing press in Europe.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "The United Nations was founded after World War II",
+        "evidence": "The United Nations was founded in 1945 after World War II.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Climate change is a hoax",
+        "evidence": "Climate change denial is a form of science denial characterized by rejecting the extensive evidence for anthropogenic global warming.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "Climate change is a hoax",
+        "evidence": "Rejecting the scientific consensus on climate change does not make climate change a hoax; it is a denial of established evidence.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "Africa is the largest continent on Earth",
+        "evidence": "Africa is the world's second-largest continent after Asia.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "Africa is the largest continent on Earth",
+        "evidence": "Asia is larger than Africa by land area.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "Venus rotates in the opposite direction to most planets",
+        "evidence": "Venus has retrograde rotation, unlike most planets in the Solar System.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Venus rotates in the opposite direction to most planets",
+        "evidence": "Venus spins backward compared with most other planets.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Mars has two moons",
+        "evidence": "Mars has two natural satellites, Phobos and Deimos.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Mars has two moons",
+        "evidence": "The two moons of Mars are named Phobos and Deimos.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "The printing press was invented by Johannes Gutenberg",
+        "evidence": "Johannes Gutenberg invented the printing press in Europe around 1440.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "The printing press was invented by Johannes Gutenberg",
+        "evidence": "Gutenberg is credited with introducing mechanical movable-type printing to Europe.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "The Berlin Wall fell in 1989",
+        "evidence": "The Berlin Wall fell in November 1989.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "The Berlin Wall fell in 1989",
+        "evidence": "The Wall opened in 1989 and its demolition began soon afterward.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "The United Nations was founded after World War II",
+        "evidence": "The UN Charter was signed in 1945, after the Second World War ended.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "The United Nations was founded after World War II",
+        "evidence": "The United Nations was established in 1945, following World War II.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Sharks are older than trees",
+        "evidence": "Sharks evolved before trees appeared on Earth.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Sharks are older than trees",
+        "evidence": "The earliest sharks predate the first trees by millions of years.",
+        "label": "SUPPORT",
+    },
+    {
+        "claim": "Humans can breathe in space without equipment",
+        "evidence": "Humans cannot breathe in outer space without a spacesuit or life-support system.",
+        "label": "REFUTE",
+    },
+    {
+        "claim": "Humans can breathe in space without equipment",
+        "evidence": "Outer space is a vacuum, so unprotected humans cannot breathe there.",
+        "label": "REFUTE",
+    },
 ]
 
 
@@ -188,13 +378,22 @@ def write_jsonl(path: Path, rows):
 def main():
     parser = argparse.ArgumentParser(description="Augment stance dataset with curated hard cases.")
     parser.add_argument("--input-dataset", default="data/stance/v2/dataset.jsonl")
-    parser.add_argument("--output-dir", default="data/stance/v3")
+    parser.add_argument("--output-dir", default="data/stance/v5")
     args = parser.parse_args()
 
     base_rows = read_jsonl(Path(args.input_dataset))
     extra_rows = []
+    seen_pairs = set()
     next_id = len(base_rows) + 1
     for row in HARD_CASES:
+        dedupe_key = (
+            row["claim"].strip().lower(),
+            row["evidence"].strip().lower(),
+            row["label"].strip().upper(),
+        )
+        if dedupe_key in seen_pairs:
+            continue
+        seen_pairs.add(dedupe_key)
         extra_rows.append(
             {
                 "id": f"stance_hard_{next_id}",
@@ -224,7 +423,7 @@ def main():
     write_jsonl(output_dir / "dataset.jsonl", merged)
 
     print(
-        f"Wrote stance v3 dataset to {output_dir} "
+        f"Wrote stance hardcase dataset to {output_dir} "
         f"(base={len(base_rows)}, hardcases={len(extra_rows)}, total={len(merged)})"
     )
 

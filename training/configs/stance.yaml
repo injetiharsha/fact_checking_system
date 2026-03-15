@@ -5,9 +5,9 @@ model:
     - cross-encoder/nli-deberta-v3-small
     - distilbert-base-uncased
 data:
-  train_file: data/stance/v3/train.jsonl
-  validation_file: data/stance/v3/validation.jsonl
-  test_file: data/stance/v3/test.jsonl
+  train_file: data/stance/v5/train.jsonl
+  validation_file: data/stance/v5/validation.jsonl
+  test_file: data/stance/v5/test.jsonl
 training:
   batch_size: 8
   eval_batch_size: 8
@@ -18,5 +18,5 @@ training:
   early_stopping_patience: 5
   save_total_limit: 2
 output:
-  checkpoint_dir: checkpoints/stance/v3_run1
+  checkpoint_dir: checkpoints/stance/v5_run1
   metrics_dir: training_artifacts/stance

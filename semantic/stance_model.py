@@ -1,6 +1,7 @@
-﻿# semantic/stance_model.py
+# semantic/stance_model.py
 
 import re
+import sys
 from models.stance.nli_model import NLIModel
 
 
@@ -10,8 +11,9 @@ class StanceDetector:
     SUPPORT_MIN_CONFIDENCE = 0.72
     REFUTE_MIN_CONFIDENCE = 0.58
 
-    def __init__(self):
+    def __init__(self, v2_mode=False):
         self.model = NLIModel()
+        self.v2_mode = v2_mode
 
     def detect(self, evidence, claim):
         evidence = (evidence or "")[:800]
@@ -32,8 +34,16 @@ class StanceDetector:
         }
 
         print("\nNLI INPUT")
-        print("Claim:", claim)
-        print("Evidence:", evidence)
+        safe_claim = (claim or "").replace("\ufeff", "").encode(
+            sys.stdout.encoding or "utf-8",
+            errors="replace",
+        ).decode(sys.stdout.encoding or "utf-8", errors="replace")
+        safe_evidence = (evidence or "").replace("\ufeff", "").encode(
+            sys.stdout.encoding or "utf-8",
+            errors="replace",
+        ).decode(sys.stdout.encoding or "utf-8", errors="replace")
+        print("Claim:", safe_claim)
+        print("Evidence:", safe_evidence)
         print("Prediction:", label, confidence)
 
         stance = stance_map.get(label, "NEUTRAL")
@@ -135,6 +145,10 @@ class StanceDetector:
             return "REFUTE"
 
         if stance == "SUPPORT":
+            if self.v2_mode and self._has_explicit_refute_language(text):
+                return None
+            if self._has_temporal_support_anchor(claim_text, text, token_overlap, confidence):
+                return "SUPPORT"
             if confidence < self.SUPPORT_MIN_CONFIDENCE:
                 return None
             if shape_claim and any(term in evidence_tokens for term in shape_refute_terms):
@@ -151,3 +165,37 @@ class StanceDetector:
             return None
 
         return None
+
+    def _has_explicit_refute_language(self, text):
+        refute_markers = (
+            "does not",
+            "doesn't",
+            "will not",
+            "cannot",
+            "can't",
+            "not protect",
+            "not prevent",
+            "not cure",
+            "no evidence",
+            "false",
+            "myth",
+            "hoax",
+            "debunk",
+            "dangerous",
+        )
+        return any(marker in (text or "") for marker in refute_markers)
+
+    def _has_temporal_support_anchor(self, claim_text, evidence_text, token_overlap, confidence):
+        if confidence < 0.58 or token_overlap < 2:
+            return False
+        temporal_claim = (
+            bool(re.search(r"\b(?:19|20)\d{2}\b", claim_text))
+            or any(token in claim_text for token in ("founded", "established", "fell", "began", "created", "started"))
+        )
+        temporal_evidence = (
+            bool(re.search(r"\b(?:19|20)\d{2}\b", evidence_text))
+            or any(token in evidence_text for token in ("founded", "established", "fell", "began", "created", "started", "officially began"))
+        )
+        return temporal_claim and temporal_evidence
+
+

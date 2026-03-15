@@ -1,8 +1,6 @@
 # evidence/scraper.py
-
-import requests
-from bs4 import BeautifulSoup
 import urllib3
+from evidence.extraction_utils import fetch_and_extract
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class WebScraper:
@@ -19,6 +17,10 @@ class WebScraper:
         self.timeout = 6
 
     def scrape(self, url):
+        result = self.scrape_with_metadata(url)
+        return result.get("text") if result.get("ok") else None
+
+    def scrape_with_metadata(self, url):
 
         print("\nScraping:", url)
 
@@ -26,44 +28,48 @@ class WebScraper:
 
             # Skip non HTML content
             if url.endswith(".pdf"):
-                return None
+                return {
+                    "ok": False,
+                    "text": "",
+                    "extractor": "none",
+                    "word_count": 0,
+                    "cache_hit": False,
+                    "reject_reason": "pdf_skipped",
+                }
 
-            response = requests.get(
+            result = fetch_and_extract(
                 url,
-                headers=self.headers,
+                self.headers,
                 timeout=self.timeout,
-                verify=False  # fixes SSL errors
+                retries=2,
+                verify=False,
+                cache_dir="logs/extraction_cache",
             )
+            print(
+                "Extraction:",
+                result.get("extractor"),
+                "| words:",
+                result.get("word_count", 0),
+                "| cache:",
+                result.get("cache_hit", False),
+                "| reject:",
+                result.get("reject_reason"),
+            )
+            text = result.get("text") or ""
+            if not result.get("ok") or not text:
+                return result
 
-            if response.status_code != 200:
-                return None
-
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            paragraphs = soup.find_all("p")
-
-            text = " ".join(p.get_text() for p in paragraphs)
-
-            text = text.strip()
-
-            if len(text.split()) < 30:
-                return None
-            
             print("Scraped length:", len(text.split()), "words")
             print("Preview:", text[:200])
 
-            return text
-        
-
-
-        except requests.exceptions.Timeout:
-            return None
-
-        except requests.exceptions.SSLError:
-            return None
-
-        except requests.exceptions.ConnectionError:
-            return None
+            return result
 
         except Exception:
-            return None
+            return {
+                "ok": False,
+                "text": "",
+                "extractor": "none",
+                "word_count": 0,
+                "cache_hit": False,
+                "reject_reason": "scrape_exception",
+            }

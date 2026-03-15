@@ -1,12 +1,12 @@
-seed: 42
+﻿seed: 42
 model:
   name: microsoft/deberta-v3-small
   fallback_models:
     - distilbert-base-uncased
 data:
-  train_file: data/relevance/v3/train.jsonl
-  validation_file: data/relevance/v3/validation.jsonl
-  test_file: data/relevance/v3/test.jsonl
+  train_file: data/relevance/v7/train.jsonl
+  validation_file: data/relevance/v7/validation.jsonl
+  test_file: data/relevance/v7/test.jsonl
 training:
   batch_size: 8
   eval_batch_size: 8
@@ -17,5 +17,9 @@ training:
   early_stopping_patience: 5
   save_total_limit: 2
 output:
-  checkpoint_dir: checkpoints/relevance/v3_run1
+  checkpoint_dir: checkpoints/relevance/v7_run1
   metrics_dir: training_artifacts/relevance
+
+
+
+

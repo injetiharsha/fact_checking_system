@@ -1,0 +1,65 @@
+[
+  {
+    "source": "Local Corpus",
+    "url": "",
+    "title": "mospi india",
+    "file_name": "mospi_india.md",
+    "text": "﻿Source: MOSPI URL: https://www.mospi.gov.in/ Title: MOSPI MOSPI is a core Indian government statistics source for economic and demographic indicators. It should be preferred for official Indian statistics when structured evidence is needed."
+  },
+  {
+    "source": "Local Corpus",
+    "url": "",
+    "title": "nasa mars moons",
+    "file_name": "nasa_mars_moons.md",
+    "text": "﻿Source: NASA URL: https://science.nasa.gov/mars/moons/ Title: Mars Moons Mars has two moons, Phobos and Deimos. NASA describes both as small, irregular moons associated with Mars. Phobos is larger than Deimos and both are central to basic factual claims about the Martian system."
+  },
+  {
+    "source": "Local Corpus",
+    "url": "",
+    "title": "oecd global",
+    "file_name": "oecd_global.md",
+    "text": "﻿Source: OECD URL: https://www.oecd.org/ Title: OECD OECD data and publications are useful for comparative policy, economics, and international development claims. OECD should be treated as a trusted structured source where its indicators match the claim."
+  },
+  {
+    "source": "Local Corpus",
+    "url": "",
+    "title": "openfda bleach",
+    "file_name": "openfda_bleach.md",
+    "text": "﻿Source: openFDA URL: https://open.fda.gov/apis/ Title: openFDA Safety Records openFDA provides public records on drugs, food, devices, and safety topics. It is suitable for checking treatment and product safety claims and should be treated as a trusted health evidence source when relevant data is available."
+  },
+  {
+    "source": "Local Corpus",
+    "url": "",
+    "title": "pib india",
+    "file_name": "pib_india.md",
+    "text": "﻿Source: PIB URL: https://pib.gov.in/ Title: Press Information Bureau PIB is an official Government of India communication channel. It is appropriate for central government announcements, policies, and ministry statements, especially for recent Indian public-policy claims."
+  },
+  {
+    "source": "Local Corpus",
+    "url": "",
+    "title": "rbi india",
+    "file_name": "rbi_india.md",
+    "text": "﻿Source: Reserve Bank of India URL: https://www.rbi.org.in/ Title: RBI The Reserve Bank of India is the primary source for Indian monetary policy, banking regulation, and many official finance-related claims involving rates, policy actions, and banking guidance."
+  },
+  {
+    "source": "Local Corpus",
+    "url": "",
+    "title": "un charter history",
+    "file_name": "un_charter_history.md",
+    "text": "﻿Source: United Nations URL: https://www.un.org/en/about-us/history-of-the-un Title: History of the United Nations The United Nations was established after World War II. The UN Charter was signed in 1945, and the organization is a postwar institution created to prevent future global conflict."
+  },
+  {
+    "source": "Local Corpus",
+    "url": "",
+    "title": "who covid bleach",
+    "file_name": "who_covid_bleach.md",
+    "text": "﻿Source: World Health Organization URL: https://www.who.int/emergencies/diseases/novel-coronavirus-2019/advice-for-public/myth-busters Title: COVID-19 Mythbusters WHO states that drinking methanol, ethanol, or bleach does not prevent or cure COVID-19 and can be extremely dangerous. WHO also warns that introducing bleach or disinfectant into the body will not protect against COVID-19."
+  },
+  {
+    "source": "Local Corpus",
+    "url": "",
+    "title": "worldbank gdp",
+    "file_name": "worldbank_gdp.md",
+    "text": "﻿Source: World Bank URL: https://data.worldbank.org/ Title: World Bank Indicators The World Bank publishes structured indicators such as GDP, population, inflation, unemployment, and life expectancy. These indicators should be preferred for country-level economic claims when an indicator and country can be identified."
+  }
+]

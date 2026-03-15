@@ -1,4 +1,5 @@
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -6,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from datasets import load_dataset
+from datasets import Dataset, DatasetDict
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -20,6 +21,31 @@ from training.common.metrics import classification_metrics, save_run_metrics
 from training.common.utils import set_seed
 
 
+def _read_jsonl(path: str) -> list[dict]:
+    rows = []
+    with Path(path).open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            rows.append(json.loads(line))
+    return rows
+
+
+def _load_local_dataset(config: dict) -> DatasetDict:
+    files = {
+        "train": config["data"]["train_file"],
+        "validation": config["data"]["validation_file"],
+    }
+    if config["data"].get("test_file"):
+        files["test"] = config["data"]["test_file"]
+
+    dataset_map = {}
+    for split_name, file_path in files.items():
+        dataset_map[split_name] = Dataset.from_list(_read_jsonl(file_path))
+    return DatasetDict(dataset_map)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train relevance reranker.")
     parser.add_argument("--config", default="training/configs/relevance.yaml")
@@ -28,15 +54,7 @@ def main() -> None:
     set_seed(int(config.get("seed", 42)))
     model_candidates = [config["model"]["name"], *config["model"].get("fallback_models", [])]
 
-    dataset = load_dataset("json", data_files={
-        "train": str(Path(config["data"]["train_file"])),
-        "validation": str(Path(config["data"]["validation_file"])),
-        **(
-            {"test": str(Path(config["data"]["test_file"]))}
-            if config["data"].get("test_file")
-            else {}
-        ),
-    })
+    dataset = _load_local_dataset(config)
     model_name = None
     tokenizer = None
     model = None

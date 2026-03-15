@@ -14,6 +14,11 @@ RUNTIME_ENV_MAP = {
         "checkpoint": "CLAIM_TYPE_CHECKPOINT",
         "device": "CLAIM_TYPE_DEVICE",
     },
+    "context": {
+        "enabled": "ENABLE_TRAINED_CONTEXT",
+        "checkpoint": "CONTEXT_CHECKPOINT",
+        "device": "CONTEXT_DEVICE",
+    },
     "stance": {
         "enabled": "ENABLE_TRAINED_STANCE",
         "checkpoint": "STANCE_CHECKPOINT",

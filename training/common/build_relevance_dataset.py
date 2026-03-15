@@ -70,6 +70,60 @@ MANUAL_RELEVANCE_SEEDS = [
         ],
         "source": "manual_seed",
     },
+    {
+        "claim": "Climate change is a hoax",
+        "positive": "A 2019 review of scientific papers found the consensus on the cause of climate change to be at 100%, and a 2021 study concluded that over 99% of scientific papers agree on the human cause of climate change.",
+        "negatives": [
+            "There are a number of myths surrounding climate change and its impacts.",
+            "A few organizations with members in extractive industries hold non-committal positions, and some have tried to persuade the public that climate change is not happening.",
+        ],
+        "source": "manual_seed",
+    },
+    {
+        "claim": "The moon landing was faked",
+        "positive": "A Moon landing or lunar landing is the arrival of a spacecraft on the surface of the Moon, including both crewed and robotic missions.",
+        "negatives": [
+            "Moon landing conspiracy theories claim that some or all elements of the Apollo program landings were hoaxes.",
+            "Conspiracy beliefs about the Moon landing became widespread after the missions.",
+        ],
+        "source": "manual_seed",
+    },
+    {
+        "claim": "Mars has two moons",
+        "positive": "Mars has two small, irregularly shaped moons, Phobos and Deimos.",
+        "negatives": [
+            "Mars is the fourth planet from the Sun.",
+            "Mars is known as the Red Planet because of iron oxide on its surface.",
+        ],
+        "source": "manual_seed",
+    },
+    {
+        "claim": "The Berlin Wall fell in 1989",
+        "positive": "The Berlin Wall stood from 1961 to 1989 and fell as East Germany opened the border in November 1989.",
+        "negatives": [
+            "The Berlin Wall was a guarded concrete barrier that encircled West Berlin.",
+            "Full demolition of the Wall continued into the early 1990s.",
+        ],
+        "source": "manual_seed",
+    },
+    {
+        "claim": "The United Nations was founded after World War II",
+        "positive": "The United Nations was established in 1945 after World War II.",
+        "negatives": [
+            "The history of the United Nations has its origins in World War II.",
+            "The United Nations is an intergovernmental organization focused on peace and security.",
+        ],
+        "source": "manual_seed",
+    },
+    {
+        "claim": "Humans can breathe in space without equipment",
+        "positive": "Humans cannot survive or breathe in the vacuum of space without pressurized life-support equipment.",
+        "negatives": [
+            "A vacuum is space devoid of matter.",
+            "Physicists use the term vacuum to describe a region with very low pressure.",
+        ],
+        "source": "manual_seed",
+    },
 ]
 
 
@@ -258,7 +312,7 @@ async def build_records_from_claims(
 async def main_async() -> None:
     parser = argparse.ArgumentParser(description="Build weakly labeled relevance dataset.")
     parser.add_argument("--benchmark", default="parallel_test_results.json")
-    parser.add_argument("--output-dir", default="data/relevance/v3")
+    parser.add_argument("--output-dir", default="data/relevance/v4")
     parser.add_argument("--max-claims", type=int, default=30)
     parser.add_argument("--max-sources-per-claim", type=int, default=4)
     parser.add_argument("--negatives-per-positive", type=int, default=4)

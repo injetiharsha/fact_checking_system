@@ -1,26 +1,30 @@
 # ingestion/webpage.py
-
-import requests
-from bs4 import BeautifulSoup
+from evidence.extraction_utils import fetch_and_extract
 
 
 class WebpageIngestor:
     def extract_text(self, url):
         try:
             headers = {"User-Agent": "Mozilla/5.0"}
-            response = requests.get(url, headers=headers, timeout=15)
-            response.raise_for_status()
-
-            soup = BeautifulSoup(response.text, "lxml")
-            for tag in soup(["script", "style", "noscript", "header", "footer", "nav", "aside", "form"]):
-                tag.decompose()
-
-            root = soup.find("article") or soup.find("main") or soup
-            paragraphs = root.find_all("p")
-            text = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
-            text = " ".join(text.split())
-
-            return text.strip()
+            result = fetch_and_extract(
+                url,
+                headers,
+                timeout=15,
+                retries=2,
+                verify=True,
+                cache_dir="logs/extraction_cache",
+            )
+            print(
+                "Webpage extraction:",
+                result.get("extractor"),
+                "| words:",
+                result.get("word_count", 0),
+                "| cache:",
+                result.get("cache_hit", False),
+                "| reject:",
+                result.get("reject_reason"),
+            )
+            return (result.get("text") or "").strip()
 
         except Exception as e:
             print("Webpage ingestion error:", e)
