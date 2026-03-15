@@ -35,6 +35,8 @@ JUNK_TEXT_PATTERNS = (
     "category archive",
 )
 
+MIN_WORDS = 30
+
 
 def _normalize_space(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "")).strip()
@@ -85,6 +87,11 @@ def _extract_with_bs4(html: str) -> str:
     paragraphs = root.find_all(["p", "li"])
     text = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
     return _normalize_space(text)
+
+
+def _text_quality(text: str) -> tuple[int, bool]:
+    normalized = _normalize_space(text)
+    return len(normalized.split()), _looks_like_junk_text(normalized) is None
 
 
 def _extract_with_trafilatura(html: str, url: str) -> str:
@@ -186,14 +193,27 @@ def fetch_and_extract(
         _write_cache(cache_dir, url, payload)
         return payload
 
-    text = _extract_with_trafilatura(html, url)
-    extractor = "trafilatura" if text else "beautifulsoup"
-    if not text:
-        text = _extract_with_bs4(html)
+    trafilatura_text = _extract_with_trafilatura(html, url)
+    bs4_text = _extract_with_bs4(html)
+    tf_words, tf_clean = _text_quality(trafilatura_text)
+    bs_words, bs_clean = _text_quality(bs4_text)
+
+    if tf_clean and not bs_clean:
+        text = trafilatura_text
+        extractor = "trafilatura"
+    elif bs_clean and not tf_clean:
+        text = bs4_text
+        extractor = "beautifulsoup"
+    elif bs_words > tf_words:
+        text = bs4_text
+        extractor = "beautifulsoup"
+    else:
+        text = trafilatura_text or bs4_text
+        extractor = "trafilatura" if trafilatura_text else "beautifulsoup"
 
     word_count = len(text.split())
     reject_reason = None
-    if word_count < 30:
+    if word_count < MIN_WORDS:
         reject_reason = "too_short"
     else:
         reject_reason = _looks_like_junk_text(text)
@@ -204,7 +224,7 @@ def fetch_and_extract(
             text = pw_text
             extractor = "playwright"
             word_count = len(text.split())
-            reject_reason = None if word_count >= 30 else "too_short"
+            reject_reason = None if word_count >= MIN_WORDS else "too_short"
         elif pw_state == "playwright_failed":
             reject_reason = f"{reject_reason}|playwright_failed"
 

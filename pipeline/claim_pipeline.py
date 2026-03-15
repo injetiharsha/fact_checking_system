@@ -124,6 +124,44 @@ def _lead_position_bonus(sentence_index, total_sentences):
     return 0.0
 
 
+def _metadata_or_shell_penalty(sentence, source_name=None, context_text=None):
+    sent_text = " ".join((sentence or "").lower().split())
+    source_text = " ".join((source_name or "").lower().split())
+    context = " ".join((context_text or "").lower().split())
+
+    metadata_markers = (
+        "document id",
+        "acquisition source",
+        "publication date",
+        "distribution limits",
+        "copyright work of the us gov",
+        "no preview available",
+        "subject category",
+    )
+    shell_markers = (
+        "how many moons does",
+        "how has nasa studied",
+        "how is nasa exploring",
+        "more about",
+        "this article is for students",
+        "6 min read",
+        "min read",
+    )
+
+    penalty = 0.0
+    if any(marker in sent_text for marker in metadata_markers):
+        penalty += 0.35
+    if any(marker in sent_text for marker in shell_markers):
+        penalty += 0.18
+    if "/search/" in source_text or source_text.strip() == "nasa":
+        penalty += 0.12
+    if sent_text.endswith("?"):
+        penalty += 0.08
+    if penalty == 0.0 and context and any(marker in context for marker in metadata_markers):
+        penalty += 0.12
+    return penalty
+
+
 def _is_misinformation_sensitive(claim, context_result=None):
     claim_text = (claim or "").lower()
     risk_flags = set((context_result or {}).get("risk_flags", []))
@@ -330,6 +368,14 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
             source_name=source_name,
             context_result=context_result,
         )
+        context_start = max(0, sentence_index - 1)
+        context_end = min(total_sentences, sentence_index + 2)
+        context_text = " ".join(s.strip() for s in sentences[context_start:context_end] if s.strip())
+        metadata_penalty = _metadata_or_shell_penalty(
+            sent,
+            source_name=source_name,
+            context_text=context_text,
+        )
         base_score = (
             (semantic_score * 0.82)
             + (fast_score * 0.14)
@@ -338,10 +384,8 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
             + direct_bonus
             + lead_bonus
             - reporting_penalty
+            - metadata_penalty
         )
-        context_start = max(0, sentence_index - 1)
-        context_end = min(total_sentences, sentence_index + 2)
-        context_text = " ".join(s.strip() for s in sentences[context_start:context_end] if s.strip())
         sentence_candidates.append(
             (
                 sent,
@@ -349,6 +393,7 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
                 semantic_score,
                 fast_score,
                 reporting_penalty,
+                metadata_penalty,
                 direct_bonus,
                 lead_bonus,
                 context_text,
@@ -361,7 +406,7 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
         ranked = sorted(sentence_candidates, key=lambda item: item[1], reverse=True)
         shortlist = ranked[:5]
         rescored = []
-        for sent, base_score, semantic_score, fast_score, reporting_penalty, direct_bonus, lead_bonus, context_text in shortlist:
+        for sent, base_score, semantic_score, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text in shortlist:
             trained_score = relevance_scorer.score(claim, sent)
             combined = (
                 (trained_score * 0.8)
@@ -370,6 +415,7 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
                 + direct_bonus
                 + lead_bonus
                 - reporting_penalty
+                - metadata_penalty
             )
             rescored.append(
                 (
@@ -379,6 +425,7 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
                     semantic_score,
                     fast_score,
                     reporting_penalty,
+                    metadata_penalty,
                     direct_bonus,
                     lead_bonus,
                     context_text,
@@ -389,8 +436,8 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
     else:
         ranked = sorted(sentence_candidates, key=lambda item: item[1], reverse=True)
         selected_candidates = [
-            (sent, score, score, semantic_score, fast_score, reporting_penalty, direct_bonus, lead_bonus, context_text)
-            for sent, score, semantic_score, fast_score, reporting_penalty, direct_bonus, lead_bonus, context_text in ranked[:max_sentences]
+            (sent, score, score, semantic_score, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text)
+            for sent, score, semantic_score, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text in ranked[:max_sentences]
         ]
 
     print("\n--- Sentence candidates ---")
@@ -398,10 +445,12 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
         print("-", _safe_console_text(s[:120]))
 
     print("Selected:")
-    for sent, score, _, _, _, reporting_penalty, direct_bonus, lead_bonus, _ in selected_candidates:
+    for sent, score, _, _, _, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, _ in selected_candidates:
         print("-", _safe_console_text(sent[:180]), f"(score={round(score,3)})")
         if reporting_penalty:
             print("  reporting penalty:", round(reporting_penalty, 3))
+        if metadata_penalty:
+            print("  metadata penalty:", round(metadata_penalty, 3))
         if direct_bonus:
             print("  direct answer bonus:", round(direct_bonus, 3))
         if lead_bonus:
@@ -412,11 +461,12 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
             "text": sent,
             "selector_score": round(float(score), 3),
             "reporting_penalty": round(float(reporting_penalty), 3),
+            "metadata_penalty": round(float(metadata_penalty), 3),
             "direct_answer_bonus": round(float(direct_bonus), 3),
             "lead_bonus": round(float(lead_bonus), 3),
             "context_text": context_text[:800],
         }
-        for sent, score, _, _, _, reporting_penalty, direct_bonus, lead_bonus, context_text in selected_candidates
+        for sent, score, _, _, _, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text in selected_candidates
     ]
 
 
@@ -778,6 +828,10 @@ class ClaimPipeline:
                 print("Rejected (low credibility)")
                 continue
 
+            if ev.get("url") and "/search/" in ev["url"].lower() and ev["weight"] < 0.8:
+                print("Rejected (search-shell source)")
+                continue
+
             text = ev.get("text")
             if not text:
                 continue
@@ -806,6 +860,7 @@ class ClaimPipeline:
                 best_sentence = candidate["text"]
                 selector_score = float(candidate.get("selector_score", 0.0))
                 reporting_penalty = float(candidate.get("reporting_penalty", 0.0))
+                metadata_penalty = float(candidate.get("metadata_penalty", 0.0))
                 direct_answer_bonus = float(candidate.get("direct_answer_bonus", 0.0))
                 lead_bonus = float(candidate.get("lead_bonus", 0.0))
                 if _should_skip_claim_reporting_sentence(
@@ -861,6 +916,7 @@ class ClaimPipeline:
                     "base_relevance_score": relevance_score,
                     "selector_score": selector_score,
                     "reporting_penalty": reporting_penalty,
+                    "metadata_penalty": metadata_penalty,
                     "direct_answer_bonus": direct_answer_bonus,
                     "lead_bonus": lead_bonus,
                     "quality_score": quality_score,
@@ -875,6 +931,7 @@ class ClaimPipeline:
                     "base_relevance": relevance_score,
                     "selector_score": selector_score,
                     "reporting_penalty": reporting_penalty,
+                    "metadata_penalty": metadata_penalty,
                     "direct_answer_bonus": direct_answer_bonus,
                     "lead_bonus": lead_bonus,
                     "quality": quality_score

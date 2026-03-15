@@ -4,6 +4,7 @@ import os
 import uuid
 import sys
 import re
+from urllib.parse import urlparse
 
 from evidence.international.worldbank import WorldBankAPI
 from evidence.international.un_data import UNDataAPI
@@ -29,8 +30,31 @@ BLOCKED_DOMAINS = [
     "instagram.com",
     "facebook.com",
     "reddit.com",
-    "pinterest.com"
+    "pinterest.com",
+    "youtube.com",
+    "youtu.be",
+    "twitter.com",
+    "x.com",
+    "news.google.com",
 ]
+
+WEAK_RESULT_URL_MARKERS = (
+    "/video/",
+    "/videos/",
+    "/shorts/",
+    "/watch?",
+    "/search?",
+    "/search/",
+    "/live/",
+)
+
+WEAK_RESULT_TITLE_MARKERS = (
+    "youtube",
+    "watch live",
+    "live updates",
+    "search results",
+    "photo gallery",
+)
 
 DOMAIN_QUERY_HINTS = {
     "science": ["science"],
@@ -78,6 +102,49 @@ DIRECT_ANSWER_TITLE_HINTS = (
     "two moons",
 )
 
+CANONICAL_FACT_URL_MARKERS = (
+    "/facts",
+    "/fact",
+    "/reference",
+    "/explainer",
+    "/science/",
+    "/jupiter/",
+    "/planets/",
+)
+
+CANONICAL_FACT_TITLE_MARKERS = (
+    "facts",
+    "fact sheet",
+    "reference",
+    "explainer",
+    "overview",
+    "what is",
+)
+
+LOW_SIGNAL_URL_MARKERS = (
+    "/search/",
+    "/search?",
+    "/gallery/",
+    "/galleries/",
+    "/image/",
+    "/images/",
+    "/photo/",
+    "/photos/",
+    "/media/",
+    "/multimedia/",
+    "/citations/",
+)
+
+LOW_SIGNAL_TITLE_MARKERS = (
+    "photo",
+    "gallery",
+    "image",
+    "images",
+    "media",
+    "technical reports server",
+    "citation",
+)
+
 
 def _safe_console_text(value):
     text = str(value)
@@ -107,6 +174,7 @@ class EvidenceRouter:
         self.scraper = WebScraper()
         self.reference_fallback = ReferenceFallback()
         self._evidence_cache = {}
+        self._domain_backoff = {}
         self.cache_enabled = os.getenv("FACTLENS_CACHE_RETRIEVAL", "0") == "1"
 
         # ensure log directory exists
@@ -214,7 +282,7 @@ class EvidenceRouter:
 
         scrape_jobs = []
 
-        for result in search_results[:4]:
+        for result in search_results[:6]:
 
             url = result["url"]
 
@@ -222,6 +290,12 @@ class EvidenceRouter:
                 continue
 
             if any(domain in url for domain in BLOCKED_DOMAINS):
+                continue
+
+            if self._should_skip_scrape_candidate(result):
+                continue
+
+            if self._domain_is_in_backoff(url):
                 continue
 
             weight = get_weight(url)
@@ -266,6 +340,7 @@ class EvidenceRouter:
 
             text = content.get("text") if isinstance(content, dict) else ""
             if not text:
+                self._record_scrape_outcome(url, content)
                 if trace is not None:
                     if content.get("extractor") == "playwright":
                         trace["playwright_used"] = True
@@ -284,6 +359,7 @@ class EvidenceRouter:
                 continue
 
             word_count = len(text.split())
+            self._record_scrape_outcome(url, content)
 
             print("\nScraped:", url)
             print("Words:", word_count)
@@ -385,6 +461,53 @@ class EvidenceRouter:
             self._evidence_cache[cache_key] = [dict(item) for item in unique_evidence]
         return unique_evidence
 
+    @staticmethod
+    def _domain_from_url(url):
+        try:
+            return urlparse(url or "").netloc.lower()
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _is_hard_block_reason(reason):
+        lowered = str(reason or "").lower()
+        return lowered.startswith("bad_response:401") or lowered.startswith("bad_response:403")
+
+    def _domain_is_in_backoff(self, url):
+        domain = self._domain_from_url(url)
+        if not domain:
+            return False
+        row = self._domain_backoff.get(domain)
+        if not row:
+            return False
+        if time.time() >= float(row.get("until", 0.0)):
+            self._domain_backoff.pop(domain, None)
+            return False
+        return True
+
+    def _record_scrape_outcome(self, url, content):
+        domain = self._domain_from_url(url)
+        if not domain:
+            return
+
+        reason = ""
+        if isinstance(content, dict):
+            reason = str(content.get("reject_reason") or "")
+
+        if self._is_hard_block_reason(reason):
+            current = self._domain_backoff.get(domain, {"count": 0})
+            count = int(current.get("count", 0)) + 1
+            cooldown_seconds = min(3600, 600 * count)
+            self._domain_backoff[domain] = {
+                "count": count,
+                "until": time.time() + cooldown_seconds,
+                "reason": reason,
+            }
+            return
+
+        if isinstance(content, dict) and content.get("ok"):
+            self._domain_backoff.pop(domain, None)
+
     def _build_search_queries(self, claim, context_result=None, claim_type_result=None):
         base_claim = " ".join((claim or "").strip().split())
         if not base_claim:
@@ -475,6 +598,7 @@ class EvidenceRouter:
     def _score_search_candidate(self, claim, result, context_result=None, claim_type_result=None):
         title = str(result.get("title") or "").lower()
         url = str(result.get("url") or "").lower()
+        snippet = str(result.get("snippet") or "").lower()
         claim_text = (claim or "").lower()
         base = float(get_weight(url))
         context_result = context_result or {}
@@ -510,12 +634,25 @@ class EvidenceRouter:
         if "true flight" in claim_text and "true flight" in title:
             direct_answer_bonus += 0.08
 
+        source_type_bonus = 0.0
+        source_type_penalty = 0.0
+        if self._looks_like_canonical_fact_page(url, title):
+            source_type_bonus += 0.12
+        if self._looks_like_low_signal_page(url, title, snippet):
+            source_type_penalty += 0.18
+
         misinformation_penalty = 0.0
         if any(token in claim_text for token in ("hoax", "fake", "faked", "spread coronavirus", "cures covid")):
             if any(marker in title for marker in MISINFORMATION_TITLE_PENALTIES):
                 misinformation_penalty += 0.12
+            if any(marker in snippet for marker in ("some persistent conspiracy theories", "people have wondered", "viral rumor")):
+                misinformation_penalty += 0.08
 
-        return round(
+        weak_result_penalty = 0.0
+        if self._looks_like_weak_result(url, title):
+            weak_result_penalty += 0.2
+
+        score = round(
             (base * 0.4)
             + (overlap * 0.28)
             + year_match
@@ -524,9 +661,53 @@ class EvidenceRouter:
             + domain_bonus
             + claim_type_bonus
             + direct_answer_bonus
+            + source_type_bonus
             - misinformation_penalty,
             4,
+        ) - round(weak_result_penalty + source_type_penalty, 4)
+        return round(score, 4)
+
+    @staticmethod
+    def _looks_like_weak_result(url, title):
+        lowered_url = str(url or "").lower()
+        lowered_title = str(title or "").lower()
+        return (
+            any(marker in lowered_url for marker in WEAK_RESULT_URL_MARKERS)
+            or any(marker in lowered_title for marker in WEAK_RESULT_TITLE_MARKERS)
         )
+
+    @staticmethod
+    def _looks_like_canonical_fact_page(url, title):
+        lowered_url = str(url or "").lower()
+        lowered_title = str(title or "").lower()
+        return (
+            any(marker in lowered_url for marker in CANONICAL_FACT_URL_MARKERS)
+            or any(marker in lowered_title for marker in CANONICAL_FACT_TITLE_MARKERS)
+        )
+
+    @staticmethod
+    def _looks_like_low_signal_page(url, title, snippet=""):
+        lowered_url = str(url or "").lower()
+        lowered_title = str(title or "").lower()
+        lowered_snippet = str(snippet or "").lower()
+        if any(marker in lowered_url for marker in LOW_SIGNAL_URL_MARKERS):
+            return True
+        if any(marker in lowered_title for marker in LOW_SIGNAL_TITLE_MARKERS):
+            return True
+        if any(marker in lowered_snippet for marker in ("image credit", "photo credit", "download wallpaper")):
+            return True
+        return False
+
+    def _should_skip_scrape_candidate(self, result):
+        url = str(result.get("url") or "").lower()
+        title = str(result.get("title") or "").lower()
+        if self._looks_like_weak_result(url, title):
+            return True
+        if self._looks_like_low_signal_page(url, title, result.get("snippet")) and not self._looks_like_canonical_fact_page(url, title):
+            return True
+        if any(domain in url for domain in BLOCKED_DOMAINS):
+            return True
+        return False
 
     @staticmethod
     def _claim_type_label(claim_type_result):

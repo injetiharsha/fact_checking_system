@@ -1,7 +1,8 @@
 # evidence/scraper.py
-import urllib3
+import os
+
+import requests
 from evidence.extraction_utils import fetch_and_extract
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class WebScraper:
 
@@ -15,6 +16,7 @@ class WebScraper:
         }
 
         self.timeout = 6
+        self.allow_insecure_retry = os.getenv("ALLOW_INSECURE_SCRAPE_RETRY", "0").strip().lower() in {"1", "true", "yes", "on"}
 
     def scrape(self, url):
         result = self.scrape_with_metadata(url)
@@ -42,9 +44,22 @@ class WebScraper:
                 self.headers,
                 timeout=self.timeout,
                 retries=2,
-                verify=False,
+                verify=True,
                 cache_dir="logs/extraction_cache",
             )
+            if (
+                self.allow_insecure_retry
+                and not result.get("ok")
+                and str(result.get("reject_reason") or "").startswith("fetch_error:SSLError")
+            ):
+                result = fetch_and_extract(
+                    url,
+                    self.headers,
+                    timeout=self.timeout,
+                    retries=1,
+                    verify=False,
+                    cache_dir="logs/extraction_cache_insecure",
+                )
             print(
                 "Extraction:",
                 result.get("extractor"),
@@ -64,6 +79,15 @@ class WebScraper:
 
             return result
 
+        except requests.RequestException:
+            return {
+                "ok": False,
+                "text": "",
+                "extractor": "none",
+                "word_count": 0,
+                "cache_hit": False,
+                "reject_reason": "scrape_request_exception",
+            }
         except Exception:
             return {
                 "ok": False,

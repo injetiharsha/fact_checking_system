@@ -1,0 +1,7 @@
+{
+  "train_rows": 49,
+  "validation_rows": 9,
+  "test_rows": 9,
+  "total_rows": 67,
+  "source": "training.common.augment_stance_with_hardcases.HARD_CASES"
+}
