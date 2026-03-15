@@ -224,22 +224,31 @@ def main() -> None:
 
     print("Preparing trainer...", flush=True)
     progress.update("preparing_trainer")
-    training_args = TrainingArguments(
-        output_dir=config["output"]["checkpoint_dir"],
-        per_device_train_batch_size=int(config["training"].get("batch_size", 8)),
-        per_device_eval_batch_size=int(config["training"].get("eval_batch_size", 8)),
-        learning_rate=float(config["training"].get("learning_rate", 2e-5)),
-        num_train_epochs=float(config["training"].get("epochs", 3)),
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
-        save_total_limit=int(config["training"].get("save_total_limit", 2)),
-        logging_steps=int(config["training"].get("logging_steps", 10)),
-        logging_strategy="steps",
-        load_best_model_at_end=True,
-        metric_for_best_model="accuracy",
-        report_to=[],
-        disable_tqdm=True,
-    )
+    evaluation_strategy = str(config["training"].get("evaluation_strategy", "epoch"))
+    save_strategy = str(config["training"].get("save_strategy", evaluation_strategy))
+    training_args_kwargs = {
+        "output_dir": config["output"]["checkpoint_dir"],
+        "per_device_train_batch_size": int(config["training"].get("batch_size", 8)),
+        "per_device_eval_batch_size": int(config["training"].get("eval_batch_size", 8)),
+        "learning_rate": float(config["training"].get("learning_rate", 2e-5)),
+        "num_train_epochs": float(config["training"].get("epochs", 3)),
+        "evaluation_strategy": evaluation_strategy,
+        "save_strategy": save_strategy,
+        "save_total_limit": int(config["training"].get("save_total_limit", 2)),
+        "logging_steps": int(config["training"].get("logging_steps", 10)),
+        "logging_strategy": str(config["training"].get("logging_strategy", "steps")),
+        "load_best_model_at_end": bool(config["training"].get("load_best_model_at_end", True)),
+        "metric_for_best_model": str(config["training"].get("metric_for_best_model", "accuracy")),
+        "report_to": [],
+        "disable_tqdm": bool(config["training"].get("disable_tqdm", True)),
+        "fp16": bool(config["training"].get("fp16", False)),
+        "gradient_accumulation_steps": int(config["training"].get("gradient_accumulation_steps", 1)),
+    }
+    if save_strategy == "steps":
+        training_args_kwargs["save_steps"] = int(config["training"].get("save_steps", config["training"].get("logging_steps", 500)))
+    if evaluation_strategy == "steps":
+        training_args_kwargs["eval_steps"] = int(config["training"].get("eval_steps", config["training"].get("save_steps", config["training"].get("logging_steps", 500))))
+    training_args = TrainingArguments(**training_args_kwargs)
 
     def compute_metrics(eval_pred):
         logits, labels = eval_pred
