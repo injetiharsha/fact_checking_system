@@ -4,11 +4,14 @@ import nltk
 import json
 import sys
 import re
+import os
 from evidence.router import EvidenceRouter
 from evidence.relevance import RelevanceScorer
 from evidence.quality import QualityScorer
 from evidence.citation_formatter import format_citations
 from semantic.stance_model import StanceDetector
+from semantic.verifier_v2 import VerifierV2
+from semantic.llm_verifier import LLMVerifier
 
 from reasoning.logical_analyzer import LogicalAnalyzer
 from reasoning.logic_engine import LogicEngine
@@ -23,7 +26,9 @@ from nlp.language import detect_language
 from nlp.translate import translate_to_english
 from claim_detection.normalizer import normalize_claim
 from claim_detection.claim_type_classifier import ClaimTypeClassifier
+from claim_detection.claim_context_classifier import ClaimContextClassifier
 from evidence.domain_diversity_filter import DomainDiversityFilter
+from evidence.india_source_registry import get_india_state_source_hints
 
 try:
     nltk.data.find("tokenizers/punkt")
@@ -55,35 +60,185 @@ def _token_set(text):
     return tokens
 
 
+def _safe_console_text(value):
+    out = str(value)
+    enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+    return out.encode(enc, errors="replace").decode(enc, errors="replace")
+
+
 def _relation_bonus(claim, sentence):
     claim_text = (claim or "").lower().strip()
     sent_text = (sentence or "").lower()
-    sent_tokens = _token_set(sentence)
     bonus = 0.0
 
     years = re.findall(r"\b(\d{3,4})\b", claim_text)
     if years and any(year in sent_text for year in years):
-        bonus += 0.2
-
-    for pattern in (
-        r"(.+?)\s+has\s+(.+)$",
-        r"(.+?)\s+is\s+(?:an?|the)?\s*(.+)$",
-        r"(.+?)\s+are\s+(.+)$",
-    ):
-        match = re.match(pattern, claim_text)
-        if not match:
-            continue
-        subject = _token_set(match.group(1))
-        predicate = _token_set(match.group(2))
-        if subject and predicate:
-            if len(subject & sent_tokens) >= 1 and len(predicate & sent_tokens) >= 1:
-                bonus += 0.08
-        break
+        bonus += 0.05
 
     return bonus
 
 
-def extract_best_sentences(claim, text, relevance_scorer, max_sentences=2):
+def _lead_position_bonus(sentence_index, total_sentences):
+    if total_sentences <= 0:
+        return 0.0
+    if sentence_index <= 2:
+        return 0.08
+    if sentence_index <= 5:
+        return 0.05
+    if sentence_index <= 8:
+        return 0.02
+    return 0.0
+
+
+def _is_misinformation_sensitive(claim, context_result=None):
+    claim_text = (claim or "").lower()
+    risk_flags = set((context_result or {}).get("risk_flags", []))
+    if "misinformation_sensitive" in risk_flags:
+        return True
+    triggers = (
+        "hoax",
+        "faked",
+        "fake",
+        "cures covid",
+        "spread coronavirus",
+        "spread covid",
+        "bleach cures",
+    )
+    return any(token in claim_text for token in triggers)
+
+
+def _claim_reporting_penalty(claim, sentence, source_name=None, context_result=None):
+    if not _is_misinformation_sensitive(claim, context_result):
+        return 0.0
+
+    sent_text = (sentence or "").lower()
+    source_text = (source_name or "").lower()
+
+    reporting_markers = (
+        "conspiracy theor",
+        "conspiracy theory",
+        "during a speech",
+        "during an interview",
+        "according to",
+        "reportedly",
+        "report said",
+        "said that",
+        "described",
+        "called",
+        "some people claim",
+        "some people believe",
+        "have claimed",
+        "claimed that",
+        "began to gain traction",
+        "rumor",
+        "myth",
+        "hoax",
+        "heard all this before",
+        "their proponents",
+        "prove the images were faked",
+    )
+    factual_resolution_markers = (
+        "no evidence",
+        "scientific consensus",
+        "scientific papers",
+        "did happen",
+        "became the first humans",
+        "considered",
+        "unequivocal",
+        "incontrovertible",
+        "debunk",
+        "false",
+        "not happening",
+        "agree on",
+    )
+
+    reporting_hit = any(marker in sent_text for marker in reporting_markers)
+    if not reporting_hit and any(marker in source_text for marker in ("conspiracy", "debunked", "denial", "myth")):
+        reporting_hit = any(
+            token in sent_text for token in ("claim", "claimed", "theories", "theorists", "hoax", "faked")
+        )
+    if not reporting_hit:
+        return 0.0
+
+    if any(marker in sent_text for marker in factual_resolution_markers):
+        return 0.0
+
+    return 0.22
+
+
+def _should_skip_claim_reporting_sentence(claim, sentence, source_name=None, context_result=None):
+    if not _is_misinformation_sensitive(claim, context_result):
+        return False
+
+    sent_text = (sentence or "").lower()
+    source_text = (source_name or "").lower()
+
+    hard_reporting_markers = (
+        "during a speech",
+        "during an interview",
+        "according to",
+        "reportedly",
+        "described as",
+        "called it",
+        "said that",
+        "thinks that nasa may have faked",
+        "fraction of the public thinks",
+        "conspiracy theories about",
+        "conspiracy theories claim",
+        "some people claim",
+        "some people believe",
+        "myth",
+        "rumor",
+        "hoax hoax",
+        "prove the images were faked",
+        "began to gain traction",
+    )
+    factual_resolution_markers = (
+        "despite overwhelming evidence to the contrary",
+        "became the first humans",
+        "successfully landed",
+        "did not",
+        "not a hoax",
+        "cannot",
+        "do not",
+        "scientific consensus",
+        "agree on",
+        "unequivocal",
+        "incontrovertible",
+        "debunk",
+    )
+
+    if any(marker in sent_text for marker in factual_resolution_markers):
+        return False
+
+    if any(marker in sent_text for marker in hard_reporting_markers):
+        return True
+
+    if (
+        _is_misinformation_sensitive(claim, context_result)
+        and (
+            ("said" in sent_text and "hoax" in sent_text)
+            or ("described" in sent_text and "hoax" in sent_text)
+            or ("claimed" in sent_text and any(token in sent_text for token in ("hoax", "fake", "cure", "spread")))
+        )
+    ):
+        return True
+
+    if any(marker in source_text for marker in ("conspiracy", "debunk", "hoax")):
+        vague_reporting = (
+            "claim" in sent_text
+            or "theor" in sent_text
+            or "thinks that" in sent_text
+            or "people think" in sent_text
+            or "public thinks" in sent_text
+        )
+        if vague_reporting:
+            return True
+
+    return False
+
+
+def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, source_name=None, context_result=None):
 
     if not text:
         return None
@@ -96,8 +251,11 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=2):
     claim_words = _token_set(claim)
 
     sentence_candidates = []
+    seen_sentences = set()
 
-    for sent in sentences:
+    total_sentences = len(sentences)
+
+    for sentence_index, sent in enumerate(sentences):
 
         sent = sent.strip()
         words = sent.split()
@@ -105,12 +263,44 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=2):
         if len(words) < 6 or len(words) > 80:
             continue
 
+        normalized_sentence = " ".join(sent.lower().split())
+        if normalized_sentence in seen_sentences:
+            continue
+        seen_sentences.add(normalized_sentence)
+
         overlap = len(claim_words & _token_set(sent))
         fast_score = relevance_scorer.fast_score(claim, sent)
         semantic_score = relevance_scorer.semantic_score(claim, sent)
         relation_bonus = _relation_bonus(claim, sent)
-        base_score = (semantic_score * 0.75) + (fast_score * 0.2) + (overlap * 0.02) + relation_bonus
-        sentence_candidates.append((sent, base_score, semantic_score, fast_score))
+        lead_bonus = _lead_position_bonus(sentence_index, total_sentences)
+        reporting_penalty = _claim_reporting_penalty(
+            claim,
+            sent,
+            source_name=source_name,
+            context_result=context_result,
+        )
+        base_score = (
+            (semantic_score * 0.82)
+            + (fast_score * 0.14)
+            + (overlap * 0.02)
+            + relation_bonus
+            + lead_bonus
+            - reporting_penalty
+        )
+        context_start = max(0, sentence_index - 1)
+        context_end = min(total_sentences, sentence_index + 2)
+        context_text = " ".join(s.strip() for s in sentences[context_start:context_end] if s.strip())
+        sentence_candidates.append(
+            (
+                sent,
+                max(0.0, base_score),
+                semantic_score,
+                fast_score,
+                reporting_penalty,
+                lead_bonus,
+                context_text,
+            )
+        )
 
     selected_candidates = []
 
@@ -118,38 +308,57 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=2):
         ranked = sorted(sentence_candidates, key=lambda item: item[1], reverse=True)
         shortlist = ranked[:5]
         rescored = []
-        for sent, base_score, semantic_score, fast_score in shortlist:
+        for sent, base_score, semantic_score, fast_score, reporting_penalty, lead_bonus, context_text in shortlist:
             trained_score = relevance_scorer.score(claim, sent)
-            combined = (trained_score * 0.8) + (semantic_score * 0.15) + (fast_score * 0.05)
-            rescored.append((sent, combined, trained_score, semantic_score, fast_score))
+            combined = (
+                (trained_score * 0.8)
+                + (semantic_score * 0.15)
+                + (fast_score * 0.05)
+                + lead_bonus
+                - reporting_penalty
+            )
+            rescored.append(
+                (
+                    sent,
+                    max(0.0, combined),
+                    trained_score,
+                    semantic_score,
+                    fast_score,
+                    reporting_penalty,
+                    lead_bonus,
+                    context_text,
+                )
+            )
         rescored.sort(key=lambda item: item[1], reverse=True)
         selected_candidates = rescored[:max_sentences]
     else:
         ranked = sorted(sentence_candidates, key=lambda item: item[1], reverse=True)
         selected_candidates = [
-            (sent, score, score, semantic_score, fast_score)
-            for sent, score, semantic_score, fast_score in ranked[:max_sentences]
+            (sent, score, score, semantic_score, fast_score, reporting_penalty, lead_bonus, context_text)
+            for sent, score, semantic_score, fast_score, reporting_penalty, lead_bonus, context_text in ranked[:max_sentences]
         ]
-
-    def _safe_console_text(value):
-        out = str(value)
-        enc = getattr(sys.stdout, "encoding", None) or "utf-8"
-        return out.encode(enc, errors="replace").decode(enc, errors="replace")
 
     print("\n--- Sentence candidates ---")
     for s in sentences[:5]:
         print("-", _safe_console_text(s[:120]))
 
     print("Selected:")
-    for sent, score, _, _, _ in selected_candidates:
+    for sent, score, _, _, _, reporting_penalty, lead_bonus, _ in selected_candidates:
         print("-", _safe_console_text(sent[:180]), f"(score={round(score,3)})")
+        if reporting_penalty:
+            print("  reporting penalty:", round(reporting_penalty, 3))
+        if lead_bonus:
+            print("  lead bonus:", round(lead_bonus, 3))
 
     return [
         {
             "text": sent,
             "selector_score": round(float(score), 3),
+            "reporting_penalty": round(float(reporting_penalty), 3),
+            "lead_bonus": round(float(lead_bonus), 3),
+            "context_text": context_text[:800],
         }
-        for sent, score, _, _, _ in selected_candidates
+        for sent, score, _, _, _, reporting_penalty, lead_bonus, context_text in selected_candidates
     ]
 
 
@@ -165,10 +374,15 @@ class ClaimPipeline:
         self.router = EvidenceRouter()
         self.logical_analyzer = LogicalAnalyzer()
         self.claim_type_classifier = ClaimTypeClassifier()
+        self.claim_context_classifier = ClaimContextClassifier()
         self.domain_diversity_filter = DomainDiversityFilter(max_per_domain=2)
         self.quality_scorer = QualityScorer()
         self._relevance_scorer = None
+        self._retrieval_v2 = None
         self._stance = None
+        self._verifier_v2 = None
+        self._llm_verifier = None
+        self._sentence_cache = {}
         self.logic_engine = LogicEngine()
         self.conflict_analyzer = ConflictAnalyzer()
         self.strong_relevance_threshold = 0.45
@@ -178,6 +392,67 @@ class ClaimPipeline:
         self.min_strong_evidence_for_forced_verdict = 1
         self.single_source_decisive_confidence = 0.85
         self.single_source_min_weight = 0.7
+        self.soft_consensus_min_items = 3
+        self.soft_consensus_min_avg_confidence = 0.85
+        self.soft_consensus_min_avg_weight = 0.5
+        self.enable_retrieval_v2 = os.getenv("ENABLE_RETRIEVAL_V2", "0").strip().lower() in {"1", "true", "yes", "on"}
+        self.enable_verifier_v2 = os.getenv("ENABLE_VERIFIER_V2", "0").strip().lower() in {"1", "true", "yes", "on"}
+        self.enable_llm_verifier = os.getenv("ENABLE_LLM_VERIFIER", "0").strip().lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _consolidate_document_results(results):
+        grouped = {}
+        for item in results:
+            key = item.get("url") or item.get("source")
+            grouped.setdefault(key, []).append(item)
+
+        consolidated = []
+        for items in grouped.values():
+            if len(items) == 1:
+                item = dict(items[0])
+                item["passage_count"] = 1
+                consolidated.append(item)
+                continue
+
+            support_items = [item for item in items if item.get("stance") == "SUPPORT"]
+            refute_items = [item for item in items if item.get("stance") == "REFUTE"]
+            dominant_items = support_items if len(support_items) >= len(refute_items) else refute_items
+
+            if dominant_items:
+                best = max(
+                    dominant_items,
+                    key=lambda item: float(item.get("confidence", 0.0)) * float(item.get("weight", 0.0)),
+                )
+                merged = dict(best)
+                consensus_boost = min(0.1, 0.03 * max(len(dominant_items) - 1, 0))
+                merged["confidence"] = round(
+                    min(
+                        1.0,
+                        (
+                            sum(float(item.get("confidence", 0.0)) for item in dominant_items)
+                            / max(len(dominant_items), 1)
+                        ) + consensus_boost,
+                    ),
+                    3,
+                )
+                merged["weight"] = round(
+                    min(
+                        1.0,
+                        max(float(item.get("weight", 0.0)) for item in dominant_items) + consensus_boost,
+                    ),
+                    3,
+                )
+            else:
+                best = max(items, key=lambda item: float(item.get("combined_score") or 0.0))
+                merged = dict(best)
+
+            merged["passage_count"] = len(items)
+            merged["support_passages"] = len(support_items)
+            merged["refute_passages"] = len(refute_items)
+            merged["neutral_passages"] = sum(1 for item in items if item.get("stance") == "NEUTRAL")
+            consolidated.append(merged)
+
+        return consolidated
 
     @property
     def relevance_scorer(self):
@@ -188,12 +463,35 @@ class ClaimPipeline:
     @property
     def stance(self):
         if self._stance is None:
-            self._stance = StanceDetector()
+            self._stance = StanceDetector(v2_mode=self.enable_retrieval_v2)
         return self._stance
+
+    @property
+    def verifier_v2(self):
+        if self._verifier_v2 is None:
+            self._verifier_v2 = VerifierV2(self.stance)
+        return self._verifier_v2
+
+    @property
+    def llm_verifier(self):
+        if self._llm_verifier is None:
+            self._llm_verifier = LLMVerifier()
+        return self._llm_verifier
+
+    @property
+    def retrieval_v2(self):
+        if self._retrieval_v2 is None:
+            from pipeline.retrieval_v2 import RetrievalPipelineV2
+            self._retrieval_v2 = RetrievalPipelineV2(
+                relevance_scorer=self.relevance_scorer,
+                quality_scorer=self.quality_scorer,
+            )
+        return self._retrieval_v2
 
     def _build_transparency(
         self,
         claim_type_result,
+        context_result,
         language,
         evidence_retrieved,
         evidence_cleaned,
@@ -202,6 +500,7 @@ class ClaimPipeline:
         strong_evidence_count,
         forced_neutral,
         logic_engine_injected,
+        trace=None,
     ):
         stance_source_counts = {}
         for item in results:
@@ -217,13 +516,38 @@ class ClaimPipeline:
         )
 
         return {
-            "version": "phase6-v1",
+            "version": "phase6-v2" if self.enable_retrieval_v2 else "phase6-v1",
+            "verifier": {
+                "verifier_v2_enabled": self.enable_verifier_v2,
+                "llm_verifier_enabled": self.enable_llm_verifier and self.llm_verifier.available,
+                "llm_verifier_model": self.llm_verifier.model if self.enable_llm_verifier and self.llm_verifier.available else None,
+                "llm_verifier_policy": self.llm_verifier.policy if self.enable_llm_verifier else None,
+            },
             "language_detected": language,
             "claim_type": {
                 "label": claim_type_result["type"].value,
                 "confidence": round(float(claim_type_result.get("confidence", 0.0)), 3),
                 "decision_source": claim_type_result.get("decision_source", "unknown"),
             },
+            "claim_context": {
+                "domain": context_result.get("domain", "general_factual"),
+                "subcategory": context_result.get("subcategory", "encyclopedic"),
+                "confidence": round(float(context_result.get("confidence", 0.0)), 3),
+                "decision_source": context_result.get("decision_source", "unknown"),
+                "risk_flags": list(context_result.get("risk_flags", [])),
+                "state_focus": context_result.get("state_focus"),
+                "local_source_hints": get_india_state_source_hints(context_result.get("state_focus")),
+                "taxonomy_version": context_result.get("taxonomy_version", "v1"),
+            },
+            "routing": {
+                "search_queries": list(trace.get("search_queries", [])) if isinstance(trace, dict) else [],
+                "search_provider_chain": list(trace.get("search_provider_chain", [])) if isinstance(trace, dict) else [],
+                "search_cache_hit": bool(trace.get("search_cache_hit", False)) if isinstance(trace, dict) else False,
+                "playwright_used": bool(trace.get("playwright_used", False)) if isinstance(trace, dict) else False,
+                "local_rag_hits": list(trace.get("local_rag_hits", [])) if isinstance(trace, dict) else [],
+            },
+            "retrieval_version": "v2" if self.enable_retrieval_v2 else "v1",
+            "reranker_provider": getattr(self.relevance_scorer, "provider_name", "current"),
             "thresholds": {
                 "strong_relevance": self.strong_relevance_threshold,
                 "strong_quality": self.strong_quality_threshold,
@@ -287,6 +611,15 @@ class ClaimPipeline:
         print(f"Claim type: {claim_type_result['type'].value} (confidence: {claim_type_result['confidence']:.2f})")
         print("Claim type classification:", round(time.time() - start, 3), "sec")
 
+        start = time.time()
+        context_result = self.claim_context_classifier.classify(claim)
+        trace["claim_context"] = dict(context_result)
+        print(
+            f"Claim context: {context_result['domain']}/{context_result['subcategory']} "
+            f"(confidence: {context_result['confidence']:.2f})"
+        )
+        print("Claim context classification:", round(time.time() - start, 3), "sec")
+
         # extract domain to exclude original source
         exclude_domain = None
         if source_url:
@@ -297,7 +630,10 @@ class ClaimPipeline:
         try:
             evidence_raw = await self.router.get_evidence(
                 claim,
-                exclude_domain=exclude_domain
+                exclude_domain=exclude_domain,
+                trace=trace,
+                context_result=context_result,
+                claim_type_result=trace["claim_type"],
             )
         except asyncio.CancelledError:
             return {
@@ -358,7 +694,19 @@ class ClaimPipeline:
         scored_evidence = []
         strong_evidence_count = 0
 
-        for ev in evidence_raw:
+        if self.enable_retrieval_v2:
+            scored_evidence = self.retrieval_v2.select_evidence(
+                claim,
+                evidence_raw,
+                self._sentence_cache,
+                context_result=context_result,
+                trace=trace,
+            )
+            strong_evidence_count = sum(
+                1 for item in scored_evidence if item.get("evidence_tier") == "strong"
+            )
+
+        for ev in ([] if self.enable_retrieval_v2 else evidence_raw):
 
             print("\nChecking source:", ev["source"])
             print("URL:", ev["url"])
@@ -373,34 +721,63 @@ class ClaimPipeline:
                 continue
 
             # extract best sentence from document
-            best_sentences = extract_best_sentences(
-                claim,
-                text,
-                self.relevance_scorer,
+            sentence_cache_key = (
+                " ".join((claim or "").strip().lower().split()),
+                ev.get("url", ""),
+                hash(text),
             )
+            best_sentences = self._sentence_cache.get(sentence_cache_key)
+            if best_sentences is None:
+                best_sentences = extract_best_sentences(
+                    claim,
+                    text,
+                    self.relevance_scorer,
+                    source_name=ev.get("source"),
+                    context_result=context_result,
+                )
+                self._sentence_cache[sentence_cache_key] = best_sentences
 
             if not best_sentences:
                 continue
 
             for index, candidate in enumerate(best_sentences):
                 best_sentence = candidate["text"]
+                selector_score = float(candidate.get("selector_score", 0.0))
+                reporting_penalty = float(candidate.get("reporting_penalty", 0.0))
+                lead_bonus = float(candidate.get("lead_bonus", 0.0))
+                if _should_skip_claim_reporting_sentence(
+                    claim,
+                    best_sentence,
+                    source_name=ev.get("source"),
+                    context_result=context_result,
+                ):
+                    print("Skipped claim-reporting evidence")
+                    trace["evidence_selected"].append({
+                        "url": ev["url"],
+                        "sentence": best_sentence,
+                        "skipped": "claim_reporting_sentence",
+                    })
+                    continue
                 relevance_score = self.relevance_scorer.score(claim, best_sentence)
                 quality_score = self.quality_scorer.score(best_sentence)
+                effective_relevance = round(min(1.0, (relevance_score * 0.85) + (selector_score * 0.15)), 3)
 
                 print("Relevance:", relevance_score)
+                print("Selector:", selector_score)
+                print("Effective relevance:", effective_relevance)
                 print("Quality:", quality_score)
 
                 evidence_tier = None
                 adjusted_weight = ev["weight"]
 
                 if (
-                    relevance_score >= self.strong_relevance_threshold
+                    effective_relevance >= self.strong_relevance_threshold
                     and quality_score >= self.strong_quality_threshold
                 ):
                     evidence_tier = "strong"
                     strong_evidence_count += 1
                 elif (
-                    relevance_score >= self.soft_relevance_threshold
+                    effective_relevance >= self.soft_relevance_threshold
                     and quality_score >= self.soft_quality_threshold
                 ):
                     evidence_tier = "soft"
@@ -417,16 +794,24 @@ class ClaimPipeline:
                     "text": best_sentence,
                     "weight": adjusted_weight,
                     "raw_weight": ev["weight"],
-                    "relevance_score": relevance_score,
+                    "relevance_score": effective_relevance,
+                    "base_relevance_score": relevance_score,
+                    "selector_score": selector_score,
+                    "reporting_penalty": reporting_penalty,
+                    "lead_bonus": lead_bonus,
                     "quality_score": quality_score,
-                    "combined_score": round(relevance_score * quality_score, 4),
+                    "combined_score": round(effective_relevance * quality_score, 4),
                     "evidence_tier": evidence_tier,
                 })
 
                 trace["evidence_selected"].append({
                     "url": ev["url"],
                     "sentence": best_sentence,
-                    "relevance": relevance_score,
+                    "relevance": effective_relevance,
+                    "base_relevance": relevance_score,
+                    "selector_score": selector_score,
+                    "reporting_penalty": reporting_penalty,
+                    "lead_bonus": lead_bonus,
                     "quality": quality_score
                 })
 
@@ -445,6 +830,7 @@ class ClaimPipeline:
                 "explanation": "No sufficiently relevant and high-quality evidence was found.",
                 "transparency": self._build_transparency(
                     claim_type_result=claim_type_result,
+                    context_result=context_result,
                     language=language,
                     evidence_retrieved=evidence_retrieved_count,
                     evidence_cleaned=evidence_cleaned_count,
@@ -453,7 +839,9 @@ class ClaimPipeline:
                     strong_evidence_count=0,
                     forced_neutral=True,
                     logic_engine_injected=False,
+                    trace=trace,
                 ),
+                "search_queries": list(trace.get("search_queries", [])),
             }
 
         # sort evidence by combined score
@@ -483,10 +871,27 @@ class ClaimPipeline:
             highlighted = ev["text"]
 
             print("\nSTANCE CHECK")
-            print("Evidence:", highlighted)
+            safe_highlighted = (highlighted or "").replace("\ufeff", "").encode(
+                sys.stdout.encoding or "utf-8",
+                errors="replace",
+            ).decode(sys.stdout.encoding or "utf-8", errors="replace")
+            print("Evidence:", safe_highlighted)
 
-            stance_result = None
-            stance_result = self.stance.detect(highlighted, claim)
+            verifier_input = ev.get("context_text") if self.enable_verifier_v2 else None
+            if self.enable_verifier_v2:
+                stance_result = self.verifier_v2.verify(claim, highlighted, verifier_input)
+            else:
+                stance_result = self.stance.detect(highlighted, claim)
+
+            if self.enable_llm_verifier and self.llm_verifier.should_verify(len(results), stance_result.get("stance")):
+                try:
+                    llm_result = self.llm_verifier.verify(claim, highlighted, ev.get("context_text"))
+                    if llm_result.get("stance") != "NEUTRAL":
+                        stance_result = llm_result
+                    elif stance_result.get("stance") == "NEUTRAL":
+                        stance_result = llm_result
+                except Exception as exc:
+                    trace.setdefault("llm_verifier_errors", []).append(str(exc))
 
             if stance_result.get("stance") == "NEUTRAL":
                 year_check = year_reasoning(claim, highlighted)
@@ -496,7 +901,7 @@ class ClaimPipeline:
                         "confidence": 0.88,
                         "source": "heuristic_year_rescue",
                     }
-                else:
+                elif not self.enable_retrieval_v2:
                     rank_check = numeric_rank_reasoning(claim, highlighted)
                     if rank_check:
                         stance_result = {
@@ -505,7 +910,7 @@ class ClaimPipeline:
                             "source": "heuristic_rank_rescue",
                         }
 
-            print("Stance:", stance_result)
+            print("Stance:", _safe_console_text(stance_result))
 
             results.append({
                 "source": ev["source"],
@@ -517,6 +922,9 @@ class ClaimPipeline:
                 "confidence": stance_result["confidence"],
                 "stance_source": stance_result.get("source", "model"),
                 "relevance_score": ev["relevance_score"],
+                "base_relevance_score": ev.get("base_relevance_score"),
+                "selector_score": ev.get("selector_score"),
+                "context_text": ev.get("context_text"),
                 "quality_score": ev["quality_score"],
                 "combined_score": ev.get("combined_score"),
                 "evidence_tier": ev.get("evidence_tier", "soft"),
@@ -530,6 +938,8 @@ class ClaimPipeline:
                 "source": stance_result.get("source", "model")
             })
 
+        results = self._consolidate_document_results(results)
+        print("Document-level evidence items:", len(results))
         print("Semantic + NLI:", round(time.time() - start, 3), "sec")
 
         # logic engine reasoning pass
@@ -562,16 +972,32 @@ class ClaimPipeline:
         # Abstain when there is no reliable non-neutral signal.
         forced_neutral = False
         non_neutral_count = len([r for r in results if r.get("stance") in {"SUPPORT", "REFUTE"}])
+        support_items = [r for r in results if r.get("stance") == "SUPPORT"]
+        refute_items = [r for r in results if r.get("stance") == "REFUTE"]
         decisive_single = any(
             r.get("stance") in {"SUPPORT", "REFUTE"}
             and float(r.get("confidence", 0.0)) >= self.single_source_decisive_confidence
             and float(r.get("weight", 0.0)) >= self.single_source_min_weight
             for r in results
         )
+        dominant_items = support_items if len(support_items) >= len(refute_items) else refute_items
+        soft_consensus = False
+        if (
+            len(dominant_items) >= self.soft_consensus_min_items
+            and (len(support_items) == 0 or len(refute_items) == 0)
+        ):
+            avg_confidence = sum(float(r.get("confidence", 0.0)) for r in dominant_items) / max(len(dominant_items), 1)
+            avg_weight = sum(float(r.get("weight", 0.0)) for r in dominant_items) / max(len(dominant_items), 1)
+            if (
+                avg_confidence >= self.soft_consensus_min_avg_confidence
+                and avg_weight >= self.soft_consensus_min_avg_weight
+            ):
+                soft_consensus = True
         if (
             (
                 strong_evidence_count < self.min_strong_evidence_for_forced_verdict
                 and not decisive_single
+                and not soft_consensus
             )
             or non_neutral_count == 0
         ):
@@ -592,6 +1018,7 @@ class ClaimPipeline:
 
         transparency = self._build_transparency(
             claim_type_result=claim_type_result,
+            context_result=context_result,
             language=language,
             evidence_retrieved=evidence_retrieved_count,
             evidence_cleaned=evidence_cleaned_count,
@@ -600,6 +1027,7 @@ class ClaimPipeline:
             strong_evidence_count=strong_evidence_count,
             forced_neutral=forced_neutral,
             logic_engine_injected=logic_engine_injected,
+            trace=trace,
         )
 
         trace["final_verdict"] = {
@@ -630,6 +1058,11 @@ class ClaimPipeline:
             "logical_analysis": logic_metadata,
             "explanation": explanation,
             "transparency": transparency,
+            "search_queries": list(trace.get("search_queries", [])),
         }
+
+
+
+
 
 
