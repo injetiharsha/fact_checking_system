@@ -1,41 +1,39 @@
 {
   "benchmark_metrics": {
     "total_claims": 30,
-    "correct_predictions": 21,
-    "accuracy": 0.7,
-    "neutral_rate": 0.233,
+    "correct_predictions": 23,
+    "accuracy": 0.767,
+    "neutral_rate": 0.2,
     "actual_positive": 22,
     "actual_negative": 8,
-    "predicted_positive": 17,
-    "predicted_negative": 13,
-    "tp": 16,
+    "predicted_positive": 18,
+    "predicted_negative": 12,
+    "tp": 17,
     "tn": 7,
     "fp": 1,
-    "fn": 6,
+    "fn": 5,
     "false_positive_rate": 0.033,
-    "false_negative_rate": 0.2,
-    "precision_true_class": 0.941,
-    "recall_true_class": 0.727,
-    "f1_true_class": 0.821,
+    "false_negative_rate": 0.167,
+    "precision_true_class": 0.944,
+    "recall_true_class": 0.773,
+    "f1_true_class": 0.85,
     "failed_by_expected_verdict": {
-      "FALSE": 3,
-      "TRUE": 6
+      "FALSE": 2,
+      "TRUE": 5
     },
     "failed_by_predicted_verdict": {
-      "NEUTRAL": 7,
-      "TRUE": 1,
-      "FALSE": 1
+      "NEUTRAL": 6,
+      "TRUE": 1
     },
     "failed_by_claim_tag": {
-      "general": 5,
-      "numeric": 2,
+      "general": 4,
       "opinion": 1,
+      "numeric": 1,
       "comparative": 1
     },
     "failed_by_category": {
-      "neutral_despite_evidence": 7,
-      "false_positive_support_bias": 1,
-      "false_negative_refute_bias": 1
+      "neutral_despite_evidence": 6,
+      "false_positive_support_bias": 1
     },
     "failed_claims": [
       {
@@ -46,17 +44,7 @@
           "general"
         ],
         "failure_category": "neutral_despite_evidence",
-        "time_seconds": 29.945
-      },
-      {
-        "claim": "5G networks spread coronavirus",
-        "expected_verdict": "FALSE",
-        "predicted_verdict": "NEUTRAL",
-        "logical_tags": [
-          "numeric"
-        ],
-        "failure_category": "neutral_despite_evidence",
-        "time_seconds": 3.945
+        "time_seconds": 37.584
       },
       {
         "claim": "The Great Wall of China is visible from space",
@@ -66,7 +54,7 @@
           "opinion"
         ],
         "failure_category": "false_positive_support_bias",
-        "time_seconds": 21.711
+        "time_seconds": 42.831
       },
       {
         "claim": "Australia is both a country and a continent",
@@ -76,7 +64,7 @@
           "general"
         ],
         "failure_category": "neutral_despite_evidence",
-        "time_seconds": 17.252
+        "time_seconds": 13.318
       },
       {
         "claim": "Humans share about 50 percent of their DNA with bananas",
@@ -86,17 +74,17 @@
           "numeric"
         ],
         "failure_category": "neutral_despite_evidence",
-        "time_seconds": 52.042
+        "time_seconds": 50.109
       },
       {
         "claim": "Jupiter is the largest planet in the solar system",
         "expected_verdict": "TRUE",
-        "predicted_verdict": "FALSE",
+        "predicted_verdict": "NEUTRAL",
         "logical_tags": [
           "comparative"
         ],
-        "failure_category": "false_negative_refute_bias",
-        "time_seconds": 16.172
+        "failure_category": "neutral_despite_evidence",
+        "time_seconds": 14.449
       },
       {
         "claim": "Neptune is the farthest planet from the Sun",
@@ -106,7 +94,7 @@
           "general"
         ],
         "failure_category": "neutral_despite_evidence",
-        "time_seconds": 12.91
+        "time_seconds": 16.525
       },
       {
         "claim": "Bats are the only mammals capable of true flight",
@@ -116,28 +104,18 @@
           "general"
         ],
         "failure_category": "neutral_despite_evidence",
-        "time_seconds": 31.125
-      },
-      {
-        "claim": "Bananas are berries",
-        "expected_verdict": "TRUE",
-        "predicted_verdict": "NEUTRAL",
-        "logical_tags": [
-          "general"
-        ],
-        "failure_category": "neutral_despite_evidence",
-        "time_seconds": 29.084
+        "time_seconds": 23.852
       }
     ]
   },
-  "total_time_seconds": 196.852,
-  "average_claim_time": 34.128,
+  "total_time_seconds": 205.671,
+  "average_claim_time": 36.299,
   "claims": [
     {
       "claim": "The moon landing was faked",
       "predicted_verdict": "NEUTRAL",
       "expected_verdict": "FALSE",
-      "time_seconds": 29.945,
+      "time_seconds": 37.584,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -159,29 +137,29 @@
             "language": "en",
             "evidence": [
               {
-                "source": "Was the Moon landing fake? Debunking the Apollo 11 conspiracy ... - BBC",
-                "url": "https://www.bbc.co.uk/bitesize/articles/z3x6b7h",
-                "text": "Despite plenty of evidence and scientific proof that this isn't the case, many people still, to this day, think the 1969 Moon landing was fake and that mankind has never taken \"one small step\", let alone \"one giant leap\" on the lunar surface.",
+                "source": "Was the Moon Landing Fake? Debunking 5 Common Myths",
+                "url": "https://starwalk.space/en/news/was-the-moon-landing-fake",
+                "text": "Debunking 5 Common Myths July 20, 2025, marks the 56th anniversary of one of the most remarkable milestones in human history \u2014 the Apollo 11 mission.",
                 "weight": 0.5,
                 "raw_weight": 0.5,
-                "stance": "REFUTE",
-                "confidence": 0.62,
-                "stance_source": "model:unknown",
-                "relevance_score": 0.792,
-                "base_relevance_score": 0.784,
-                "selector_score": 0.835,
+                "stance": "NEUTRAL",
+                "confidence": 0.5,
+                "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
+                "relevance_score": 0.674,
+                "base_relevance_score": 0.655,
+                "selector_score": 0.785,
                 "context_text": null,
-                "quality_score": 0.9000000000000001,
-                "combined_score": 0.7128,
+                "quality_score": 0.5,
+                "combined_score": 0.337,
                 "evidence_tier": "strong",
                 "passage_count": 1
               }
             ],
             "final_verdict": "NEUTRAL",
-            "confidence": 0.55,
-            "conflict_analysis": "Strong Contradictory Evidence",
+            "confidence": 0,
+            "conflict_analysis": "Insufficient decisive evidence for definitive verdict",
             "citations": [
-              "[1] Was the Moon landing fake? Debunking the Apollo 11 conspiracy ... - BBC - https://www.bbc.co.uk/bitesize/articles/z3x6b7h"
+              "[1] Was the Moon Landing Fake? Debunking 5 Common Myths - https://starwalk.space/en/news/was-the-moon-landing-fake"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -190,7 +168,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "The claim \"the moon landing was faked\" was evaluated against available evidence. Evidence balance: 0 supporting, 1 contradicting, and 0 neutral items. The evidence is mixed or not strong enough for a definitive conclusion. Contradicting side: \"Despite plenty of evidence and scientific proof that this isn't the case, many people still, to this day, think the 1969 Moon landing was fake and that mankind has never taken \"one small step\", let alone \"one giant le...\" Confidence level: 55.0%. Conflict assessment: Strong Contradictory Evidence.",
+            "explanation": "The claim \"the moon landing was faked\" was evaluated against available evidence. Evidence balance: 0 supporting, 0 contradicting, and 1 neutral items. The evidence is mixed or not strong enough for a definitive conclusion. Confidence level: 0.0%. Conflict assessment: Insufficient decisive evidence for definitive verdict.",
             "transparency": {
               "version": "phase6-v1",
               "verifier": {
@@ -250,17 +228,17 @@
                 "retrieved": 2,
                 "cleaned": 1,
                 "scored": 1,
-                "strong": 2,
+                "strong": 1,
                 "soft": 0,
                 "support": 0,
-                "refute": 1,
-                "neutral": 0
+                "refute": 0,
+                "neutral": 1
               },
               "stance_sources": {
-                "model:unknown": 1
+                "llm_verifier:groq:openai/gpt-oss-20b": 1
               },
               "policy_flags": {
-                "forced_neutral_due_to_weak_evidence": false,
+                "forced_neutral_due_to_weak_evidence": true,
                 "logic_engine_injected": false
               }
             },
@@ -279,7 +257,7 @@
       "claim": "Climate change is a hoax",
       "predicted_verdict": "FALSE",
       "expected_verdict": "FALSE",
-      "time_seconds": 12.591,
+      "time_seconds": 25.365,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -309,12 +287,12 @@
                 "stance": "REFUTE",
                 "confidence": 0.99,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.686,
+                "relevance_score": 0.693,
                 "base_relevance_score": 0.675,
-                "selector_score": 0.748,
+                "selector_score": 0.798,
                 "context_text": null,
                 "quality_score": 0.7,
-                "combined_score": 0.4802,
+                "combined_score": 0.4851,
                 "evidence_tier": "strong",
                 "passage_count": 1
               },
@@ -440,7 +418,7 @@
       "claim": "Drinking bleach cures COVID-19",
       "predicted_verdict": "FALSE",
       "expected_verdict": "FALSE",
-      "time_seconds": 27.869,
+      "time_seconds": 31.056,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -581,9 +559,9 @@
     },
     {
       "claim": "5G networks spread coronavirus",
-      "predicted_verdict": "NEUTRAL",
+      "predicted_verdict": "FALSE",
       "expected_verdict": "FALSE",
-      "time_seconds": 3.945,
+      "time_seconds": 4.475,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -595,10 +573,10 @@
         "source_url": null,
         "claims_analyzed": 1,
         "true_claims": 0,
-        "false_claims": 0,
-        "neutral_claims": 1,
-        "document_credibility_score": 0.0,
-        "document_verdict": "Mixed",
+        "false_claims": 1,
+        "neutral_claims": 0,
+        "document_credibility_score": -1.0,
+        "document_verdict": "Highly Misleading",
         "results": [
           {
             "claim": "5g networks spread coronavirus",
@@ -607,25 +585,25 @@
               {
                 "source": "Coronavirus: 5G and microchip conspiracies around the ...",
                 "url": "https://www.bbc.com/news/53191523",
-                "text": "A former grand mufti in Egypt has spoken on television about the 5G network and how it might have caused electromagnetic disturbance, creating a perfect environment for the spread of coronavirus.",
+                "text": "5G to Bolivia and beyond There's absolutely no way 5G mobile phone signals either transmit the virus or reduce our defences to it - we've debunked these claims, which scientists say are biologically impossible.",
                 "weight": 0.85,
                 "raw_weight": 0.85,
-                "stance": "NEUTRAL",
-                "confidence": 0.7,
+                "stance": "REFUTE",
+                "confidence": 0.95,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.738,
-                "base_relevance_score": 0.725,
-                "selector_score": 0.814,
+                "relevance_score": 0.713,
+                "base_relevance_score": 0.712,
+                "selector_score": 0.719,
                 "context_text": null,
                 "quality_score": 0.9000000000000001,
-                "combined_score": 0.6642,
+                "combined_score": 0.6417,
                 "evidence_tier": "strong",
                 "passage_count": 1
               }
             ],
-            "final_verdict": "NEUTRAL",
-            "confidence": 0,
-            "conflict_analysis": "Insufficient decisive evidence for definitive verdict",
+            "final_verdict": "FALSE",
+            "confidence": 1.0,
+            "conflict_analysis": "Strong Contradictory Evidence",
             "citations": [
               "[1] Coronavirus: 5G and microchip conspiracies around the ... - https://www.bbc.com/news/53191523"
             ],
@@ -636,7 +614,7 @@
               "has_numeric_value": true,
               "is_opinion": false
             },
-            "explanation": "The claim \"5g networks spread coronavirus\" was evaluated against available evidence. Evidence balance: 0 supporting, 0 contradicting, and 1 neutral items. The evidence is mixed or not strong enough for a definitive conclusion. Confidence level: 0.0%. Conflict assessment: Insufficient decisive evidence for definitive verdict.",
+            "explanation": "The claim \"5g networks spread coronavirus\" was evaluated against available evidence. Evidence balance: 0 supporting, 1 contradicting, and 0 neutral items. The evidence contradicts the claim more strongly than it supports it. Key contradicting sources include Coronavirus: 5G and microchip conspiracies around the .... Strong contradicting point: \"5G to Bolivia and beyond There's absolutely no way 5G mobile phone signals either transmit the virus or reduce our defences to it - we've debunked these claims, which scientists say are biologically impossible.\" Confidence level: 100.0%. Conflict assessment: Strong Contradictory Evidence.",
             "transparency": {
               "version": "phase6-v1",
               "verifier": {
@@ -699,14 +677,14 @@
                 "strong": 3,
                 "soft": 0,
                 "support": 0,
-                "refute": 0,
-                "neutral": 1
+                "refute": 1,
+                "neutral": 0
               },
               "stance_sources": {
                 "llm_verifier:groq:openai/gpt-oss-20b": 1
               },
               "policy_flags": {
-                "forced_neutral_due_to_weak_evidence": true,
+                "forced_neutral_due_to_weak_evidence": false,
                 "logic_engine_injected": false
               }
             },
@@ -725,7 +703,7 @@
       "claim": "The Great Wall of China is visible from space",
       "predicted_verdict": "TRUE",
       "expected_verdict": "FALSE",
-      "time_seconds": 21.711,
+      "time_seconds": 42.831,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -755,12 +733,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.9,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.853,
+                "relevance_score": 0.86,
                 "base_relevance_score": 0.826,
-                "selector_score": 1.006,
+                "selector_score": 1.056,
                 "context_text": null,
                 "quality_score": 0.9000000000000001,
-                "combined_score": 0.7677,
+                "combined_score": 0.774,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 1,
@@ -901,7 +879,7 @@
       "claim": "Australia is both a country and a continent",
       "predicted_verdict": "NEUTRAL",
       "expected_verdict": "TRUE",
-      "time_seconds": 17.252,
+      "time_seconds": 13.318,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -923,27 +901,6 @@
             "language": "en",
             "evidence": [
               {
-                "source": "Why Greenland is an Island and Australia is a Continent",
-                "url": "https://legacy.geog.ucsb.edu/why-greenland-is-an-island-and-australia-is-a-continent/",
-                "text": "People living in both countries largely live along the coast due to nearly uninhabitable land covering each of the countries\u2014in Greenland, the natural barrier is an ice cap, while in Australia it\u2019s a desert.",
-                "weight": 0.5,
-                "raw_weight": 0.5,
-                "stance": "NEUTRAL",
-                "confidence": 0.5,
-                "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.765,
-                "base_relevance_score": 0.752,
-                "selector_score": 0.837,
-                "context_text": null,
-                "quality_score": 0.7,
-                "combined_score": 0.5355,
-                "evidence_tier": "strong",
-                "passage_count": 2,
-                "support_passages": 0,
-                "refute_passages": 0,
-                "neutral_passages": 2
-              },
-              {
                 "source": "Why Is Australia Both a Country And a Continent?",
                 "url": "https://www.mentalfloss.com/geography/why-is-australia-country-and-continent",
                 "text": "A country is defined as \u00e2a nation with its own government, occupying a particular territory,\u00e2 and since 1901, the Commonwealth of Australia\u00e2as it\u00e2s officially known\u00e2has fit that description.",
@@ -952,13 +909,34 @@
                 "stance": "NEUTRAL",
                 "confidence": 0.6,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.797,
+                "relevance_score": 0.805,
                 "base_relevance_score": 0.784,
-                "selector_score": 0.873,
+                "selector_score": 0.923,
                 "context_text": null,
                 "quality_score": 0.5,
-                "combined_score": 0.3985,
+                "combined_score": 0.4025,
                 "evidence_tier": "strong",
+                "passage_count": 2,
+                "support_passages": 0,
+                "refute_passages": 0,
+                "neutral_passages": 2
+              },
+              {
+                "source": "Australia",
+                "url": "https://en.wikipedia.org/wiki/Australia",
+                "text": "Australia, officially the Commonwealth of Australia, is a country comprising the mainland of the Australian continent, the island of Tasmania and numerous smaller islands.",
+                "weight": 0.72,
+                "raw_weight": 0.9,
+                "stance": "NEUTRAL",
+                "confidence": 0.6,
+                "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
+                "relevance_score": 0.941,
+                "base_relevance_score": 0.882,
+                "selector_score": 1.273,
+                "context_text": null,
+                "quality_score": 0.3,
+                "combined_score": 0.2823,
+                "evidence_tier": "soft",
                 "passage_count": 2,
                 "support_passages": 0,
                 "refute_passages": 0,
@@ -969,8 +947,8 @@
             "confidence": 0,
             "conflict_analysis": "Insufficient decisive evidence for definitive verdict",
             "citations": [
-              "[1] Why Greenland is an Island and Australia is a Continent - https://legacy.geog.ucsb.edu/why-greenland-is-an-island-and-australia-is-a-continent/",
-              "[2] Why Is Australia Both a Country And a Continent? - https://www.mentalfloss.com/geography/why-is-australia-country-and-continent"
+              "[1] Why Is Australia Both a Country And a Continent? - https://www.mentalfloss.com/geography/why-is-australia-country-and-continent",
+              "[2] Australia - https://en.wikipedia.org/wiki/Australia"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -1036,8 +1014,8 @@
                 "retrieved": 2,
                 "cleaned": 2,
                 "scored": 4,
-                "strong": 3,
-                "soft": 1,
+                "strong": 1,
+                "soft": 3,
                 "support": 0,
                 "refute": 0,
                 "neutral": 2
@@ -1064,7 +1042,7 @@
       "claim": "The Amazon River is the longest river in the world",
       "predicted_verdict": "FALSE",
       "expected_verdict": "FALSE",
-      "time_seconds": 39.915,
+      "time_seconds": 51.703,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1094,12 +1072,12 @@
                 "stance": "REFUTE",
                 "confidence": 0.59,
                 "stance_source": "model:unknown",
-                "relevance_score": 0.837,
+                "relevance_score": 0.844,
                 "base_relevance_score": 0.817,
-                "selector_score": 0.95,
+                "selector_score": 1.0,
                 "context_text": null,
                 "quality_score": 0.9000000000000001,
-                "combined_score": 0.7533,
+                "combined_score": 0.7596,
                 "evidence_tier": "strong",
                 "passage_count": 1
               },
@@ -1112,12 +1090,12 @@
                 "stance": "NEUTRAL",
                 "confidence": 0.7,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.817,
+                "relevance_score": 0.824,
                 "base_relevance_score": 0.796,
-                "selector_score": 0.933,
+                "selector_score": 0.983,
                 "context_text": null,
                 "quality_score": 0.9000000000000001,
-                "combined_score": 0.7353,
+                "combined_score": 0.7416,
                 "evidence_tier": "strong",
                 "passage_count": 1
               }
@@ -1222,7 +1200,7 @@
       "claim": "Africa is the largest continent on Earth",
       "predicted_verdict": "FALSE",
       "expected_verdict": "FALSE",
-      "time_seconds": 41.648,
+      "time_seconds": 39.821,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1252,12 +1230,12 @@
                 "stance": "REFUTE",
                 "confidence": 0.95,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.826,
+                "relevance_score": 0.833,
                 "base_relevance_score": 0.818,
-                "selector_score": 0.871,
+                "selector_score": 0.921,
                 "context_text": null,
                 "quality_score": 0.9000000000000001,
-                "combined_score": 0.7434,
+                "combined_score": 0.7497,
                 "evidence_tier": "strong",
                 "passage_count": 1
               },
@@ -1267,15 +1245,15 @@
                 "text": "[4] It is thought to be the continent where the first humans evolved.",
                 "weight": 0.9,
                 "raw_weight": 0.9,
-                "stance": "REFUTE",
-                "confidence": 0.9,
-                "stance_source": "heuristic_rank_rescue",
-                "relevance_score": 0.737,
+                "stance": "NEUTRAL",
+                "confidence": 0.8,
+                "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
+                "relevance_score": 0.744,
                 "base_relevance_score": 0.731,
-                "selector_score": 0.769,
+                "selector_score": 0.819,
                 "context_text": null,
                 "quality_score": 0.5,
-                "combined_score": 0.3685,
+                "combined_score": 0.372,
                 "evidence_tier": "strong",
                 "passage_count": 1
               },
@@ -1288,12 +1266,12 @@
                 "stance": "REFUTE",
                 "confidence": 0.59,
                 "stance_source": "model:unknown",
-                "relevance_score": 0.871,
+                "relevance_score": 0.879,
                 "base_relevance_score": 0.857,
-                "selector_score": 0.953,
+                "selector_score": 1.003,
                 "context_text": null,
                 "quality_score": 0.3,
-                "combined_score": 0.2613,
+                "combined_score": 0.2637,
                 "evidence_tier": "soft",
                 "passage_count": 2,
                 "support_passages": 0,
@@ -1316,7 +1294,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "The claim \"africa is the largest continent on earth\" was evaluated against available evidence. Evidence balance: 0 supporting, 3 contradicting, and 0 neutral items. The evidence contradicts the claim more strongly than it supports it. Key contradicting sources include List of countries by continents - Wikipedia, Africa - Simple English Wikipedia, the free encyclopedia, Africa - test2.Wikipedia. Strong contradicting point: \"There are 54 fully recognized and independent countries in Africa, which are: Sovereign states [change | change source]Dependent territories [change | change source]- Transcontinental countries classified as Southern...\" Confidence level: 100.0%. Conflict assessment: Strong Contradictory Evidence.",
+            "explanation": "The claim \"africa is the largest continent on earth\" was evaluated against available evidence. Evidence balance: 0 supporting, 2 contradicting, and 1 neutral items. The evidence contradicts the claim more strongly than it supports it. Key contradicting sources include List of countries by continents - Wikipedia, Africa - test2.Wikipedia. Strong contradicting point: \"There are 54 fully recognized and independent countries in Africa, which are: Sovereign states [change | change source]Dependent territories [change | change source]- Transcontinental countries classified as Southern...\" Confidence level: 100.0%. Conflict assessment: Strong Contradictory Evidence.",
             "transparency": {
               "version": "phase6-v1",
               "verifier": {
@@ -1376,12 +1354,11 @@
                 "strong": 2,
                 "soft": 2,
                 "support": 0,
-                "refute": 3,
-                "neutral": 0
+                "refute": 2,
+                "neutral": 1
               },
               "stance_sources": {
-                "llm_verifier:groq:openai/gpt-oss-20b": 1,
-                "heuristic_rank_rescue": 1,
+                "llm_verifier:groq:openai/gpt-oss-20b": 2,
                 "model:unknown": 1
               },
               "policy_flags": {
@@ -1403,7 +1380,7 @@
       "claim": "Greenland is the largest island in the world",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 38.238,
+      "time_seconds": 41.048,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1433,12 +1410,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.95,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.871,
+                "relevance_score": 0.879,
                 "base_relevance_score": 0.843,
-                "selector_score": 1.031,
+                "selector_score": 1.081,
                 "context_text": null,
                 "quality_score": 0.9000000000000001,
-                "combined_score": 0.7839,
+                "combined_score": 0.7911,
                 "evidence_tier": "strong",
                 "passage_count": 1
               }
@@ -1541,7 +1518,7 @@
       "claim": "Lake Baikal is the deepest lake on Earth",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 59.236,
+      "time_seconds": 54.889,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1560,7 +1537,7 @@
         "results": [
           {
             "claim": "lake baikal is the deepest lake on earth",
-            "language": "nl",
+            "language": "en",
             "evidence": [
               {
                 "source": "Lake Baikal - Wikipedia",
@@ -1571,12 +1548,12 @@
                 "stance": "SUPPORT",
                 "confidence": 1.0,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.879,
+                "relevance_score": 0.887,
                 "base_relevance_score": 0.873,
-                "selector_score": 0.916,
+                "selector_score": 0.966,
                 "context_text": null,
                 "quality_score": 0.9000000000000001,
-                "combined_score": 0.7911,
+                "combined_score": 0.7983,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 2,
@@ -1592,12 +1569,12 @@
                 "stance": "NEUTRAL",
                 "confidence": 0.6,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.864,
+                "relevance_score": 0.871,
                 "base_relevance_score": 0.857,
-                "selector_score": 0.903,
+                "selector_score": 0.953,
                 "context_text": null,
                 "quality_score": 0.9000000000000001,
-                "combined_score": 0.7776,
+                "combined_score": 0.7839,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 0,
@@ -1628,7 +1605,7 @@
                 "llm_verifier_model": "openai/gpt-oss-20b",
                 "llm_verifier_policy": "neutral_only"
               },
-              "language_detected": "nl",
+              "language_detected": "en",
               "claim_type": {
                 "label": "mixed",
                 "confidence": 0.6,
@@ -1706,7 +1683,7 @@
       "claim": "Sound travels faster in water than in air",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 68.063,
+      "time_seconds": 71.467,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1817,7 +1794,7 @@
                 "retrieved": 2,
                 "cleaned": 1,
                 "scored": 1,
-                "strong": 2,
+                "strong": 3,
                 "soft": 0,
                 "support": 1,
                 "refute": 0,
@@ -1846,7 +1823,7 @@
       "claim": "Humans share about 50 percent of their DNA with bananas",
       "predicted_verdict": "NEUTRAL",
       "expected_verdict": "TRUE",
-      "time_seconds": 52.042,
+      "time_seconds": 50.109,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -1986,7 +1963,7 @@
       "claim": "Lightning is hotter than the surface of the Sun",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 49.025,
+      "time_seconds": 57.045,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2010,54 +1987,44 @@
               {
                 "source": "Breakdown: Why lightning can get hotter than the sun - Action News 5",
                 "url": "https://www.actionnews5.com/2020/11/08/breakdown-why-lightning-can-get-hotter-than-sun/",
-                "text": "Breakdown: Why lightning can get hotter than the sun Published: Nov. 8, 2020 at 5:40 AM CST MEMPHIS, Tenn. (WMC) - Lightning can cause extensive damage and sometimes even results in fires.",
-                "weight": 0.53,
+                "text": "Lightning can get five times hotter than the sun.",
+                "weight": 0.4,
                 "raw_weight": 0.5,
-                "stance": "SUPPORT",
-                "confidence": 0.955,
-                "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.796,
-                "base_relevance_score": 0.777,
-                "selector_score": 0.905,
-                "context_text": null,
-                "quality_score": 0.9000000000000001,
-                "combined_score": 0.7164,
-                "evidence_tier": "strong",
-                "passage_count": 2,
-                "support_passages": 2,
-                "refute_passages": 0,
-                "neutral_passages": 0
-              },
-              {
-                "source": "Lightning",
-                "url": "https://en.wikipedia.org/wiki/Lightning",
-                "text": "The air around the lightning flash rapidly heats to temperatures of about 30,000 \u00b0C (54,000 \u00b0F).",
-                "weight": 0.9,
-                "raw_weight": 0.9,
                 "stance": "SUPPORT",
                 "confidence": 0.95,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.788,
-                "base_relevance_score": 0.79,
-                "selector_score": 0.78,
+                "relevance_score": 0.893,
+                "base_relevance_score": 0.877,
+                "selector_score": 0.987,
                 "context_text": null,
-                "quality_score": 0.5,
-                "combined_score": 0.394,
-                "evidence_tier": "strong",
+                "quality_score": 0.3,
+                "combined_score": 0.2679,
+                "evidence_tier": "soft",
                 "passage_count": 2,
                 "support_passages": 1,
                 "refute_passages": 0,
                 "neutral_passages": 1
               },
               {
-                "source": "logic_engine",
-                "url": "internal://logic_engine",
-                "text": "Structured reasoning signal",
-                "weight": 0.8,
-                "stance": "SUPPORT",
-                "confidence": 0.8,
-                "relevance_score": 1.0,
-                "quality_score": 1.0
+                "source": "Lightning",
+                "url": "https://en.wikipedia.org/wiki/Lightning",
+                "text": "Positive lightning is less common than negative lightning and on average makes up less than 5% of all lightning strikes.",
+                "weight": 0.9,
+                "raw_weight": 0.9,
+                "stance": "NEUTRAL",
+                "confidence": 0.95,
+                "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
+                "relevance_score": 0.748,
+                "base_relevance_score": 0.738,
+                "selector_score": 0.805,
+                "context_text": null,
+                "quality_score": 0.5,
+                "combined_score": 0.374,
+                "evidence_tier": "strong",
+                "passage_count": 2,
+                "support_passages": 0,
+                "refute_passages": 0,
+                "neutral_passages": 2
               }
             ],
             "final_verdict": "TRUE",
@@ -2074,7 +2041,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "The claim \"lightning is hotter than the surface of the sun\" was evaluated against available evidence. Evidence balance: 3 supporting, 0 contradicting, and 0 neutral items. The evidence aligns with the claim more strongly than it contradicts it. Key supporting sources include Breakdown: Why lightning can get hotter than the sun - Action News 5, Lightning. Strong supporting point: \"Structured reasoning signal\" Confidence level: 100.0%. Conflict assessment: Strong Supporting Consensus.",
+            "explanation": "The claim \"lightning is hotter than the surface of the sun\" was evaluated against available evidence. Evidence balance: 1 supporting, 0 contradicting, and 1 neutral items. The evidence aligns with the claim more strongly than it contradicts it. Key supporting sources include Breakdown: Why lightning can get hotter than the sun - Action News 5. Strong supporting point: \"Lightning can get five times hotter than the sun.\" Confidence level: 100.0%. Conflict assessment: Strong Supporting Consensus.",
             "transparency": {
               "version": "phase6-v1",
               "verifier": {
@@ -2134,17 +2101,16 @@
                 "scored": 4,
                 "strong": 2,
                 "soft": 2,
-                "support": 3,
+                "support": 1,
                 "refute": 0,
-                "neutral": 0
+                "neutral": 1
               },
               "stance_sources": {
-                "llm_verifier:groq:openai/gpt-oss-20b": 2,
-                "unknown": 1
+                "llm_verifier:groq:openai/gpt-oss-20b": 2
               },
               "policy_flags": {
                 "forced_neutral_due_to_weak_evidence": false,
-                "logic_engine_injected": true
+                "logic_engine_injected": false
               }
             },
             "search_queries": [
@@ -2162,7 +2128,7 @@
       "claim": "Water expands when it freezes",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 51.636,
+      "time_seconds": 49.237,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2192,12 +2158,12 @@
                 "stance": "SUPPORT",
                 "confidence": 1.0,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.811,
+                "relevance_score": 0.818,
                 "base_relevance_score": 0.784,
-                "selector_score": 0.963,
+                "selector_score": 1.013,
                 "context_text": null,
                 "quality_score": 0.7,
-                "combined_score": 0.5677,
+                "combined_score": 0.5726,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 2,
@@ -2338,7 +2304,7 @@
       "claim": "Venus rotates in the opposite direction to most planets",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 53.429,
+      "time_seconds": 52.623,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2368,17 +2334,17 @@
                 "stance": "SUPPORT",
                 "confidence": 0.95,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.738,
+                "relevance_score": 0.746,
                 "base_relevance_score": 0.719,
-                "selector_score": 0.847,
+                "selector_score": 0.897,
                 "context_text": null,
                 "quality_score": 0.9000000000000001,
-                "combined_score": 0.6642,
+                "combined_score": 0.6714,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 1,
-                "refute_passages": 1,
-                "neutral_passages": 0
+                "refute_passages": 0,
+                "neutral_passages": 1
               },
               {
                 "source": "Mariner 2 Data from Venus - NASA",
@@ -2389,12 +2355,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.95,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.884,
+                "relevance_score": 0.891,
                 "base_relevance_score": 0.857,
-                "selector_score": 1.037,
+                "selector_score": 1.087,
                 "context_text": null,
                 "quality_score": 0.7,
-                "combined_score": 0.6188,
+                "combined_score": 0.6237,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 1,
@@ -2503,7 +2469,7 @@
                 "retrieved": 4,
                 "cleaned": 3,
                 "scored": 5,
-                "strong": 5,
+                "strong": 6,
                 "soft": 1,
                 "support": 3,
                 "refute": 0,
@@ -2532,9 +2498,9 @@
     },
     {
       "claim": "Jupiter is the largest planet in the solar system",
-      "predicted_verdict": "FALSE",
+      "predicted_verdict": "NEUTRAL",
       "expected_verdict": "TRUE",
-      "time_seconds": 16.172,
+      "time_seconds": 14.449,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2546,10 +2512,10 @@
         "source_url": null,
         "claims_analyzed": 1,
         "true_claims": 0,
-        "false_claims": 1,
-        "neutral_claims": 0,
-        "document_credibility_score": -1.0,
-        "document_verdict": "Highly Misleading",
+        "false_claims": 0,
+        "neutral_claims": 1,
+        "document_credibility_score": 0.0,
+        "document_verdict": "Mixed",
         "results": [
           {
             "claim": "jupiter is the largest planet in the solar system",
@@ -2579,15 +2545,15 @@
                 "text": "The solar system largest moon, Ganymede, is captured here alongside the planet Jupiter in a color picture taken by NASA Cassini spacecraft on Dec. 3, 2000.",
                 "weight": 0.9,
                 "raw_weight": 0.9,
-                "stance": "REFUTE",
-                "confidence": 0.9,
-                "stance_source": "heuristic_rank_rescue",
-                "relevance_score": 0.844,
+                "stance": "NEUTRAL",
+                "confidence": 0.5,
+                "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
+                "relevance_score": 0.852,
                 "base_relevance_score": 0.809,
-                "selector_score": 1.043,
+                "selector_score": 1.093,
                 "context_text": null,
                 "quality_score": 0.5,
-                "combined_score": 0.422,
+                "combined_score": 0.426,
                 "evidence_tier": "strong",
                 "passage_count": 1
               },
@@ -2597,15 +2563,15 @@
                 "text": "But the \"King of Planets\" is no lumbering giant \u2014 Jupiter has the shortest day in the solar system, taking about 9.9 hours to spin around once on its axis.",
                 "weight": 1.0,
                 "raw_weight": 1.0,
-                "stance": "REFUTE",
-                "confidence": 0.9,
-                "stance_source": "heuristic_rank_rescue",
-                "relevance_score": 0.706,
+                "stance": "NEUTRAL",
+                "confidence": 0.8,
+                "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
+                "relevance_score": 0.713,
                 "base_relevance_score": 0.677,
-                "selector_score": 0.868,
+                "selector_score": 0.918,
                 "context_text": null,
                 "quality_score": 0.5,
-                "combined_score": 0.353,
+                "combined_score": 0.3565,
                 "evidence_tier": "strong",
                 "passage_count": 1
               },
@@ -2618,32 +2584,22 @@
                 "stance": "NEUTRAL",
                 "confidence": 0.59,
                 "stance_source": "model_low_confidence_or_neutral:unknown",
-                "relevance_score": 0.987,
+                "relevance_score": 0.995,
                 "base_relevance_score": 0.962,
-                "selector_score": 1.131,
+                "selector_score": 1.181,
                 "context_text": null,
                 "quality_score": 0.3,
-                "combined_score": 0.2961,
+                "combined_score": 0.2985,
                 "evidence_tier": "soft",
                 "passage_count": 2,
                 "support_passages": 0,
                 "refute_passages": 0,
                 "neutral_passages": 2
-              },
-              {
-                "source": "logic_engine",
-                "url": "internal://logic_engine",
-                "text": "Structured reasoning signal",
-                "weight": 0.8,
-                "stance": "REFUTE",
-                "confidence": 0.8,
-                "relevance_score": 1.0,
-                "quality_score": 1.0
               }
             ],
-            "final_verdict": "FALSE",
-            "confidence": 1.0,
-            "conflict_analysis": "Strong Contradictory Evidence",
+            "final_verdict": "NEUTRAL",
+            "confidence": 0,
+            "conflict_analysis": "Insufficient decisive evidence for definitive verdict",
             "citations": [
               "[1] Jupiter: The Solar System's Giant - NASA Technical Reports Server - https://ntrs.nasa.gov/citations/20010069495",
               "[2] NASA - https://www.nasa.gov/search/Ganymede+and+Jupiter",
@@ -2657,7 +2613,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "The claim \"jupiter is the largest planet in the solar system\" was evaluated against available evidence. Evidence balance: 0 supporting, 3 contradicting, and 2 neutral items. The evidence contradicts the claim more strongly than it supports it. Key contradicting sources include NASA, Jupiter. Strong contradicting point: \"Structured reasoning signal\" Confidence level: 100.0%. Conflict assessment: Strong Contradictory Evidence.",
+            "explanation": "The claim \"jupiter is the largest planet in the solar system\" was evaluated against available evidence. Evidence balance: 0 supporting, 0 contradicting, and 4 neutral items. The evidence is mixed or not strong enough for a definitive conclusion. Confidence level: 0.0%. Conflict assessment: Insufficient decisive evidence for definitive verdict.",
             "transparency": {
               "version": "phase6-v1",
               "verifier": {
@@ -2718,18 +2674,16 @@
                 "strong": 3,
                 "soft": 2,
                 "support": 0,
-                "refute": 3,
-                "neutral": 2
+                "refute": 0,
+                "neutral": 4
               },
               "stance_sources": {
-                "llm_verifier:groq:openai/gpt-oss-20b": 1,
-                "heuristic_rank_rescue": 2,
-                "model_low_confidence_or_neutral:unknown": 1,
-                "unknown": 1
+                "llm_verifier:groq:openai/gpt-oss-20b": 3,
+                "model_low_confidence_or_neutral:unknown": 1
               },
               "policy_flags": {
-                "forced_neutral_due_to_weak_evidence": false,
-                "logic_engine_injected": true
+                "forced_neutral_due_to_weak_evidence": true,
+                "logic_engine_injected": false
               }
             },
             "search_queries": [
@@ -2747,7 +2701,7 @@
       "claim": "Mars has two moons",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 20.588,
+      "time_seconds": 20.375,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2775,19 +2729,16 @@
                 "weight": 1.0,
                 "raw_weight": 1.0,
                 "stance": "SUPPORT",
-                "confidence": 0.98,
+                "confidence": 0.95,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.813,
+                "relevance_score": 0.837,
                 "base_relevance_score": 0.798,
-                "selector_score": 0.899,
+                "selector_score": 1.059,
                 "context_text": null,
                 "quality_score": 0.7,
-                "combined_score": 0.5691,
+                "combined_score": 0.5859,
                 "evidence_tier": "strong",
-                "passage_count": 2,
-                "support_passages": 2,
-                "refute_passages": 0,
-                "neutral_passages": 0
+                "passage_count": 1
               },
               {
                 "source": "NASA",
@@ -2809,6 +2760,24 @@
                 "support_passages": 0,
                 "refute_passages": 0,
                 "neutral_passages": 2
+              },
+              {
+                "source": "The Moons of Mars - NASA Science",
+                "url": "https://science.nasa.gov/photojournal/the-moons-of-mars/",
+                "text": "See PIA17089 to watch a time-lapse view of Mars' moons in motion.",
+                "weight": 1.0,
+                "raw_weight": 1.0,
+                "stance": "NEUTRAL",
+                "confidence": 0.5,
+                "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
+                "relevance_score": 0.767,
+                "base_relevance_score": 0.768,
+                "selector_score": 0.76,
+                "context_text": null,
+                "quality_score": 0.5,
+                "combined_score": 0.3835,
+                "evidence_tier": "strong",
+                "passage_count": 1
               }
             ],
             "final_verdict": "TRUE",
@@ -2816,7 +2785,8 @@
             "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
               "[1] Two Moons and the Pleiades from Mars - NASA Science - https://science.nasa.gov/photojournal/two-moons-and-the-pleiades-from-mars-2/",
-              "[2] NASA - https://www.nasa.gov/search/Phobos+in+Transit"
+              "[2] NASA - https://www.nasa.gov/search/Phobos+in+Transit",
+              "[3] The Moons of Mars - NASA Science - https://science.nasa.gov/photojournal/the-moons-of-mars/"
             ],
             "logical_analysis": {
               "is_future_claim": false,
@@ -2825,7 +2795,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "The claim \"mars has two moons\" was evaluated against available evidence. Evidence balance: 1 supporting, 0 contradicting, and 1 neutral items. The evidence aligns with the claim more strongly than it contradicts it. Key supporting sources include Two Moons and the Pleiades from Mars - NASA Science. Strong supporting point: \"Description Taking advantage of extra solar energy collected during the day, NASA's Mars Exploration Rover Spirit recently settled in for an evening of stargazing, photographing the two moons of Mars as they crossed t...\" Confidence level: 100.0%. Conflict assessment: Strong Supporting Consensus.",
+            "explanation": "The claim \"mars has two moons\" was evaluated against available evidence. Evidence balance: 1 supporting, 0 contradicting, and 2 neutral items. The evidence aligns with the claim more strongly than it contradicts it. Key supporting sources include Two Moons and the Pleiades from Mars - NASA Science. Strong supporting point: \"Description Taking advantage of extra solar energy collected during the day, NASA's Mars Exploration Rover Spirit recently settled in for an evening of stargazing, photographing the two moons of Mars as they crossed t...\" Confidence level: 100.0%. Conflict assessment: Strong Supporting Consensus.",
             "transparency": {
               "version": "phase6-v1",
               "verifier": {
@@ -2881,16 +2851,16 @@
               },
               "evidence_stats": {
                 "retrieved": 5,
-                "cleaned": 5,
+                "cleaned": 4,
                 "scored": 4,
-                "strong": 6,
+                "strong": 4,
                 "soft": 1,
                 "support": 1,
                 "refute": 0,
-                "neutral": 1
+                "neutral": 2
               },
               "stance_sources": {
-                "llm_verifier:groq:openai/gpt-oss-20b": 2
+                "llm_verifier:groq:openai/gpt-oss-20b": 3
               },
               "policy_flags": {
                 "forced_neutral_due_to_weak_evidence": false,
@@ -2912,7 +2882,7 @@
       "claim": "Neptune is the farthest planet from the Sun",
       "predicted_verdict": "NEUTRAL",
       "expected_verdict": "TRUE",
-      "time_seconds": 12.91,
+      "time_seconds": 16.525,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -2942,12 +2912,12 @@
                 "stance": "NEUTRAL",
                 "confidence": 0.5,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.742,
+                "relevance_score": 0.75,
                 "base_relevance_score": 0.726,
-                "selector_score": 0.835,
+                "selector_score": 0.885,
                 "context_text": null,
                 "quality_score": 0.5,
-                "combined_score": 0.371,
+                "combined_score": 0.375,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 0,
@@ -2963,12 +2933,12 @@
                 "stance": "NEUTRAL",
                 "confidence": 0.5,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.685,
+                "relevance_score": 0.693,
                 "base_relevance_score": 0.672,
-                "selector_score": 0.761,
+                "selector_score": 0.811,
                 "context_text": null,
                 "quality_score": 0.5,
-                "combined_score": 0.3425,
+                "combined_score": 0.3465,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 0,
@@ -3077,7 +3047,7 @@
       "claim": "The Sun is a star",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 36.66,
+      "time_seconds": 38.418,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -3125,12 +3095,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.99,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.697,
+                "relevance_score": 0.704,
                 "base_relevance_score": 0.679,
-                "selector_score": 0.797,
+                "selector_score": 0.847,
                 "context_text": null,
                 "quality_score": 0.7,
-                "combined_score": 0.4879,
+                "combined_score": 0.4928,
                 "evidence_tier": "strong",
                 "passage_count": 1
               },
@@ -3143,12 +3113,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.99,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.771,
+                "relevance_score": 0.778,
                 "base_relevance_score": 0.743,
-                "selector_score": 0.929,
+                "selector_score": 0.979,
                 "context_text": null,
                 "quality_score": 0.5,
-                "combined_score": 0.3855,
+                "combined_score": 0.389,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 1,
@@ -3269,7 +3239,7 @@
       "claim": "Saturn has rings",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 14.155,
+      "time_seconds": 49.556,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -3311,18 +3281,18 @@
               {
                 "source": "Why does Saturn have rings? | NASA Space Place",
                 "url": "https://spaceplace.nasa.gov/saturn-rings/",
-                "text": "They have revealed many surprising things about Saturn's rings.",
-                "weight": 0.72,
+                "text": "Scientists have ideas about why Saturn has rings, but no one knows for sure.",
+                "weight": 0.8,
                 "raw_weight": 1.0,
                 "stance": "SUPPORT",
-                "confidence": 0.95,
+                "confidence": 0.9,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.83,
-                "base_relevance_score": 0.835,
-                "selector_score": 0.801,
+                "relevance_score": 0.835,
+                "base_relevance_score": 0.807,
+                "selector_score": 0.992,
                 "context_text": null,
                 "quality_score": 0.3,
-                "combined_score": 0.249,
+                "combined_score": 0.2505,
                 "evidence_tier": "soft",
                 "passage_count": 1
               }
@@ -3341,7 +3311,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "The claim \"saturn has rings\" was evaluated against available evidence. Evidence balance: 1 supporting, 0 contradicting, and 1 neutral items. The evidence aligns with the claim more strongly than it contradicts it. Key supporting sources include Why does Saturn have rings? | NASA Space Place. Strong supporting point: \"They have revealed many surprising things about Saturn's rings.\" Confidence level: 100.0%. Conflict assessment: Strong Supporting Consensus.",
+            "explanation": "The claim \"saturn has rings\" was evaluated against available evidence. Evidence balance: 1 supporting, 0 contradicting, and 1 neutral items. The evidence aligns with the claim more strongly than it contradicts it. Key supporting sources include Why does Saturn have rings? | NASA Space Place. Strong supporting point: \"Scientists have ideas about why Saturn has rings, but no one knows for sure.\" Confidence level: 100.0%. Conflict assessment: Strong Supporting Consensus.",
             "transparency": {
               "version": "phase6-v1",
               "verifier": {
@@ -3428,7 +3398,7 @@
       "claim": "World War II ended in 1945",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 48.345,
+      "time_seconds": 47.514,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -3458,12 +3428,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.945,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.826,
+                "relevance_score": 0.833,
                 "base_relevance_score": 0.802,
-                "selector_score": 0.961,
+                "selector_score": 1.011,
                 "context_text": null,
                 "quality_score": 0.5,
-                "combined_score": 0.413,
+                "combined_score": 0.4165,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 2,
@@ -3605,7 +3575,7 @@
       "claim": "The Roman Empire fell in 476 AD",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 49.152,
+      "time_seconds": 46.376,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -3635,12 +3605,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.99,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.897,
+                "relevance_score": 0.904,
                 "base_relevance_score": 0.877,
-                "selector_score": 1.009,
+                "selector_score": 1.059,
                 "context_text": null,
                 "quality_score": 0.5,
-                "combined_score": 0.4485,
+                "combined_score": 0.452,
                 "evidence_tier": "strong",
                 "passage_count": 1
               }
@@ -3745,7 +3715,7 @@
       "claim": "The printing press was invented by Johannes Gutenberg",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 43.4,
+      "time_seconds": 44.014,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -3856,7 +3826,7 @@
                 "retrieved": 3,
                 "cleaned": 1,
                 "scored": 1,
-                "strong": 1,
+                "strong": 2,
                 "soft": 0,
                 "support": 1,
                 "refute": 0,
@@ -3885,7 +3855,7 @@
       "claim": "The Berlin Wall fell in 1989",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 46.89,
+      "time_seconds": 49.931,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -3915,12 +3885,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.59,
                 "stance_source": "model:unknown",
-                "relevance_score": 0.778,
+                "relevance_score": 0.786,
                 "base_relevance_score": 0.751,
-                "selector_score": 0.932,
+                "selector_score": 0.982,
                 "context_text": null,
                 "quality_score": 0.9000000000000001,
-                "combined_score": 0.7002,
+                "combined_score": 0.7074,
                 "evidence_tier": "strong",
                 "passage_count": 1
               }
@@ -4025,7 +3995,7 @@
       "claim": "The United Nations was founded after World War II",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 35.037,
+      "time_seconds": 31.12,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -4201,7 +4171,7 @@
       "claim": "Bats are the only mammals capable of true flight",
       "predicted_verdict": "NEUTRAL",
       "expected_verdict": "TRUE",
-      "time_seconds": 31.125,
+      "time_seconds": 23.852,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -4231,12 +4201,12 @@
                 "stance": "NEUTRAL",
                 "confidence": 0.5,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.795,
+                "relevance_score": 0.803,
                 "base_relevance_score": 0.782,
-                "selector_score": 0.869,
+                "selector_score": 0.919,
                 "context_text": null,
                 "quality_score": 0.9000000000000001,
-                "combined_score": 0.7155,
+                "combined_score": 0.7227,
                 "evidence_tier": "strong",
                 "passage_count": 1
               }
@@ -4341,7 +4311,7 @@
       "claim": "Sharks are older than trees",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 24.875,
+      "time_seconds": 18.786,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -4371,12 +4341,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.95,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.894,
+                "relevance_score": 0.902,
                 "base_relevance_score": 0.87,
-                "selector_score": 1.033,
+                "selector_score": 1.083,
                 "context_text": null,
                 "quality_score": 0.5,
-                "combined_score": 0.447,
+                "combined_score": 0.451,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 1,
@@ -4386,18 +4356,18 @@
               {
                 "source": "Sharks Are Older Than Trees, Which Seems Wrong",
                 "url": "https://www.popularmechanics.com/science/animals/a65775651/sharks-are-old/",
-                "text": "- While sharks have seen evolutionary changes in the 450 million years they have been around, their body plans have held up for eons because they have been so successful.",
+                "text": "Us humans have only been wandering the planet for around 300,000 years, making sharks over a thousand times older than us.",
                 "weight": 0.5,
                 "raw_weight": 0.5,
                 "stance": "NEUTRAL",
-                "confidence": 0.7,
+                "confidence": 0.5,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.782,
-                "base_relevance_score": 0.784,
-                "selector_score": 0.771,
+                "relevance_score": 0.769,
+                "base_relevance_score": 0.76,
+                "selector_score": 0.817,
                 "context_text": null,
                 "quality_score": 0.5,
-                "combined_score": 0.391,
+                "combined_score": 0.3845,
                 "evidence_tier": "strong",
                 "passage_count": 2,
                 "support_passages": 0,
@@ -4477,8 +4447,8 @@
                 "retrieved": 2,
                 "cleaned": 2,
                 "scored": 4,
-                "strong": 3,
-                "soft": 1,
+                "strong": 2,
+                "soft": 2,
                 "support": 1,
                 "refute": 0,
                 "neutral": 1
@@ -4506,7 +4476,7 @@
       "claim": "Octopuses have three hearts",
       "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 22.828,
+      "time_seconds": 22.74,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -4557,12 +4527,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.99,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.752,
+                "relevance_score": 0.759,
                 "base_relevance_score": 0.747,
-                "selector_score": 0.778,
+                "selector_score": 0.828,
                 "context_text": null,
                 "quality_score": 0.3,
-                "combined_score": 0.2256,
+                "combined_score": 0.2277,
                 "evidence_tier": "soft",
                 "passage_count": 2,
                 "support_passages": 1,
@@ -4669,9 +4639,9 @@
     },
     {
       "claim": "Bananas are berries",
-      "predicted_verdict": "NEUTRAL",
+      "predicted_verdict": "TRUE",
       "expected_verdict": "TRUE",
-      "time_seconds": 29.084,
+      "time_seconds": 16.465,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,
@@ -4682,11 +4652,11 @@
       "pipeline_output": {
         "source_url": null,
         "claims_analyzed": 1,
-        "true_claims": 0,
+        "true_claims": 1,
         "false_claims": 0,
-        "neutral_claims": 1,
-        "document_credibility_score": 0.0,
-        "document_verdict": "Mixed",
+        "neutral_claims": 0,
+        "document_credibility_score": 1.0,
+        "document_verdict": "Highly Reliable",
         "results": [
           {
             "claim": "bananas are berries",
@@ -4701,12 +4671,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.98,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.853,
+                "relevance_score": 0.882,
                 "base_relevance_score": 0.834,
-                "selector_score": 0.964,
+                "selector_score": 1.154,
                 "context_text": null,
                 "quality_score": 0.3,
-                "combined_score": 0.2559,
+                "combined_score": 0.2646,
                 "evidence_tier": "soft",
                 "passage_count": 2,
                 "support_passages": 2,
@@ -4722,12 +4692,12 @@
                 "stance": "SUPPORT",
                 "confidence": 0.95,
                 "stance_source": "llm_verifier:groq:openai/gpt-oss-20b",
-                "relevance_score": 0.863,
+                "relevance_score": 0.891,
                 "base_relevance_score": 0.856,
-                "selector_score": 0.902,
+                "selector_score": 1.092,
                 "context_text": null,
                 "quality_score": 0.3,
-                "combined_score": 0.2589,
+                "combined_score": 0.2673,
                 "evidence_tier": "soft",
                 "passage_count": 2,
                 "support_passages": 1,
@@ -4735,9 +4705,9 @@
                 "neutral_passages": 1
               }
             ],
-            "final_verdict": "NEUTRAL",
-            "confidence": 0.55,
-            "conflict_analysis": "Insufficient decisive evidence for definitive verdict",
+            "final_verdict": "TRUE",
+            "confidence": 1.0,
+            "conflict_analysis": "Strong Supporting Consensus",
             "citations": [
               "[1] Are Bananas Berries? - https://www.southernliving.com/are-bananas-berries-8692263?srsltid=AfmBOooZ-9Y0RAwFr4iIkKefnuXlACY6dcI3x8yeG88PAoP5eOTp8ps1",
               "[2] Bananas Are Berries? - https://stanfordmag.org/contents/bananas-are-berries"
@@ -4749,7 +4719,7 @@
               "has_numeric_value": false,
               "is_opinion": false
             },
-            "explanation": "The claim \"bananas are berries\" was evaluated against available evidence. Evidence balance: 2 supporting, 0 contradicting, and 0 neutral items. The evidence is mixed or not strong enough for a definitive conclusion. Supporting side: \"So, bananas are berries and raspberries aren't.\" Confidence level: 55.0%. Conflict assessment: Insufficient decisive evidence for definitive verdict.",
+            "explanation": "The claim \"bananas are berries\" was evaluated against available evidence. Evidence balance: 2 supporting, 0 contradicting, and 0 neutral items. The evidence aligns with the claim more strongly than it contradicts it. Key supporting sources include Are Bananas Berries?, Bananas Are Berries?. Strong supporting point: \"So, bananas are berries and raspberries aren't.\" Confidence level: 100.0%. Conflict assessment: Strong Supporting Consensus.",
             "transparency": {
               "version": "phase6-v1",
               "verifier": {
@@ -4817,7 +4787,7 @@
                 "llm_verifier:groq:openai/gpt-oss-20b": 2
               },
               "policy_flags": {
-                "forced_neutral_due_to_weak_evidence": true,
+                "forced_neutral_due_to_weak_evidence": false,
                 "logic_engine_injected": false
               }
             },
@@ -4836,7 +4806,7 @@
       "claim": "Humans can breathe in space without equipment",
       "predicted_verdict": "FALSE",
       "expected_verdict": "FALSE",
-      "time_seconds": 26.087,
+      "time_seconds": 26.268,
       "logical_analysis": {
         "is_future_claim": false,
         "is_projection": false,

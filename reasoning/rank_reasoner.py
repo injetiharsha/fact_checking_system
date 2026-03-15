@@ -34,10 +34,6 @@ def extract_all_ranks(text):
         except:
             continue
 
-    # detect words implying rank 1
-    if "largest" in text or "biggest" in text or "tallest" in text:
-        ranks.append(1)
-
     return ranks
 
 
@@ -62,17 +58,24 @@ def numeric_rank_reasoning(claim, evidence_text):
     claim_markers = _comparative_markers(claim)
     evidence_markers = _comparative_markers(evidence_text)
 
+    overlap = claim_tokens & evidence_tokens
     if (
         not claim_ranks
         or not evidence_ranks
-        or len(claim_tokens & evidence_tokens) < 1
+        or len(overlap) < 2
         or (claim_markers and evidence_markers and not (claim_markers & evidence_markers))
     ):
         return None
 
     claim_rank = claim_ranks[0]
-
     evidence_rank = evidence_ranks[0]
+
+    # Keep this rescue narrow: only trust explicit ordinal/number evidence.
+    # Qualitative rank words such as "largest" often appear in related but
+    # non-answer sentences (for example, "largest moon" beside the real subject).
+    if claim_rank == 1 and not re.search(r"\b(first|1st|number one|#1)\b", (evidence_text or "").lower()):
+        return None
+
     if evidence_rank == claim_rank:
         return "SUPPORT"
     if claim_rank != evidence_rank and claim_markers:

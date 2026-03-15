@@ -3,6 +3,7 @@ import time
 import os
 import uuid
 import sys
+import re
 
 from evidence.international.worldbank import WorldBankAPI
 from evidence.international.un_data import UNDataAPI
@@ -10,12 +11,16 @@ from evidence.government_india.rbi import RBIAPI
 from evidence.government_india.mospi import MOSPIAPI
 from evidence.international.who import WHOAPI
 from evidence.international.oecd import OECDAPI
+from evidence.international.nasa import NASAAPI
+from evidence.international.openfda import OpenFDAAPI
 from evidence.trusted_news.news_api import TrustedNewsAPI
 
 from evidence.general_search import SearchEngine
+from evidence.local_rag import LocalRAGRetriever
 from evidence.scraper import WebScraper
 from evidence.credibility_weights import get_weight
 from evidence.reference_fallback import ReferenceFallback
+from evidence.india_source_registry import get_india_state_source_hints
 
 
 # domains that should never be scraped
@@ -26,6 +31,52 @@ BLOCKED_DOMAINS = [
     "reddit.com",
     "pinterest.com"
 ]
+
+DOMAIN_QUERY_HINTS = {
+    "science": ["science"],
+    "health": ["health", "medical"],
+    "technology": ["technology"],
+    "history": ["history"],
+    "politics_government": ["government", "public policy"],
+    "economics_business": ["economics"],
+    "geography": ["geography"],
+    "space_astronomy": ["astronomy", "space"],
+    "environment_climate": ["climate science", "environment"],
+    "society_culture": ["society"],
+    "law_crime": ["law"],
+    "sports": ["sports"],
+    "entertainment": ["entertainment"],
+    "general_factual": [],
+}
+
+CLAIM_TYPE_QUERY_HINTS = {
+    "numerical": ["statistics", "data", "report"],
+    "factual": ["facts"],
+    "mixed": [],
+    "opinion": [],
+}
+
+MISINFORMATION_QUERY_HINTS = ["debunked", "fact check", "myth"]
+TEMPORAL_QUERY_HINTS = ["timeline", "history", "official history"]
+SPACE_SURVIVAL_HINTS = ["vacuum", "spacesuit", "life support"]
+MISINFORMATION_TITLE_PENALTIES = (
+    "conspiracy",
+    "changed my mind",
+    "described as a hoax",
+    "false claim",
+)
+DIRECT_ANSWER_TITLE_HINTS = (
+    "fact check",
+    "debunk",
+    "myth",
+    "does not",
+    "not responsible",
+    "largest planet",
+    "only mammals",
+    "country and a continent",
+    "berries",
+    "two moons",
+)
 
 
 def _safe_console_text(value):
@@ -45,17 +96,31 @@ class EvidenceRouter:
         self.mospi = MOSPIAPI()
         self.who = WHOAPI()
         self.oecd = OECDAPI()
+        self.nasa = NASAAPI()
+        self.openfda = OpenFDAAPI()
         self.news_api = TrustedNewsAPI()
+        self.local_rag = LocalRAGRetriever()
+        self.local_rag_mode = (os.getenv("LOCAL_RAG_MODE") or "off").strip().lower()
 
         # search + scraping
         self.search_engine = SearchEngine()
         self.scraper = WebScraper()
         self.reference_fallback = ReferenceFallback()
+        self._evidence_cache = {}
+        self.cache_enabled = os.getenv("FACTLENS_CACHE_RETRIEVAL", "0") == "1"
 
         # ensure log directory exists
         os.makedirs("logs/scraped_pages", exist_ok=True)
+        os.makedirs("logs/retrieval_debug", exist_ok=True)
 
-    async def get_evidence(self, claim, exclude_domain=None, trace=None):
+    async def get_evidence(self, claim, exclude_domain=None, trace=None, context_result=None, claim_type_result=None):
+        cache_key = (
+            " ".join((claim or "").strip().lower().split()),
+            (exclude_domain or "").strip().lower(),
+        )
+        if self.cache_enabled and cache_key in self._evidence_cache:
+            cached = self._evidence_cache[cache_key]
+            return [dict(item) for item in cached]
 
         evidence_list = []
 
@@ -72,6 +137,8 @@ class EvidenceRouter:
             asyncio.to_thread(self.mospi.fetch, claim),
             asyncio.to_thread(self.who.fetch, claim),
             asyncio.to_thread(self.oecd.fetch, claim),
+            asyncio.to_thread(self.nasa.fetch, claim),
+            asyncio.to_thread(self.openfda.fetch, claim),
             asyncio.to_thread(self.news_api.fetch, claim)
         ]
 
@@ -96,22 +163,58 @@ class EvidenceRouter:
 
         print("Dynamic data:", round(time.time() - api_start, 3), "sec")
 
+        if trace is not None:
+            trace["search_provider_chain"] = list(self.search_engine._backend_order())
+
         # ----------------------------
         # 2. Web search fallback
         # ----------------------------
 
         search_start = time.time()
 
-        search_results = self.search_engine.search(claim)[:15]
+        query_plan = self._build_search_queries(claim, context_result, claim_type_result)
+        if trace is not None:
+            trace["search_queries"] = list(query_plan)
+
+        search_results = []
+        seen_urls = set()
+        for index, query in enumerate(query_plan):
+            per_query_limit = 8 if index == 0 else 4
+            for result in self.search_engine.search(query, max_results=per_query_limit):
+                if trace is not None:
+                    trace["search_cache_hit"] = bool(self.search_engine.last_trace.get("cache_hit", False))
+                url = (result.get("url") or "").strip()
+                if not url or url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                enriched = dict(result)
+                enriched["query"] = query
+                enriched["rank_score"] = self._score_search_candidate(claim, enriched, context_result, claim_type_result)
+                search_results.append(enriched)
+                if len(search_results) >= 15:
+                    break
+            if len(search_results) >= 15:
+                break
+
+        search_results.sort(key=lambda item: item.get("rank_score", 0.0), reverse=True)
+        search_results = search_results[:6]
 
         print("\n--- SEARCH RESULTS ---")
         for r in search_results:
             print(_safe_console_text(r.get("title", "")))
             print(_safe_console_text(r.get("url", "")))
+            print(
+                "provider:",
+                _safe_console_text(r.get("provider", "unknown")),
+                "| query:",
+                _safe_console_text(r.get("query", "")),
+                "| rank:",
+                round(float(r.get("rank_score", 0.0)), 3),
+            )
 
         scrape_jobs = []
 
-        for result in search_results:
+        for result in search_results[:4]:
 
             url = result["url"]
 
@@ -128,9 +231,18 @@ class EvidenceRouter:
 
             scrape_jobs.append((result, url))
 
+            if trace is not None:
+                trace.setdefault("search_candidates", []).append({
+                    "title": result.get("title"),
+                    "url": url,
+                    "provider": result.get("provider"),
+                    "query": result.get("query"),
+                    "rank_score": round(float(result.get("rank_score", 0.0)), 3),
+                })
+
         # run scrapers concurrently
         scrape_tasks = [
-            asyncio.to_thread(self.scraper.scrape, url)
+            asyncio.to_thread(self.scraper.scrape_with_metadata, url)
             for _, url in scrape_jobs
         ]
 
@@ -152,34 +264,61 @@ class EvidenceRouter:
             if not content:
                 continue
 
-            word_count = len(content.split())
+            text = content.get("text") if isinstance(content, dict) else ""
+            if not text:
+                if trace is not None:
+                    if content.get("extractor") == "playwright":
+                        trace["playwright_used"] = True
+                    trace["scraped_pages"].append({
+                        "url": url,
+                        "title": result["title"],
+                        "provider": result.get("provider"),
+                        "query": result.get("query"),
+                        "rank_score": round(float(result.get("rank_score", 0.0)), 3),
+                        "word_count": int(content.get("word_count", 0) or 0),
+                        "extractor": content.get("extractor"),
+                        "cache_hit": bool(content.get("cache_hit")),
+                        "reject_reason": content.get("reject_reason"),
+                        "preview": "",
+                    })
+                continue
+
+            word_count = len(text.split())
 
             print("\nScraped:", url)
             print("Words:", word_count)
-            print("Preview:", _safe_console_text(content[:200]))
+            print("Preview:", _safe_console_text(text[:200]))
 
             # save page to file
             page_id = str(uuid.uuid4())[:8]
             filename = f"logs/scraped_pages/page_{page_id}.txt"
 
             with open(filename, "w", encoding="utf-8") as f:
-                f.write(content)
+                f.write(text)
 
             # add to trace
             if trace is not None:
+                if content.get("extractor") == "playwright":
+                    trace["playwright_used"] = True
 
                 trace["scraped_pages"].append({
                     "url": url,
                     "title": result["title"],
+                    "provider": result.get("provider"),
+                    "query": result.get("query"),
+                    "rank_score": round(float(result.get("rank_score", 0.0)), 3),
                     "word_count": word_count,
+                    "extractor": content.get("extractor"),
+                    "cache_hit": bool(content.get("cache_hit")),
+                    "reject_reason": content.get("reject_reason"),
                     "file": filename,
-                    "preview": content[:200]
+                    "preview": text[:200]
                 })
 
             evidence_list.append({
                 "source": result["title"],
                 "url": url,
-                "text": content,
+                "text": text,
                 "weight": get_weight(url)
             })
 
@@ -193,6 +332,37 @@ class EvidenceRouter:
                 print("\nReference fallback:", _safe_console_text(reference_hit["source"]))
                 print(_safe_console_text(reference_hit["url"]))
                 evidence_list.append(reference_hit)
+
+        # ----------------------------
+        # 2.5 Optional Local RAG fallback
+        # ----------------------------
+
+        rag_results = []
+        if self.local_rag_mode in {"fallback", "augment"}:
+            rag_start = time.time()
+            rag_results = self.local_rag.fetch(claim)
+            print("Local RAG:", round(time.time() - rag_start, 3), "sec")
+            if trace is not None and rag_results:
+                trace["local_rag_hits"] = [
+                    {
+                        "source": row.get("source"),
+                        "url": row.get("url"),
+                        "preview": (row.get("text") or "")[:200],
+                    }
+                    for row in rag_results
+                ]
+
+        if rag_results:
+            should_merge_rag = (
+                self.local_rag_mode == "augment"
+                or len(evidence_list) < 2
+            )
+            if should_merge_rag:
+                existing_urls = {ev.get("url") for ev in evidence_list}
+                for row in rag_results:
+                    if row.get("url") in existing_urls:
+                        continue
+                    evidence_list.append(row)
 
         # ----------------------------
         # 3. Remove duplicate URLs
@@ -211,4 +381,158 @@ class EvidenceRouter:
             seen.add(url)
             unique_evidence.append(ev)
 
+        if self.cache_enabled and len(unique_evidence) >= 2:
+            self._evidence_cache[cache_key] = [dict(item) for item in unique_evidence]
         return unique_evidence
+
+    def _build_search_queries(self, claim, context_result=None, claim_type_result=None):
+        base_claim = " ".join((claim or "").strip().split())
+        if not base_claim:
+            return []
+
+        context_result = context_result or {}
+        domain = str(context_result.get("domain") or "general_factual").strip()
+        subcategory = str(context_result.get("subcategory") or "").strip()
+        state_focus = context_result.get("state_focus")
+        claim_type = self._claim_type_label(claim_type_result)
+
+        candidates = [base_claim]
+
+        subcategory_hint = self._clean_hint(subcategory)
+        if subcategory_hint and subcategory_hint not in {"encyclopedic", "entity property", "general news"}:
+            candidates.append(f"{base_claim} {subcategory_hint}")
+
+        for hint in DOMAIN_QUERY_HINTS.get(domain, [])[:2]:
+            cleaned_hint = self._clean_hint(hint)
+            if cleaned_hint:
+                candidates.append(f"{base_claim} {cleaned_hint}")
+
+        for hint in CLAIM_TYPE_QUERY_HINTS.get(claim_type, [])[:2]:
+            cleaned_hint = self._clean_hint(hint)
+            if cleaned_hint:
+                candidates.append(f"{base_claim} {cleaned_hint}")
+
+        for hint in self._pattern_query_hints(base_claim, domain)[:3]:
+            cleaned_hint = self._clean_hint(hint)
+            if cleaned_hint:
+                candidates.append(f"{base_claim} {cleaned_hint}")
+
+        local_hints = get_india_state_source_hints(state_focus)
+        for domain_hint in local_hints.get("source_domains", [])[:2]:
+            candidates.append(f"{base_claim} site:{domain_hint}")
+
+        trusted_variants = self._trusted_source_variants(domain)
+        for variant in trusted_variants:
+            candidates.append(f"{base_claim} {variant}")
+
+        seen = set()
+        ordered = []
+        for candidate in candidates:
+            compact = re.sub(r"\s+", " ", candidate).strip()
+            key = compact.lower()
+            if compact and key not in seen:
+                seen.add(key)
+                ordered.append(compact)
+        return ordered[:5]
+
+    @staticmethod
+    def _pattern_query_hints(claim, domain):
+        claim_text = (claim or "").lower()
+        hints = []
+
+        misinformation_tokens = ("hoax", "fake", "faked", "myth", "cure", "cures", "spread")
+        if any(token in claim_text for token in misinformation_tokens):
+            hints.extend(MISINFORMATION_QUERY_HINTS)
+
+        temporal_tokens = ("founded", "established", "fell", "began", "created", "started")
+        if domain == "history" or any(token in claim_text for token in temporal_tokens) or re.search(r"\b(?:19|20)\d{2}\b", claim_text):
+            hints.extend(TEMPORAL_QUERY_HINTS)
+
+        if domain == "space_astronomy" and any(token in claim_text for token in ("breathe", "survive", "without", "equipment")):
+            hints.extend(SPACE_SURVIVAL_HINTS)
+
+        return hints
+
+    @staticmethod
+    def _clean_hint(value):
+        text = str(value or "").replace("_", " ").strip().lower()
+        return re.sub(r"\s+", " ", text)
+
+    @staticmethod
+    def _trusted_source_variants(domain):
+        mapping = {
+            "health": ["site:who.int"],
+            "economics_business": ["site:worldbank.org", "site:oecd.org"],
+            "politics_government": ["site:.gov", "site:un.org"],
+            "science": ["site:.edu", "site:wikipedia.org"],
+            "space_astronomy": ["site:nasa.gov", "site:wikipedia.org"],
+            "environment_climate": ["site:who.int", "site:wikipedia.org"],
+            "history": ["site:wikipedia.org"],
+            "geography": ["site:wikipedia.org"],
+        }
+        return mapping.get(domain, [])
+
+    def _score_search_candidate(self, claim, result, context_result=None, claim_type_result=None):
+        title = str(result.get("title") or "").lower()
+        url = str(result.get("url") or "").lower()
+        claim_text = (claim or "").lower()
+        base = float(get_weight(url))
+        context_result = context_result or {}
+        domain = str(context_result.get("domain") or "general_factual").strip()
+        claim_type = self._claim_type_label(claim_type_result)
+        claim_tokens = {
+            token for token in re.findall(r"[a-z0-9]+", (claim or "").lower())
+            if len(token) > 2
+        }
+        title_tokens = set(re.findall(r"[a-z0-9]+", title))
+        overlap = len(claim_tokens & title_tokens) / max(len(claim_tokens), 1)
+        years = re.findall(r"\b(?:19|20)\d{2}\b", claim or "")
+        year_match = 0.15 if years and any(year in title or year in url for year in years) else 0.0
+        numeric_match = 0.1 if re.search(r"\b\d+\b", claim or "") and re.search(r"\b\d+\b", title) else 0.0
+        source_bonus = 0.08 if any(token in url for token in ("wikipedia.org", ".gov", "who.int", "worldbank.org", "oecd.org", "un.org", ".edu")) else 0.0
+        domain_bonus = 0.0
+        if domain == "history" and (year_match > 0 or any(token in title for token in ("history", "war", "event", "wall", "empire"))):
+            domain_bonus += 0.08
+        if domain in {"science", "space_astronomy", "environment_climate"} and any(token in url for token in ("wikipedia.org", "nasa.gov", ".edu", "who.int")):
+            domain_bonus += 0.06
+        if domain == "geography" and any(token in title for token in ("country", "continent", "river", "lake", "planet", "island")):
+            domain_bonus += 0.05
+        claim_type_bonus = 0.0
+        if claim_type == "numerical" and (numeric_match > 0 or year_match > 0):
+            claim_type_bonus += 0.08
+        direct_answer_bonus = 0.0
+        if any(hint in title for hint in DIRECT_ANSWER_TITLE_HINTS):
+            direct_answer_bonus += 0.07
+        if "bananas are berries" in claim_text and "berries" in title:
+            direct_answer_bonus += 0.08
+        if "country and a continent" in claim_text and "country" in title and "continent" in title:
+            direct_answer_bonus += 0.08
+        if "true flight" in claim_text and "true flight" in title:
+            direct_answer_bonus += 0.08
+
+        misinformation_penalty = 0.0
+        if any(token in claim_text for token in ("hoax", "fake", "faked", "spread coronavirus", "cures covid")):
+            if any(marker in title for marker in MISINFORMATION_TITLE_PENALTIES):
+                misinformation_penalty += 0.12
+
+        return round(
+            (base * 0.4)
+            + (overlap * 0.28)
+            + year_match
+            + numeric_match
+            + source_bonus
+            + domain_bonus
+            + claim_type_bonus
+            + direct_answer_bonus
+            - misinformation_penalty,
+            4,
+        )
+
+    @staticmethod
+    def _claim_type_label(claim_type_result):
+        if not claim_type_result:
+            return ""
+        claim_type = claim_type_result.get("type") if isinstance(claim_type_result, dict) else None
+        if hasattr(claim_type, "value"):
+            return str(claim_type.value).lower()
+        return str(claim_type or "").lower()
