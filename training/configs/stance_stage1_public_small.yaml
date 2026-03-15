@@ -15,7 +15,7 @@ training:
   learning_rate: 2.0e-5
   epochs: 1
   max_length: 192
-  logging_steps: 500
+  logging_steps: 100
   early_stopping_patience: 1
   save_total_limit: 2
 output:
