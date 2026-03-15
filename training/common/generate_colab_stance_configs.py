@@ -38,7 +38,7 @@ def build_configs(use_drive: bool, drive_dir: str) -> tuple[Path, Path]:
     s1["training"]["save_steps"] = 2000
     s1["training"]["evaluation_strategy"] = "steps"
     s1["training"]["eval_steps"] = 2000
-    s1["training"]["save_total_limit"] = 3
+    s1["training"]["save_total_limit"] = 4
     s1["training"]["disable_tqdm"] = True
 
     s2["training"]["batch_size"] = 48
@@ -50,7 +50,7 @@ def build_configs(use_drive: bool, drive_dir: str) -> tuple[Path, Path]:
     s2["training"]["save_steps"] = 50
     s2["training"]["evaluation_strategy"] = "steps"
     s2["training"]["eval_steps"] = 50
-    s2["training"]["save_total_limit"] = 3
+    s2["training"]["save_total_limit"] = 4
     s2["training"]["disable_tqdm"] = True
 
     with colab_stage1.open("w", encoding="utf-8") as f:
