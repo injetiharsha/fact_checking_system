@@ -1,5 +1,6 @@
 import argparse
 import json
+import sys
 
 import torch
 import torch.nn.functional as F
@@ -24,20 +25,17 @@ LABEL_TO_DOMAIN = {
 }
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Isolated context inference helper.')
-    parser.add_argument('--checkpoint', required=True)
-    parser.add_argument('--device', default='cpu')
-    parser.add_argument('--text', required=True)
-    args = parser.parse_args()
-
-    device = torch.device(args.device)
-    tokenizer = AutoTokenizer.from_pretrained(args.checkpoint, use_fast=False)
-    model = AutoModelForSequenceClassification.from_pretrained(args.checkpoint).to(device)
+def _load_model(checkpoint, device_name):
+    device = torch.device(device_name)
+    tokenizer = AutoTokenizer.from_pretrained(checkpoint, use_fast=False)
+    model = AutoModelForSequenceClassification.from_pretrained(checkpoint).to(device)
     model.eval()
+    return device, tokenizer, model
 
+
+def _predict(text, device, tokenizer, model):
     inputs = tokenizer(
-        args.text,
+        text,
         return_tensors='pt',
         truncation=True,
         max_length=256,
@@ -56,7 +54,40 @@ def main():
         for idx in range(probs.shape[-1])
     }
 
-    print(json.dumps({'label': label, 'confidence': float(confidence), 'scores': scores}))
+    return {'label': label, 'confidence': float(confidence), 'scores': scores}
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Isolated context inference helper.')
+    parser.add_argument('--checkpoint', required=True)
+    parser.add_argument('--device', default='cpu')
+    parser.add_argument('--text', default=None)
+    parser.add_argument('--serve', action='store_true')
+    args = parser.parse_args()
+
+    device, tokenizer, model = _load_model(args.checkpoint, args.device)
+
+    if args.serve:
+        print(json.dumps({'status': 'ready'}), flush=True)
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+                text = str(payload.get('text') or '')
+                if not text:
+                    print(json.dumps({'error': 'missing_text'}), flush=True)
+                    continue
+                print(json.dumps(_predict(text, device, tokenizer, model)), flush=True)
+            except Exception as exc:
+                print(json.dumps({'error': str(exc)}), flush=True)
+        return
+
+    if not args.text:
+        raise SystemExit('--text is required unless --serve is used')
+
+    print(json.dumps(_predict(args.text, device, tokenizer, model)))
 
 
 if __name__ == '__main__':

@@ -1,7 +1,9 @@
 import asyncio
+import argparse
 import json
 import time
 from collections import Counter
+from pathlib import Path
 
 from pipeline.document_pipeline import DocumentPipeline
 
@@ -71,16 +73,39 @@ ground_truth = [
 ]
 
 
+def load_claim_batch(path: str | None):
+    if not path:
+        return claims, ground_truth
+
+    batch_path = Path(path)
+    payload = json.loads(batch_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, list):
+        raise ValueError("Claims file must be a JSON list of {claim, expected_verdict} items.")
+
+    loaded_claims = []
+    loaded_truth = []
+    for idx, row in enumerate(payload):
+        if not isinstance(row, dict):
+            raise ValueError(f"Invalid item at index {idx}: expected object.")
+        claim = row.get("claim")
+        verdict = row.get("expected_verdict")
+        if not claim or not verdict:
+            raise ValueError(f"Missing claim or expected_verdict at index {idx}.")
+        loaded_claims.append(str(claim))
+        loaded_truth.append(str(verdict).upper())
+    return loaded_claims, loaded_truth
+
+
 # ------------------------------------------------
 # Process a single claim
 # ------------------------------------------------
 
-async def process_claim(i, claim):
+async def process_claim(i, claim, active_claims, active_truth):
 
     async with semaphore:
 
         print("\n==============================")
-        print(f"Processing claim {i+1}/{len(claims)}")
+        print(f"Processing claim {i+1}/{len(active_claims)}")
         print("Claim:", claim)
 
         start = time.time()
@@ -108,7 +133,7 @@ async def process_claim(i, claim):
         return {
             "claim": claim,
             "predicted_verdict": verdict,
-            "expected_verdict": ground_truth[i],
+            "expected_verdict": active_truth[i],
             "time_seconds": elapsed,
             "logical_analysis": claim_result.get("logical_analysis", {}),
             "pipeline_output": res
@@ -119,13 +144,13 @@ async def process_claim(i, claim):
 # Run benchmark (parallel)
 # ------------------------------------------------
 
-async def run_benchmark():
+async def run_benchmark(active_claims, active_truth):
 
     start = time.time()
 
     tasks = [
-        process_claim(i, claim)
-        for i, claim in enumerate(claims)
+        process_claim(i, claim, active_claims, active_truth)
+        for i, claim in enumerate(active_claims)
     ]
 
     results = await asyncio.gather(*tasks)
@@ -296,7 +321,7 @@ def evaluate(results):
 # Save results
 # ------------------------------------------------
 
-def save_results(results, metrics, claim_times, total_time):
+def save_results(results, metrics, claim_times, total_time, output_path):
 
     output = {
         "benchmark_metrics": metrics,
@@ -305,10 +330,10 @@ def save_results(results, metrics, claim_times, total_time):
         "claims": results
     }
 
-    with open("parallel_test_results.json", "w", encoding="utf-8") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2)
 
-    print("\nResults saved to parallel_test_results.json")
+    print(f"\nResults saved to {output_path}")
 
 
 # ------------------------------------------------
@@ -316,8 +341,13 @@ def save_results(results, metrics, claim_times, total_time):
 # ------------------------------------------------
 
 async def main():
+    parser = argparse.ArgumentParser(description="Run the multi-claim benchmark.")
+    parser.add_argument("--claims-file", default=None, help="Optional JSON file with {claim, expected_verdict} rows.")
+    parser.add_argument("--output", default="parallel_test_results.json", help="Output JSON path.")
+    args = parser.parse_args()
 
-    results, claim_times, total_time = await run_benchmark()
+    active_claims, active_truth = load_claim_batch(args.claims_file)
+    results, claim_times, total_time = await run_benchmark(active_claims, active_truth)
 
     metrics = evaluate(results)
 
@@ -341,7 +371,7 @@ async def main():
     print("failed_by_claim_tag :", metrics.get("failed_by_claim_tag"))
     print("failed_by_category :", metrics.get("failed_by_category"))
 
-    save_results(results, metrics, claim_times, total_time)
+    save_results(results, metrics, claim_times, total_time, args.output)
 
 
 if __name__ == "__main__":

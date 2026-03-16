@@ -1,7 +1,8 @@
-﻿import json
+import json
 import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from typing import Dict, List
 
@@ -110,20 +111,89 @@ class ClaimContextClassifier:
         self.trained_checkpoint = None
         self.trained_device = "cpu"
         self.helper_script = Path(__file__).with_name("context_subprocess_infer.py")
+        self._worker = None
+        self._worker_lock = threading.Lock()
+        self._worker_ready = False
 
         runtime = runtime_model_settings("context")
         checkpoint = runtime.get("checkpoint")
         if runtime.get("enabled") and checkpoint is not None:
             self.trained_checkpoint = Path(checkpoint)
             self.trained_device = runtime.get("device") or "cpu"
-            print(
-                "ClaimContextClassifier using trained checkpoint via isolated inference:",
-                checkpoint,
+
+    def _start_worker(self) -> bool:
+        if self._worker_ready and self._worker is not None and self._worker.poll() is None:
+            return True
+        if self.trained_checkpoint is None or not self.helper_script.exists():
+            return False
+
+        command = [
+            sys.executable,
+            str(self.helper_script),
+            "--checkpoint",
+            str(self.trained_checkpoint),
+            "--device",
+            self.trained_device,
+            "--serve",
+        ]
+
+        try:
+            self._worker = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                bufsize=1,
             )
+        except Exception as exc:
+            print(f"Failed to start trained context worker: {exc}")
+            self._worker = None
+            self._worker_ready = False
+            return False
+
+        try:
+            ready_line = self._worker.stdout.readline().strip() if self._worker.stdout else ""
+            payload = json.loads(ready_line) if ready_line else {}
+            if payload.get("status") == "ready":
+                self._worker_ready = True
+                print(
+                    "ClaimContextClassifier using persistent context worker:",
+                    self.trained_checkpoint,
+                    "on",
+                    self.trained_device,
+                )
+                return True
+        except Exception as exc:
+            print(f"Context worker failed to initialize: {exc}")
+
+        self._stop_worker()
+        return False
+
+    def _stop_worker(self) -> None:
+        worker = self._worker
+        self._worker = None
+        self._worker_ready = False
+        if worker is None:
+            return
+        try:
+            if worker.stdin:
+                worker.stdin.close()
+        except Exception:
+            pass
+        try:
+            worker.terminate()
+            worker.wait(timeout=2)
+        except Exception:
+            try:
+                worker.kill()
+            except Exception:
+                pass
 
     def classify(self, claim: str) -> dict:
         if self.trained_checkpoint is not None:
-            trained_result = self._classify_with_subprocess(claim)
+            trained_result = self._classify_with_worker(claim)
             if trained_result is not None:
                 return trained_result
         return self._heuristic_classify(claim)
@@ -177,49 +247,36 @@ class ClaimContextClassifier:
                 best_subcategory = subcategory_name
         return best_subcategory
 
-    def _classify_with_subprocess(self, claim: str):
-        if not self.helper_script.exists():
-            return None
-
-        command = [
-            sys.executable,
-            str(self.helper_script),
-            "--checkpoint",
-            str(self.trained_checkpoint),
-            "--device",
-            self.trained_device,
-            "--text",
-            claim,
-        ]
-
-        try:
-            completed = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                timeout=45,
-                check=False,
-            )
-        except Exception as exc:
-            print(f"Trained context subprocess failed to start: {exc}")
-            return None
-
-        if completed.returncode != 0:
-            stderr = (completed.stderr or "").strip()
-            if stderr:
-                print(f"Trained context subprocess failed: {stderr[:300]}")
-            return None
-
-        stdout = (completed.stdout or "").strip().splitlines()
-        if not stdout:
-            return None
-
-        try:
-            payload = json.loads(stdout[-1])
-        except Exception as exc:
-            print(f"Invalid trained context subprocess output: {exc}")
-            return None
+    def _classify_with_worker(self, claim: str):
+        with self._worker_lock:
+            if not self._start_worker():
+                return None
+            try:
+                payload = json.dumps({"text": claim}, ensure_ascii=False)
+                if not self._worker or not self._worker.stdin or not self._worker.stdout:
+                    return None
+                self._worker.stdin.write(payload + "\n")
+                self._worker.stdin.flush()
+                result_line = self._worker.stdout.readline().strip()
+                if not result_line:
+                    stderr = ""
+                    if self._worker.stderr:
+                        try:
+                            stderr = self._worker.stderr.read(200)
+                        except Exception:
+                            stderr = ""
+                    if stderr:
+                        print(f"Trained context worker returned no output: {stderr}")
+                    self._stop_worker()
+                    return None
+                payload = json.loads(result_line)
+                if payload.get("error"):
+                    print(f"Trained context worker error: {payload['error']}")
+                    return None
+            except Exception as exc:
+                print(f"Trained context worker inference failed: {exc}")
+                self._stop_worker()
+                return None
 
         label = str(payload.get("label") or "general_factual").lower()
         confidence = float(payload.get("confidence") or 0.0)
@@ -261,6 +318,3 @@ class ClaimContextClassifier:
         if state_focus:
             flags.append("regional_local_claim")
         return flags
-
-
-
