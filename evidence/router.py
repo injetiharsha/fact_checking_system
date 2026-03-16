@@ -587,6 +587,7 @@ class EvidenceRouter:
             "health": ["site:who.int"],
             "economics_business": ["site:worldbank.org", "site:oecd.org"],
             "politics_government": ["site:.gov", "site:un.org"],
+            "technology": ["technology", "company blog", "site:techcrunch.com", "site:theverge.com"],
             "science": ["site:.edu", "site:wikipedia.org"],
             "space_astronomy": ["site:nasa.gov", "site:wikipedia.org"],
             "environment_climate": ["site:who.int", "site:wikipedia.org"],
@@ -614,6 +615,8 @@ class EvidenceRouter:
         year_match = 0.15 if years and any(year in title or year in url for year in years) else 0.0
         numeric_match = 0.1 if re.search(r"\b\d+\b", claim or "") and re.search(r"\b\d+\b", title) else 0.0
         source_bonus = 0.08 if any(token in url for token in ("wikipedia.org", ".gov", "who.int", "worldbank.org", "oecd.org", "un.org", ".edu")) else 0.0
+        if domain == "technology":
+            source_bonus = 0.08 if any(token in url for token in ("techcrunch.com", "theverge.com", "niantic", "linkedin.com", "wikipedia.org")) else 0.0
         domain_bonus = 0.0
         if domain == "history" and (year_match > 0 or any(token in title for token in ("history", "war", "event", "wall", "empire"))):
             domain_bonus += 0.08
@@ -640,6 +643,13 @@ class EvidenceRouter:
             source_type_bonus += 0.12
         if self._looks_like_low_signal_page(url, title, snippet):
             source_type_penalty += 0.18
+        if domain == "technology":
+            entity_terms = [
+                token for token in ("niantic", "pokemon", "pokémon", "ar", "spatial", "dataset", "images")
+                if token in claim_text
+            ]
+            if entity_terms and not any(term in title or term in url or term in snippet for term in entity_terms[:4]):
+                source_type_penalty += 0.22
 
         misinformation_penalty = 0.0
         if any(token in claim_text for token in ("hoax", "fake", "faked", "spread coronavirus", "cures covid")):

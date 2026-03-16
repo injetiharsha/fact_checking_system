@@ -342,6 +342,8 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
     seen_sentences = set()
 
     total_sentences = len(sentences)
+    semantic_shortlist = []
+    semantic_shortlist_size = max(24, max_sentences * 10)
 
     for sentence_index, sent in enumerate(sentences):
 
@@ -358,7 +360,6 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
 
         overlap = len(claim_words & _token_set(sent))
         fast_score = relevance_scorer.fast_score(claim, sent)
-        semantic_score = relevance_scorer.semantic_score(claim, sent)
         relation_bonus = _relation_bonus(claim, sent)
         direct_bonus = _direct_answer_bonus(claim, sent)
         lead_bonus = _lead_position_bonus(sentence_index, total_sentences)
@@ -376,9 +377,8 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
             source_name=source_name,
             context_text=context_text,
         )
-        base_score = (
-            (semantic_score * 0.82)
-            + (fast_score * 0.14)
+        lexical_score = (
+            (fast_score * 0.96)
             + (overlap * 0.02)
             + relation_bonus
             + direct_bonus
@@ -389,7 +389,37 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
         sentence_candidates.append(
             (
                 sent,
-                max(0.0, base_score),
+                max(0.0, lexical_score),
+                0.0,
+                fast_score,
+                reporting_penalty,
+                metadata_penalty,
+                direct_bonus,
+                lead_bonus,
+                context_text,
+            )
+        )
+
+    if sentence_candidates:
+        semantic_shortlist = sorted(sentence_candidates, key=lambda item: item[1], reverse=True)[:semantic_shortlist_size]
+
+    rescored_candidates = []
+    semantic_lookup = {}
+    for sent, lexical_score, _, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text in semantic_shortlist:
+        semantic_score = relevance_scorer.semantic_score(claim, sent)
+        semantic_lookup[" ".join(sent.lower().split())] = semantic_score
+        combined_score = (
+            (semantic_score * 0.82)
+            + (fast_score * 0.14)
+            + direct_bonus
+            + lead_bonus
+            - reporting_penalty
+            - metadata_penalty
+        )
+        rescored_candidates.append(
+            (
+                sent,
+                max(0.0, combined_score),
                 semantic_score,
                 fast_score,
                 reporting_penalty,
@@ -402,8 +432,8 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
 
     selected_candidates = []
 
-    if relevance_scorer.has_trained_reranker and sentence_candidates:
-        ranked = sorted(sentence_candidates, key=lambda item: item[1], reverse=True)
+    if relevance_scorer.has_trained_reranker and rescored_candidates:
+        ranked = sorted(rescored_candidates, key=lambda item: item[1], reverse=True)
         shortlist = ranked[:5]
         rescored = []
         for sent, base_score, semantic_score, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text in shortlist:
@@ -434,7 +464,7 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
         rescored.sort(key=lambda item: item[1], reverse=True)
         selected_candidates = rescored[:max_sentences]
     else:
-        ranked = sorted(sentence_candidates, key=lambda item: item[1], reverse=True)
+        ranked = sorted(rescored_candidates, key=lambda item: item[1], reverse=True)
         selected_candidates = [
             (sent, score, score, semantic_score, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text)
             for sent, score, semantic_score, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text in ranked[:max_sentences]

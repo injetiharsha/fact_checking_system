@@ -115,7 +115,10 @@ class RelevanceScorer:
         else:
             selected_device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(selected_device)
-        self.embed_device = os.getenv("RELEVANCE_EMBED_DEVICE", "cpu").strip().lower()
+        self.embed_device = os.getenv(
+            "RELEVANCE_EMBED_DEVICE",
+            "cuda" if torch.cuda.is_available() else "cpu",
+        ).strip().lower()
         self.rerank_device = (
             os.getenv("BGE_RERANKER_DEVICE")
             or os.getenv("RELEVANCE_RERANK_DEVICE")
