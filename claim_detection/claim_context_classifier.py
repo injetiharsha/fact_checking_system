@@ -1,4 +1,4 @@
-import json
+﻿import json
 import re
 import subprocess
 import sys
@@ -24,7 +24,7 @@ DOMAIN_HINTS: Dict[str, Dict[str, List[str]]] = {
     },
     "technology": {
         "telecom": ["5g", "network", "telecom"],
-        "software_ai": ["ai", "software", "algorithm"],
+        "software_ai": ["ai", "software", "algorithm", "dataset", "images", "scans", "augmented reality", "ar app", "spatial"],
         "social_media": ["twitter", "facebook", "instagram", "youtube"],
     },
     "history": {
@@ -82,11 +82,6 @@ DOMAIN_HINTS: Dict[str, Dict[str, List[str]]] = {
         "gaming": ["game", "gaming"],
     },
 }
-
-MISINFORMATION_TERMS = ["hoax", "fake", "faked", "conspiracy", "miracle cure", "cures", "spread coronavirus", "causes covid", "causes coronavirus"]
-MEDICAL_SAFETY_TERMS = ["bleach", "poison", "without equipment", "cures", "treatment"]
-ELECTION_TERMS = ["election", "vote", "voter", "poll", "ballot"]
-
 
 DOMAIN_TO_DEFAULT_SUBCATEGORY = {
     "science": "scientific_consensus",
@@ -159,7 +154,7 @@ class ClaimContextClassifier:
         if state_focus:
             confidence = max(confidence, 0.62)
 
-        return {
+        result = {
             "domain": domain,
             "subcategory": subcategory,
             "confidence": round(float(confidence), 3),
@@ -169,6 +164,18 @@ class ClaimContextClassifier:
             "taxonomy_version": "v1",
             "available_domains": list(CONTEXT_TAXONOMY.keys()),
         }
+        return result
+
+    def _best_subcategory_for_domain(self, claim_text: str, domain: str) -> str:
+        subcategories = DOMAIN_HINTS.get(domain, {})
+        best_subcategory = DOMAIN_TO_DEFAULT_SUBCATEGORY.get(domain, "encyclopedic")
+        best_score = 0
+        for subcategory_name, hints in subcategories.items():
+            score = sum(1 for hint in hints if hint in claim_text)
+            if score > best_score:
+                best_score = score
+                best_subcategory = subcategory_name
+        return best_subcategory
 
     def _classify_with_subprocess(self, claim: str):
         if not self.helper_script.exists():
@@ -227,9 +234,9 @@ class ClaimContextClassifier:
         claim_text = " ".join((claim or "").strip().lower().split())
         state_focus = self._detect_state_focus(claim_text)
         risk_flags = self._detect_risk_flags(claim_text, state_focus)
-        return {
+        result = {
             "domain": label,
-            "subcategory": DOMAIN_TO_DEFAULT_SUBCATEGORY.get(label, "encyclopedic"),
+            "subcategory": self._best_subcategory_for_domain(claim_text, label),
             "confidence": round(confidence, 3),
             "decision_source": "trained_context_model",
             "risk_flags": risk_flags,
@@ -238,6 +245,7 @@ class ClaimContextClassifier:
             "available_domains": list(CONTEXT_TAXONOMY.keys()),
             "scores": payload.get("scores", {}),
         }
+        return result
 
     def _detect_state_focus(self, claim_text: str) -> str | None:
         for state_name, aliases in INDIA_STATE_ALIASES.items():
@@ -250,12 +258,9 @@ class ClaimContextClassifier:
     @staticmethod
     def _detect_risk_flags(claim_text: str, state_focus: str | None) -> list[str]:
         flags = []
-        if any(term in claim_text for term in MISINFORMATION_TERMS):
-            flags.append("misinformation_sensitive")
-        if any(term in claim_text for term in MEDICAL_SAFETY_TERMS):
-            flags.append("medical_safety")
-        if any(term in claim_text for term in ELECTION_TERMS):
-            flags.append("election_sensitive")
         if state_focus:
             flags.append("regional_local_claim")
         return flags
+
+
+
