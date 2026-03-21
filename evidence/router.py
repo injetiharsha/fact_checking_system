@@ -1,4 +1,5 @@
 import asyncio
+import math
 import time
 import os
 import uuid
@@ -145,6 +146,12 @@ LOW_SIGNAL_TITLE_MARKERS = (
     "citation",
 )
 
+BM25_STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has",
+    "have", "in", "is", "it", "its", "of", "on", "or", "that", "the", "to",
+    "was", "were", "will", "with",
+}
+
 
 def _safe_console_text(value):
     text = str(value)
@@ -257,12 +264,23 @@ class EvidenceRouter:
                 seen_urls.add(url)
                 enriched = dict(result)
                 enriched["query"] = query
-                enriched["rank_score"] = self._score_search_candidate(claim, enriched, context_result, claim_type_result)
                 search_results.append(enriched)
                 if len(search_results) >= 15:
                     break
             if len(search_results) >= 15:
                 break
+
+        bm25_scores = self._build_bm25_scores(claim, search_results)
+        for enriched in search_results:
+            score, components = self._score_search_candidate(
+                claim,
+                enriched,
+                context_result,
+                claim_type_result,
+                bm25_scores=bm25_scores,
+            )
+            enriched["rank_score"] = score
+            enriched["rank_components"] = components
 
         search_results.sort(key=lambda item: item.get("rank_score", 0.0), reverse=True)
         search_results = search_results[:6]
@@ -312,6 +330,7 @@ class EvidenceRouter:
                     "provider": result.get("provider"),
                     "query": result.get("query"),
                     "rank_score": round(float(result.get("rank_score", 0.0)), 3),
+                    "rank_components": dict(result.get("rank_components") or {}),
                 })
 
         # run scrapers concurrently
@@ -350,6 +369,7 @@ class EvidenceRouter:
                         "provider": result.get("provider"),
                         "query": result.get("query"),
                         "rank_score": round(float(result.get("rank_score", 0.0)), 3),
+                        "rank_components": dict(result.get("rank_components") or {}),
                         "word_count": int(content.get("word_count", 0) or 0),
                         "extractor": content.get("extractor"),
                         "cache_hit": bool(content.get("cache_hit")),
@@ -383,6 +403,7 @@ class EvidenceRouter:
                     "provider": result.get("provider"),
                     "query": result.get("query"),
                     "rank_score": round(float(result.get("rank_score", 0.0)), 3),
+                    "rank_components": dict(result.get("rank_components") or {}),
                     "word_count": word_count,
                     "extractor": content.get("extractor"),
                     "cache_hit": bool(content.get("cache_hit")),
@@ -596,7 +617,79 @@ class EvidenceRouter:
         }
         return mapping.get(domain, [])
 
-    def _score_search_candidate(self, claim, result, context_result=None, claim_type_result=None):
+    @staticmethod
+    def _tokenize_rank_text(text):
+        return [
+            token for token in re.findall(r"[a-z0-9]+", (text or "").lower())
+            if len(token) > 1 and token not in BM25_STOPWORDS
+        ]
+
+    @staticmethod
+    def _candidate_rank_text(result):
+        title = str(result.get("title") or "")
+        snippet = str(result.get("snippet") or "")
+        parsed = urlparse(str(result.get("url") or ""))
+        url_text = f"{parsed.netloc} {parsed.path.replace('/', ' ')}"
+        return f"{title} {snippet} {url_text}".strip()
+
+    def _build_bm25_scores(self, claim, results):
+        query_tokens = self._tokenize_rank_text(claim)
+        if not query_tokens or not results:
+            return {}
+
+        doc_tokens = {}
+        document_frequency = {}
+        total_doc_len = 0
+
+        for result in results:
+            url = str(result.get("url") or "")
+            tokens = self._tokenize_rank_text(self._candidate_rank_text(result))
+            doc_tokens[url] = tokens
+            total_doc_len += len(tokens)
+            for token in set(tokens):
+                document_frequency[token] = document_frequency.get(token, 0) + 1
+
+        avg_doc_len = total_doc_len / max(len(results), 1)
+        k1 = 1.2
+        b = 0.75
+        num_docs = len(results)
+        raw_scores = {}
+
+        for result in results:
+            url = str(result.get("url") or "")
+            tokens = doc_tokens.get(url, [])
+            if not tokens:
+                raw_scores[url] = 0.0
+                continue
+
+            token_counts = {}
+            for token in tokens:
+                token_counts[token] = token_counts.get(token, 0) + 1
+
+            doc_len = len(tokens)
+            score = 0.0
+            for token in query_tokens:
+                freq = token_counts.get(token, 0)
+                if freq <= 0:
+                    continue
+                doc_freq = document_frequency.get(token, 0)
+                idf = math.log(1 + ((num_docs - doc_freq + 0.5) / (doc_freq + 0.5)))
+                numerator = freq * (k1 + 1.0)
+                denominator = freq + k1 * (1.0 - b + b * (doc_len / max(avg_doc_len, 1.0)))
+                score += idf * (numerator / max(denominator, 1e-9))
+            raw_scores[url] = round(score, 4)
+
+        max_raw = max(raw_scores.values(), default=0.0)
+        scores = {}
+        for url, raw_score in raw_scores.items():
+            normalized = (raw_score / max_raw) if max_raw > 0 else 0.0
+            scores[url] = {
+                "raw": round(raw_score, 4),
+                "normalized": round(normalized, 4),
+            }
+        return scores
+
+    def _score_search_candidate(self, claim, result, context_result=None, claim_type_result=None, bm25_scores=None):
         title = str(result.get("title") or "").lower()
         url = str(result.get("url") or "").lower()
         snippet = str(result.get("snippet") or "").lower()
@@ -611,6 +704,11 @@ class EvidenceRouter:
         }
         title_tokens = set(re.findall(r"[a-z0-9]+", title))
         overlap = len(claim_tokens & title_tokens) / max(len(claim_tokens), 1)
+        candidate_tokens = set(self._tokenize_rank_text(self._candidate_rank_text(result)))
+        query_tokens = set(self._tokenize_rank_text(claim))
+        query_coverage = len(query_tokens & candidate_tokens) / max(len(query_tokens), 1)
+        bm25_payload = (bm25_scores or {}).get(url, {})
+        bm25_normalized = float(bm25_payload.get("normalized", 0.0))
         years = re.findall(r"\b(?:19|20)\d{2}\b", claim or "")
         year_match = 0.15 if years and any(year in title or year in url for year in years) else 0.0
         numeric_match = 0.1 if re.search(r"\b\d+\b", claim or "") and re.search(r"\b\d+\b", title) else 0.0
@@ -640,7 +738,9 @@ class EvidenceRouter:
         source_type_bonus = 0.0
         source_type_penalty = 0.0
         if self._looks_like_canonical_fact_page(url, title):
-            source_type_bonus += 0.12
+            source_type_bonus += 0.14
+            if query_coverage >= 0.5:
+                source_type_bonus += 0.08
         if self._looks_like_low_signal_page(url, title, snippet):
             source_type_penalty += 0.18
         if domain == "technology":
@@ -661,10 +761,14 @@ class EvidenceRouter:
         weak_result_penalty = 0.0
         if self._looks_like_weak_result(url, title):
             weak_result_penalty += 0.2
+        if any(domain in url for domain in BLOCKED_DOMAINS):
+            weak_result_penalty += 0.6
 
-        score = round(
-            (base * 0.4)
-            + (overlap * 0.28)
+        positive_score = (
+            (bm25_normalized * 0.44)
+            + (query_coverage * 0.18)
+            + (overlap * 0.12)
+            + (base * 0.14)
             + year_match
             + numeric_match
             + source_bonus
@@ -672,10 +776,28 @@ class EvidenceRouter:
             + claim_type_bonus
             + direct_answer_bonus
             + source_type_bonus
-            - misinformation_penalty,
-            4,
-        ) - round(weak_result_penalty + source_type_penalty, 4)
-        return round(score, 4)
+        )
+        total_penalty = weak_result_penalty + source_type_penalty + misinformation_penalty
+        score = round(positive_score - total_penalty, 4)
+        components = {
+            "bm25_raw": round(float(bm25_payload.get("raw", 0.0)), 4),
+            "bm25_normalized": round(bm25_normalized, 4),
+            "query_coverage": round(query_coverage, 4),
+            "lexical_overlap": round(overlap, 4),
+            "base_weight": round(base, 4),
+            "year_match": round(year_match, 4),
+            "numeric_match": round(numeric_match, 4),
+            "source_bonus": round(source_bonus, 4),
+            "domain_bonus": round(domain_bonus, 4),
+            "claim_type_bonus": round(claim_type_bonus, 4),
+            "direct_answer_bonus": round(direct_answer_bonus, 4),
+            "source_type_bonus": round(source_type_bonus, 4),
+            "misinformation_penalty": round(misinformation_penalty, 4),
+            "source_type_penalty": round(source_type_penalty, 4),
+            "weak_result_penalty": round(weak_result_penalty, 4),
+            "final_score": round(score, 4),
+        }
+        return round(score, 4), components
 
     @staticmethod
     def _looks_like_weak_result(url, title):

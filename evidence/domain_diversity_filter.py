@@ -37,6 +37,7 @@ class DomainDiversityFilter:
 
         dynamic_cap = self._compute_dynamic_cap(len(evidence_list))
         domain_counts = {}
+        url_counts = {}
         filtered_evidence = []
 
         # Prefer stronger evidence first, then apply domain cap.
@@ -47,17 +48,22 @@ class DomainDiversityFilter:
         )
 
         for evidence in ranked_evidence:
-            # Extract domain
             url = evidence.get('url') or evidence.get('source_url', '')
             domain = self._extract_domain(url)
-            
-            # Count items from this domain
             current_count = domain_counts.get(domain, 0)
-            
-            # Add if under limit
-            if current_count < dynamic_cap:
+            current_url_count = url_counts.get(url, 0)
+
+            allow_same_document_followup = (
+                bool(url)
+                and current_url_count < 2
+                and any((row.get('url') or row.get('source_url', '')) == url for row in filtered_evidence)
+            )
+
+            if current_count < dynamic_cap or allow_same_document_followup:
                 filtered_evidence.append(evidence)
                 domain_counts[domain] = current_count + 1
+                if url:
+                    url_counts[url] = current_url_count + 1
         
         return filtered_evidence
     

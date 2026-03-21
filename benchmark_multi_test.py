@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import json
+import os
 import time
 from collections import Counter
 from pathlib import Path
@@ -10,7 +11,7 @@ from pipeline.document_pipeline import DocumentPipeline
 pipeline = DocumentPipeline()
 
 # limit concurrent pipelines (important for scraping stability)
-MAX_CONCURRENT = 6
+MAX_CONCURRENT = int(os.getenv("BENCHMARK_MAX_CONCURRENT", "4"))
 semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
 
@@ -78,7 +79,7 @@ def load_claim_batch(path: str | None):
         return claims, ground_truth
 
     batch_path = Path(path)
-    payload = json.loads(batch_path.read_text(encoding="utf-8"))
+    payload = json.loads(batch_path.read_text(encoding="utf-8-sig"))
     if not isinstance(payload, list):
         raise ValueError("Claims file must be a JSON list of {claim, expected_verdict} items.")
 
@@ -110,7 +111,18 @@ async def process_claim(i, claim, active_claims, active_truth):
 
         start = time.time()
 
-        res = await pipeline._process_text(claim)
+        error_text = None
+        try:
+            res = await pipeline._process_text(claim)
+        except Exception as exc:
+            res = {
+                "final_verdict": "NEUTRAL",
+                "logical_analysis": {},
+                "evidence": [],
+                "error": str(exc),
+            }
+            error_text = str(exc)
+            print("Claim processing error:", error_text)
 
         elapsed = round(time.time() - start, 3)
 
@@ -136,7 +148,8 @@ async def process_claim(i, claim, active_claims, active_truth):
             "expected_verdict": active_truth[i],
             "time_seconds": elapsed,
             "logical_analysis": claim_result.get("logical_analysis", {}),
-            "pipeline_output": res
+            "pipeline_output": res,
+            "error": error_text,
         }
 
 
