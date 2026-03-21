@@ -60,18 +60,21 @@ T4 tuning note:
 Use [notebooks/colab_train_relevance.ipynb](./notebooks/colab_train_relevance.ipynb) on a Google Colab T4.
 
 What it supports:
+- rebuilding `v11` in Colab
 - rebuilding `v9` in Colab
 - optionally rebuilding `v10` if the public AVeriTeC files are present in the repo
 - generating a Drive-backed relevance config
-- training `v9` or `v10`
+- training `v11`, `v9`, or `v10`
 - zipping the final relevance checkpoint for download
 
 Recommended order for the T4 time budget:
-1. train `v9` first
+1. train `v11` first
 2. benchmark it locally in this repo
-3. only then spend time on the larger `v10` public-data run
+3. if `v11` still misses key Phase 2 claims, try `v9` or a follow-up cleaned variant
+4. only then spend time on the larger `v10` public-data run
 
 Relevant configs:
+- `training/configs/relevance_v11.yaml`
 - `training/configs/relevance_v9.yaml`
 - `training/configs/relevance_v10_averitec.yaml`
 
@@ -82,3 +85,8 @@ The notebook generates Colab-specific configs automatically with:
 
 Helper script used by the notebook:
 - `training/common/generate_colab_relevance_config.py`
+
+Download note:
+- the notebook creates the zip inside the Colab runtime under `/content/<run_name>.zip`
+- `files.download(...)` sends that file to your browser, which usually saves it in your local `Downloads` folder unless your browser is configured differently
+- if you want to confirm the file exists before downloading, run `!ls -lh /content/*.zip`
