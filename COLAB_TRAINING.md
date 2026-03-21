@@ -54,3 +54,31 @@ ENABLE_VERIFIER_V2=1
 T4 tuning note:
 - the notebook now targets `batch_size=48` on a T4
 - if Colab throws CUDA out-of-memory, lower both train/eval batch sizes to `32` in the generated config cell
+
+## Relevance Training
+
+Use [notebooks/colab_train_relevance.ipynb](./notebooks/colab_train_relevance.ipynb) on a Google Colab T4.
+
+What it supports:
+- rebuilding `v9` in Colab
+- optionally rebuilding `v10` if the public AVeriTeC files are present in the repo
+- generating a Drive-backed relevance config
+- training `v9` or `v10`
+- zipping the final relevance checkpoint for download
+
+Recommended order for the T4 time budget:
+1. train `v9` first
+2. benchmark it locally in this repo
+3. only then spend time on the larger `v10` public-data run
+
+Relevant configs:
+- `training/configs/relevance_v9.yaml`
+- `training/configs/relevance_v10_averitec.yaml`
+
+The notebook generates Colab-specific configs automatically with:
+- `batch_size=16`
+- `eval_batch_size=16`
+- Drive-backed checkpoint and metrics paths
+
+Helper script used by the notebook:
+- `training/common/generate_colab_relevance_config.py`
