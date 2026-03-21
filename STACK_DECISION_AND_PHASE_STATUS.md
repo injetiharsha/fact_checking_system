@@ -343,6 +343,8 @@ Meaning:
 
 - the current work has correctly stayed retrieval/relevance/passage-first
 - stance retraining should remain later work unless residual failures are clearly isolated as genuine stance failures
+- the current residual gate is now documented in `PHASE5_RESIDUAL_TAXONOMY.md`
+- current Phase 5 status is analysis-only, not training
 
 ## Overall Project Position
 
@@ -355,7 +357,7 @@ Most honest summary:
 - Phase 3 has produced the needed structural evidence and is now paused with deferred edge-case follow-up
 - Phase 4 has passed foundation and similar-claim validation, including one successful tuning pass
 - Phase 4 also passed a broader repeated-query validation across a wider 10-claim slice
-- Phase 5 has not started yet
+- Phase 5 has started only as residual taxonomy and gating, not as stance retraining
 
 That is meaningful progress toward the project goal:
 
@@ -381,6 +383,11 @@ Commit the Phase 4 implementation and validation docs, then either:
 
 - keep Phase 4 as the current stopping point, or
 - extend it with a broader benchmark-style repeated-query study
+
+Current practical stop point:
+
+- Phase 4 is a good stopping point
+- Phase 5 remains analysis-only until a clean stance-only failure set exists
 
 Keep these as deferred non-blocking cleanup items:
 
