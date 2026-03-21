@@ -29,6 +29,7 @@ from claim_detection.claim_type_classifier import ClaimTypeClassifier
 from claim_detection.claim_context_classifier import ClaimContextClassifier
 from evidence.domain_diversity_filter import DomainDiversityFilter
 from evidence.india_source_registry import get_india_state_source_hints
+from evidence.session_retrieval_cache import SessionRetrievalCache
 
 try:
     nltk.data.find("tokenizers/punkt")
@@ -521,6 +522,7 @@ class ClaimPipeline:
         self._verifier_v2 = None
         self._llm_verifier = None
         self._sentence_cache = {}
+        self._session_retrieval_cache = SessionRetrievalCache()
         self.logic_engine = LogicEngine()
         self.conflict_analyzer = ConflictAnalyzer()
         self.strong_relevance_threshold = 0.45
@@ -542,22 +544,27 @@ class ClaimPipeline:
         self.enable_llm_verifier = os.getenv("ENABLE_LLM_VERIFIER", "0").strip().lower() in {"1", "true", "yes", "on"}
 
     @staticmethod
-    def _consolidate_document_results(results):
+    def _consolidate_document_results(results, trace=None):
         grouped = {}
         for item in results:
             key = item.get("url") or item.get("source")
             grouped.setdefault(key, []).append(item)
 
         consolidated = []
-        for items in grouped.values():
-            if len(items) == 1:
-                item = dict(items[0])
-                item["passage_count"] = 1
-                consolidated.append(item)
-                continue
-
-            support_items = [item for item in items if item.get("stance") == "SUPPORT"]
-            refute_items = [item for item in items if item.get("stance") == "REFUTE"]
+        trace_rows = []
+        for key, items in grouped.items():
+            ranked_items = sorted(
+                items,
+                key=lambda item: (
+                    float(item.get("combined_score") or 0.0),
+                    float(item.get("confidence") or 0.0),
+                    float(item.get("weight") or 0.0),
+                ),
+                reverse=True,
+            )
+            support_items = [item for item in ranked_items if item.get("stance") == "SUPPORT"]
+            refute_items = [item for item in ranked_items if item.get("stance") == "REFUTE"]
+            neutral_items = [item for item in ranked_items if item.get("stance") == "NEUTRAL"]
             dominant_items = support_items if len(support_items) >= len(refute_items) else refute_items
 
             if dominant_items:
@@ -585,14 +592,50 @@ class ClaimPipeline:
                     3,
                 )
             else:
-                best = max(items, key=lambda item: float(item.get("combined_score") or 0.0))
+                best = ranked_items[0]
                 merged = dict(best)
 
-            merged["passage_count"] = len(items)
+            retained_passages = []
+            for item in ranked_items[:3]:
+                retained_passages.append({
+                    "text": item.get("text"),
+                    "stance": item.get("stance"),
+                    "confidence": round(float(item.get("confidence", 0.0)), 3),
+                    "weight": round(float(item.get("weight", 0.0)), 3),
+                    "relevance_score": round(float(item.get("relevance_score", 0.0)), 3),
+                    "quality_score": round(float(item.get("quality_score", 0.0)), 3),
+                    "combined_score": round(float(item.get("combined_score", 0.0)), 4),
+                    "evidence_tier": item.get("evidence_tier", "soft"),
+                })
+
+            merged["passage_count"] = len(ranked_items)
             merged["support_passages"] = len(support_items)
             merged["refute_passages"] = len(refute_items)
-            merged["neutral_passages"] = sum(1 for item in items if item.get("stance") == "NEUTRAL")
+            merged["neutral_passages"] = len(neutral_items)
+            merged["document_score"] = round(max(float(item.get("combined_score") or 0.0) for item in ranked_items), 4)
+            merged["document_has_conflict"] = bool(support_items and refute_items)
+            merged["retained_passages"] = retained_passages
+            merged["context_text"] = "\n".join(
+                passage["text"] for passage in retained_passages[:2] if passage.get("text")
+            )[:800]
             consolidated.append(merged)
+
+            trace_rows.append({
+                "document_key": key,
+                "source": merged.get("source"),
+                "url": merged.get("url"),
+                "passage_count": len(ranked_items),
+                "support_passages": len(support_items),
+                "refute_passages": len(refute_items),
+                "neutral_passages": len(neutral_items),
+                "document_score": merged["document_score"],
+                "selected_stance": merged.get("stance"),
+                "selected_text": merged.get("text"),
+                "retained_passages": retained_passages,
+            })
+
+        if isinstance(trace, dict):
+            trace["document_consolidation"] = trace_rows
 
         return consolidated
 
@@ -688,6 +731,9 @@ class ClaimPipeline:
                 "search_cache_hit": bool(trace.get("search_cache_hit", False)) if isinstance(trace, dict) else False,
                 "playwright_used": bool(trace.get("playwright_used", False)) if isinstance(trace, dict) else False,
                 "local_rag_hits": list(trace.get("local_rag_hits", [])) if isinstance(trace, dict) else [],
+                "session_cache_hits": list(trace.get("session_cache_hits", [])) if isinstance(trace, dict) else [],
+                "session_cache_lookup": dict(trace.get("session_cache_lookup", {})) if isinstance(trace, dict) else {},
+                "session_cache_store": dict(trace.get("session_cache_store", {})) if isinstance(trace, dict) else {},
             },
             "retrieval_version": "v2" if self.enable_retrieval_v2 else "v1",
             "reranker_provider": getattr(self.relevance_scorer, "provider_name", "current"),
@@ -707,7 +753,10 @@ class ClaimPipeline:
                 "support": support_count,
                 "refute": refute_count,
                 "neutral": neutral_count,
+                "document_level_items": len(results),
+                "documents_with_multiple_passages": sum(1 for item in results if int(item.get("passage_count", 1)) > 1),
             },
+            "document_consolidation": list(trace.get("document_consolidation", [])) if isinstance(trace, dict) else [],
             "stance_sources": stance_source_counts,
             "policy_flags": {
                 "forced_neutral_due_to_weak_evidence": forced_neutral,
@@ -739,6 +788,10 @@ class ClaimPipeline:
             "scraped_pages": [],
             "evidence_selected": [],
             "stance_predictions": [],
+            "document_consolidation": [],
+            "session_cache_hits": [],
+            "session_cache_lookup": {},
+            "session_cache_store": {},
             "final_verdict": None
         }
 
@@ -983,6 +1036,36 @@ class ClaimPipeline:
                     "quality": quality_score
                 })
 
+        session_cache_hits, cache_lookup_stats = self._session_retrieval_cache.lookup(
+            claim,
+            context_result=context_result,
+            max_items=2,
+        )
+        trace["session_cache_lookup"] = cache_lookup_stats
+        if session_cache_hits:
+            existing = {
+                ((item.get("url") or "").strip(), " ".join((item.get("text") or "").split()))
+                for item in scored_evidence
+            }
+            appended = []
+            duplicates_skipped = 0
+            for item in session_cache_hits:
+                dedupe_key = ((item.get("url") or "").strip(), " ".join((item.get("text") or "").split()))
+                if dedupe_key in existing:
+                    duplicates_skipped += 1
+                    continue
+                existing.add(dedupe_key)
+                scored_evidence.append(dict(item))
+                appended.append({
+                    "source": item.get("source"),
+                    "url": item.get("url"),
+                    "similarity": item.get("session_cache_similarity"),
+                    "from_claim": item.get("session_cache_from_claim"),
+                })
+            trace["session_cache_hits"] = appended
+            trace["session_cache_lookup"]["appended_items"] = len(appended)
+            trace["session_cache_lookup"]["duplicates_skipped"] = duplicates_skipped
+
         # abstain early if no evidence passes filtering
         if not scored_evidence:
             print("No usable evidence found - abstaining")
@@ -1027,7 +1110,13 @@ class ClaimPipeline:
         print(f"Domain diversity filter - score: {diversity_score:.2f}")
         print("Domain diversity filtering:", round(time.time() - start_diversity, 3), "sec")
 
-        scored_evidence = scored_evidence[:5]
+        scored_evidence = scored_evidence[:6]
+
+        trace["session_cache_store"] = self._session_retrieval_cache.store(
+            claim,
+            context_result=context_result,
+            evidence_rows=scored_evidence,
+        )
 
         print("Relevance + quality:", round(time.time() - start, 3), "sec")
 
@@ -1108,7 +1197,7 @@ class ClaimPipeline:
                 "source": stance_result.get("source", "model")
             })
 
-        results = self._consolidate_document_results(results)
+        results = self._consolidate_document_results(results, trace=trace)
         print("Document-level evidence items:", len(results))
         print("Semantic + NLI:", round(time.time() - start, 3), "sec")
 

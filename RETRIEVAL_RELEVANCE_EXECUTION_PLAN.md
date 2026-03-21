@@ -175,9 +175,9 @@ All must pass:
 - ranking still depends mainly on authority/domain bonuses
 - scrape quality remains poor on focused claims
 
-## Phase 2: Relevance v7 Audit, Benchmark, and Promotion Decision
+## Phase 2: Relevance Audit, Residual Follow-up, and Provisional Handoff
 
-Status: In progress
+Status: Deferred follow-up
 
 ### Goal
 
@@ -230,13 +230,45 @@ All must pass:
 - false positives rise
 - improvements depend on offline behavior that does not show up in live retrieval runs
 
+### Phase 2 handoff note
+
+Phase 3 may begin provisionally with `v9_run1`, but this does not mean Phase 2 is solved. The open follow-up list remains:
+
+- reduce `Amazon River` false-positive support bias
+- reduce `bananas` neutral-despite-evidence failures
+- revisit `v10` or later public-data candidates only if they beat `v9` on live residual behavior
+
 ### Current phase state
 
 - `v7_run1` was evaluated and should not be promoted.
-- A residual follow-up dataset and config now exist as `v8`, but this is still a Phase 2 candidate path, not a promotion.
-- A public-web import path is now prepared for AVeriTeC-style JSON so public internet-grounded data can be added without heavy rewriting.
-- The remaining misses are still model/data issues on hard live claims, so Phase 2 is not complete yet.
-- Phase 3 must not start until a relevance candidate passes the live promotion gate without adding new runtime heuristics.
+- `v8` remained too weak on the residual gate and was not promoted.
+- `v9_run1` is the strongest recent candidate on the hard residual live set.
+- `v9_run1` residual benchmark result: accuracy `0.75`, neutral rate `0.125`, false-positive rate `0.125`.
+- `v9_run1` fixed multiple earlier residual failures, including `Lake Baikal`, `Roman Empire 476 AD`, and `Humans can breathe in space without equipment`.
+- `v9_run1` still has two important residual issues: `Amazon River` false-positive support bias and `bananas` neutral-despite-evidence.
+- `v11_run1` was a regression and should not be promoted.
+- `v11_run1` residual benchmark result: accuracy `0.125`, neutral rate `0.875`, false-positive rate `0.0`.
+- The `v11` cleanup/expansion attempt made the system broadly over-abstain, so it does not justify another immediate Phase 2 hold.
+- A public-web import path exists for AVeriTeC-style JSON, but `v10` has not been adopted as the preferred next candidate.
+- Because the project goal is minimal heuristics and forward progress matters, `v9_run1` is kept as the provisional experimental relevance checkpoint while broader Phase 2 refinement is deferred.
+- The promoted stable baseline does not automatically change just because Phase 3 work begins.
+
+### Why `v9` is kept for the next step
+
+`v9_run1` is not treated as a final Phase 2 success. It is kept because it is the best live-tested relevance candidate among the recent residual follow-ups.
+
+Decision logic:
+
+- Keep `v9` because it materially improved the hard residual live set relative to `v8` and `v11`.
+- Do not keep `v11` because it collapsed into broad `NEUTRAL` behavior on live claims.
+- Do not block Phase 3 on perfect Phase 2 closure, because the remaining `v9` misses are narrow and already understood.
+- Do not mark Phase 2 complete, because `Amazon` support bias and `bananas` abstention are still open relevance issues.
+
+Operationally, this means:
+
+- `v9_run1` is the relevance checkpoint to use for next-step experimental work.
+- Phase 2 remains open as a deferred refinement track.
+- Any future Phase 2 revisit should compare against `v9_run1`, not `v11_run1`.
 
 ### Public data path
 
@@ -259,7 +291,7 @@ Not allowed:
 
 ## Phase 3: Passage Retention and Document-Level Aggregation Cleanup
 
-Status: Not started
+Status: Sufficient for now, paused with deferred edge-case follow-up
 
 ### Goal
 
@@ -274,6 +306,7 @@ The repo already retains multiple candidate sentences and performs document cons
 - Work inside the current internet-first claim pipeline.
 - Preserve multiple strong passages per source where they are genuinely relevant.
 - Improve document aggregation behavior without turning it into a heuristic maze.
+- Use `v9_run1` as the working experimental relevance checkpoint for Phase 3 validation unless a later Phase 2 candidate clearly beats it live.
 
 ### Work items
 
@@ -296,6 +329,19 @@ All must pass:
 - known `neutral_despite_evidence` cases improve because later strong passages are preserved
 - passage handling is simpler or more principled after the change, not more heuristic-heavy
 
+### Current phase state
+
+- Phase 3 work has already started and produced live benchmark evidence.
+- Document-level consolidation is now trace-visible.
+- Same-document passage survival is improved enough to be observable in runtime behavior.
+- Full-stack comparison runs were completed across baseline and experimental env combinations.
+- The remaining hard misses in the best-performing stack are not a single clean Phase 3 issue:
+  - `5G networks spread coronavirus` includes stance/logic interaction risk
+  - `The Great Wall of China is visible from space` is partly an ambiguity/definition case
+  - `The Amazon River is the longest river in the world` is partly a disputed-comparison case
+- Because of that, Phase 3 should not keep expanding unless a clearly non-heuristic, general fix appears.
+- The current recommendation is to pause Phase 3 here and carry the remaining false positives as deferred cleanup, not as a blocker to Phase 4.
+
 ### Evidence to record
 
 - before/after retained-passage counts
@@ -310,7 +356,7 @@ All must pass:
 
 ## Phase 4: Session-Scoped Retrieval Cache
 
-Status: Ready to execute after Phase 3 only
+Status: Active, validated, and tuned for near-paraphrase reuse
 
 ### Goal
 
@@ -342,6 +388,42 @@ All must pass:
 - live retrieval still runs on every request
 - repeated-claim latency improves
 - benchmark quality does not regress
+
+### Current phase state
+
+- A supplementary session-scoped retrieval cache is now implemented.
+- The cache stores only strong, high-quality passages with source metadata.
+- Live retrieval still executes on every tested repeated claim.
+- Cache lookup and store behavior are now trace-visible in pipeline transparency.
+- Repeated-claim validation artifact: `logs/phase4_repeat_claim_validation.json`
+- Similar-claim validation artifacts:
+  - `logs/phase4_similar_claim_validation.json`
+  - `logs/phase4_similar_claim_validation_post_tuning.json`
+- Broader repeated-query validation artifact:
+  - `logs/phase4_broader_repeat_query_validation.json`
+- Validation summary:
+  - average first pass: `63.804s`
+  - average second pass: `1.694s`
+  - average improvement: `62.11s`
+- Similar-claim summary after one tuning pass:
+  - matched pairs: `3/4`
+  - returned pairs: `3/4`
+  - appended pairs: `2/4`
+- Broader repeated-query summary:
+  - claim count: `10`
+  - verdict stability: `10/10`
+  - average first pass: `85.094s`
+  - average second pass: `1.410s`
+  - average improvement: `83.684s`
+  - second-pass matched claims: `9/10`
+  - second-pass returned claims: `9/10`
+  - second-pass appended claims: `0/10`
+- The current validation confirms the architectural requirement, but not yet the full Phase 4 completion condition:
+  - the cache is supplementary
+  - live retrieval still runs
+  - repeated-claim latency improves
+  - near-paraphrase reuse now works better after tuning
+  - broader regression validation on the full benchmark is still pending
 
 ### Evidence to record
 
@@ -435,6 +517,6 @@ No reordering unless a blocking reason is documented in writing.
 
 ## Immediate Next Step
 
-Start with Phase 1 baseline collection and score-trace validation.
+Freeze Phase 4 here as a good stopping point unless a full-benchmark repeated-query study is explicitly needed.
 
-Do not start by training anything.
+Do not reopen broad Phase 3 work unless a clearly general, non-heuristic fix appears for the deferred edge cases.

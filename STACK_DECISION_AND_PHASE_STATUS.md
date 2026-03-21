@@ -245,7 +245,7 @@ Meaning:
 
 ### Phase 3: Passage Retention And Aggregation Cleanup
 
-Status: in progress
+Status: sufficient for now, paused with deferred edge-case follow-up
 
 What happened:
 
@@ -261,19 +261,79 @@ What we learned in Phase 3:
 - trained stance must be explicitly enabled or the system can silently fall back in misleading ways
 - `v9` relevance interacts positively with later-stack improvements
 - the combined experimental stack currently gives the best benchmark result, but the simpler `v9` upgrade is the better real-time recommendation
+- the remaining benchmark misses are not a clean single Phase 3 problem:
+  - `5G networks spread coronavirus` includes stance/logic interaction risk
+  - `The Great Wall of China is visible from space` is partly an ambiguity/definition case
+  - `The Amazon River is the longest river in the world` is partly a disputed-comparison case
 
 Meaning:
 
 - Phase 3 is no longer just "ready to execute"
 - it has started, produced evidence, and clarified the next decision boundary
+- the structural Phase 3 goal has been met well enough that it should not block Phase 4
+- the remaining false positives should be tracked as deferred cleanup, not as a reason to keep expanding Phase 3 indefinitely
 
 ### Phase 4: Session-Scoped Retrieval Cache
 
-Status: not started
+Status: active, validated, and tuned for near-paraphrase reuse
 
 Meaning:
 
-- caching has not been the focus yet because retrieval quality and evidence handling were higher priority
+- caching had been deferred while retrieval quality and evidence handling were still the bigger blockers
+- after the narrow Phase 3 review, Phase 4 became the best next active phase
+- a supplementary session-scoped retrieval cache is now implemented
+- repeated-claim validation shows that live retrieval still executes while the cache remains trace-visible and supplementary
+
+Phase 4 validation artifact:
+
+- `logs/phase4_repeat_claim_validation.json`
+- `logs/phase4_similar_claim_validation.json`
+- `logs/phase4_similar_claim_validation_post_tuning.json`
+- `logs/phase4_broader_repeat_query_validation.json`
+
+Phase 4 validation summary:
+
+- average first pass: `63.804s`
+- average second pass: `1.694s`
+- average improvement: `62.11s`
+
+Important interpretation:
+
+- this speedup is not only from the new session cache
+- it also benefits from existing search, extraction, and model caches
+- the key Phase 4 success is architectural:
+  - live internet retrieval still runs
+  - session cache matches are visible
+  - duplicate cached evidence is not injected over live evidence
+- after one tuning pass, near-paraphrase reuse is materially better while still remaining conservative on looser misinformation phrasing
+
+Post-tuning similar-claim summary:
+
+- before tuning:
+  - matched pairs: `1/4`
+  - appended pairs: `1/4`
+- after tuning:
+  - matched pairs: `3/4`
+  - returned pairs: `3/4`
+  - appended pairs: `2/4`
+
+Broader repeated-query summary:
+
+- claim count: `10`
+- verdict stability: `10/10`
+- average first pass: `85.094s`
+- average second pass: `1.410s`
+- average improvement: `83.684s`
+- second-pass matched claims: `9/10`
+- second-pass returned claims: `9/10`
+- second-pass appended claims: `0/10`
+
+Interpretation:
+
+- the cache generalizes well for exact repeated claims across a broader slice
+- verdicts stayed stable across both passes
+- cached matches were usually recognized but not appended because live retrieval resurfaced the same strong evidence
+- this is the desired internet-first behavior for Phase 4
 
 ### Phase 5: Stance Retraining On Residual Failures
 
@@ -292,8 +352,10 @@ Most honest summary:
 
 - Phase 1 is effectively done
 - Phase 2 produced a provisional winner (`v9`) but still has deferred cleanup
-- Phase 3 is actively underway and already producing stack-level decisions
-- Phase 4 and Phase 5 have not started yet
+- Phase 3 has produced the needed structural evidence and is now paused with deferred edge-case follow-up
+- Phase 4 has passed foundation and similar-claim validation, including one successful tuning pass
+- Phase 4 also passed a broader repeated-query validation across a wider 10-claim slice
+- Phase 5 has not started yet
 
 That is meaningful progress toward the project goal:
 
@@ -312,3 +374,16 @@ If a single runtime decision must be made today:
 If only one stack should be recommended as the current real-time candidate, choose:
 
 - `stance v2 + relevance v9 + locked retrieval/verifier path + llm verifier`
+
+## Immediate Next Step
+
+Commit the Phase 4 implementation and validation docs, then either:
+
+- keep Phase 4 as the current stopping point, or
+- extend it with a broader benchmark-style repeated-query study
+
+Keep these as deferred non-blocking cleanup items:
+
+- `5G networks spread coronavirus`
+- `The Great Wall of China is visible from space`
+- `The Amazon River is the longest river in the world`
