@@ -44,7 +44,11 @@ class LLMVerifier:
             "Use only the provided evidence. "
             "If the evidence directly supports the claim, return SUPPORT. "
             "If the evidence directly contradicts the claim, return REFUTE. "
-            "If the evidence is indirect, about reported opinions, or insufficient, return NEUTRAL. "
+            "If the evidence is indirect, advisory, conditional, headline-like, about reported opinions, "
+            "or insufficient, return NEUTRAL. "
+            "Administrative or payment-status instructions such as deadlines, 'do this', 'check status', "
+            "'file a complaint', or 'if you have not received money' are NEUTRAL unless the evidence "
+            "explicitly verifies both the condition and the exact claimed consequence. "
             "Do not rely on outside knowledge. Return JSON only."
         )
         user_prompt = (

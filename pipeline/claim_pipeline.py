@@ -188,6 +188,22 @@ def _is_capital_relation_claim(claim, context_result=None):
     return "capital of" in claim_text or "capital city of" in claim_text
 
 
+def _is_official_public_admin_source(url):
+    normalized = (url or "").lower().strip()
+    if not normalized:
+        return False
+    official_markers = (
+        ".gov.in",
+        ".gov/",
+        ".gov?",
+        ".gov#",
+        ".gov.",
+        "ap.gov.in",
+        "nic.in",
+    )
+    return any(marker in normalized for marker in official_markers)
+
+
 def _claim_reporting_penalty(claim, sentence, source_name=None, context_result=None):
     if not _is_misinformation_sensitive(claim, context_result):
         return 0.0
@@ -1200,9 +1216,22 @@ class ClaimPipeline:
                     llm_start = time.time()
                     llm_result = self.llm_verifier.verify(claim, highlighted, ev.get("context_text"))
                     stage_timings["llm_verifier"] += time.time() - llm_start
-                    if llm_result.get("stance") != "NEUTRAL":
+                    regional_local_claim = "regional_local_claim" in set((context_result or {}).get("risk_flags", []))
+                    llm_non_neutral_allowed = True
+                    if (
+                        regional_local_claim
+                        and llm_result.get("stance") in {"SUPPORT", "REFUTE"}
+                        and not _is_official_public_admin_source(ev.get("url"))
+                    ):
+                        llm_non_neutral_allowed = False
+                        trace.setdefault("llm_verifier_suppressed", []).append({
+                            "url": ev.get("url"),
+                            "stance": llm_result.get("stance"),
+                            "reason": "regional_local_non_official_source",
+                        })
+                    if llm_result.get("stance") != "NEUTRAL" and llm_non_neutral_allowed:
                         stance_result = llm_result
-                    elif stance_result.get("stance") == "NEUTRAL":
+                    elif llm_result.get("stance") == "NEUTRAL" and stance_result.get("stance") == "NEUTRAL":
                         stance_result = llm_result
                 except Exception as exc:
                     trace.setdefault("llm_verifier_errors", []).append(str(exc))

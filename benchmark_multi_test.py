@@ -386,15 +386,34 @@ def summarize_stage_timings(results):
     }
 
 
+def classify_run_validity(metrics):
+    total = int(metrics.get("total_claims", 0) or 0)
+    neutral_rate = float(metrics.get("neutral_rate", 0.0) or 0.0)
+    failed_claims = metrics.get("failed_claims", []) or []
+    insufficient = sum(
+        1 for item in failed_claims if item.get("failure_category") == "insufficient_evidence"
+    )
+
+    is_invalid = neutral_rate >= 0.8 or (total > 0 and insufficient >= max(5, total // 2))
+    return {
+        "is_valid_comparison": not is_invalid,
+        "status": "invalid_search_collapsed" if is_invalid else "valid",
+        "neutral_rate": round(neutral_rate, 3),
+        "insufficient_evidence_failures": insufficient,
+    }
+
+
 # ------------------------------------------------
 # Save results
 # ------------------------------------------------
 
 def save_results(results, metrics, claim_times, total_time, output_path):
     stage_summary = summarize_stage_timings(results)
+    run_validity = classify_run_validity(metrics)
 
     output = {
         "benchmark_metrics": metrics,
+        "run_validity": run_validity,
         "total_time_seconds": total_time,
         "average_claim_time": round(sum(claim_times)/len(claim_times),3),
         "stage_timing_summary": stage_summary,
@@ -443,9 +462,12 @@ async def main():
     print("failed_by_category :", metrics.get("failed_by_category"))
 
     stage_summary = summarize_stage_timings(results)
+    run_validity = classify_run_validity(metrics)
     print("dominant_stage :", stage_summary.get("dominant_stage"))
     print("dominant_stage_seconds :", stage_summary.get("dominant_stage_seconds"))
     print("model_locked_total_seconds :", stage_summary.get("model_locked_total_seconds"))
+    print("run_validity_status :", run_validity.get("status"))
+    print("is_valid_comparison :", run_validity.get("is_valid_comparison"))
 
     save_results(results, metrics, claim_times, total_time, args.output)
 

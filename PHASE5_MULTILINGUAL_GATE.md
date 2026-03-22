@@ -75,6 +75,21 @@ This command:
 - runs the multilingual batch
 - writes a fresh retry artifact under `logs/`
 
+## Fast Result Check
+
+After the rerun, classify it quickly with:
+
+```powershell
+.\.venv\Scripts\python.exe phase5_multilingual_compare.py logs\multilingual_regression_batch_v2_results_retry.json
+```
+
+This quickly tells you whether the run is:
+
+- `INVALID_RUN` because search collapsed
+- `IMPROVED_OR_EQUAL` against the `fix2` baseline
+- `REGRESSION`
+- or `MIXED`
+
 ## Decision Rule
 
 After a healthy-network run:

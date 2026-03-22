@@ -260,6 +260,10 @@ class EvidenceRouter:
         search_results = []
         seen_urls = set()
         for index, query in enumerate(query_plan):
+            if index > 0 and not self.search_engine.available_backends():
+                if trace is not None:
+                    trace["search_short_circuit_reason"] = "all_search_backends_in_backoff"
+                break
             per_query_limit = 8 if index == 0 else 4
             for result in self.search_engine.search(query, max_results=per_query_limit):
                 if trace is not None:
