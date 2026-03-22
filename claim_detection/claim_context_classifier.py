@@ -102,6 +102,60 @@ DOMAIN_TO_DEFAULT_SUBCATEGORY = {
 }
 
 
+LANGUAGE_LOCALITY_HINTS: Dict[str, Dict[str, List[str] | str]] = {
+    "te": {
+        "countries": ["india"],
+        "states": ["andhra_pradesh", "telangana"],
+        "query_language": "telugu",
+    },
+    "ta": {
+        "countries": ["india", "sri_lanka"],
+        "states": ["tamil_nadu"],
+        "query_language": "tamil",
+    },
+    "kn": {
+        "countries": ["india"],
+        "states": ["karnataka"],
+        "query_language": "kannada",
+    },
+    "ml": {
+        "countries": ["india"],
+        "states": ["kerala"],
+        "query_language": "malayalam",
+    },
+    "bn": {
+        "countries": ["india", "bangladesh"],
+        "states": ["west_bengal"],
+        "query_language": "bengali",
+    },
+    "mr": {
+        "countries": ["india"],
+        "states": ["maharashtra"],
+        "query_language": "marathi",
+    },
+    "gu": {
+        "countries": ["india"],
+        "states": ["gujarat"],
+        "query_language": "gujarati",
+    },
+    "pa": {
+        "countries": ["india", "pakistan"],
+        "states": ["punjab"],
+        "query_language": "punjabi",
+    },
+    "or": {
+        "countries": ["india"],
+        "states": ["odisha"],
+        "query_language": "odia",
+    },
+    "hi": {
+        "countries": ["india"],
+        "states": ["uttar_pradesh", "bihar", "rajasthan", "delhi", "madhya_pradesh"],
+        "query_language": "hindi",
+    },
+}
+
+
 class ClaimContextClassifier:
     """Context classifier with trained-model-first support and lexical fallback."""
 
@@ -191,15 +245,17 @@ class ClaimContextClassifier:
             except Exception:
                 pass
 
-    def classify(self, claim: str) -> dict:
+    def classify(self, claim: str, original_claim: str | None = None, language: str | None = None) -> dict:
         if self.trained_checkpoint is not None:
-            trained_result = self._classify_with_worker(claim)
+            trained_result = self._classify_with_worker(claim, original_claim=original_claim, language=language)
             if trained_result is not None:
                 return trained_result
-        return self._heuristic_classify(claim)
+        return self._heuristic_classify(claim, original_claim=original_claim, language=language)
 
-    def _heuristic_classify(self, claim: str) -> dict:
+    def _heuristic_classify(self, claim: str, original_claim: str | None = None, language: str | None = None) -> dict:
         claim_text = " ".join((claim or "").strip().lower().split())
+        original_text = " ".join((original_claim or "").strip().lower().split())
+        combined_text = " ".join(part for part in (claim_text, original_text) if part).strip()
         domain = "general_factual"
         subcategory = "encyclopedic"
         confidence = 0.3
@@ -208,7 +264,7 @@ class ClaimContextClassifier:
         best_score = 0
         for domain_name, subcategories in DOMAIN_HINTS.items():
             for subcategory_name, hints in subcategories.items():
-                score = sum(1 for hint in hints if hint in claim_text)
+                score = sum(1 for hint in hints if hint in combined_text)
                 if score > best_score:
                     best_score = score
                     domain = domain_name
@@ -218,11 +274,14 @@ class ClaimContextClassifier:
             confidence = min(0.45 + (best_score * 0.12), 0.82)
             decision_source = "bootstrap_lexical_context"
 
-        state_focus = self._detect_state_focus(claim_text)
-        risk_flags = self._detect_risk_flags(claim_text, state_focus)
+        state_focus = self._detect_state_focus(combined_text, language=language)
+        risk_flags = self._detect_risk_flags(combined_text, state_focus)
+        locality = self._detect_language_locality(language, combined_text)
 
         if state_focus:
             confidence = max(confidence, 0.62)
+        elif locality.get("countries"):
+            confidence = max(confidence, 0.52)
 
         result = {
             "domain": domain,
@@ -231,6 +290,10 @@ class ClaimContextClassifier:
             "decision_source": decision_source,
             "risk_flags": risk_flags,
             "state_focus": state_focus,
+            "language": language or "unknown",
+            "query_language": locality.get("query_language"),
+            "region_hints": locality.get("countries", []),
+            "original_claim": original_claim,
             "taxonomy_version": "v1",
             "available_domains": list(CONTEXT_TAXONOMY.keys()),
         }
@@ -247,7 +310,7 @@ class ClaimContextClassifier:
                 best_subcategory = subcategory_name
         return best_subcategory
 
-    def _classify_with_worker(self, claim: str):
+    def _classify_with_worker(self, claim: str, original_claim: str | None = None, language: str | None = None):
         with self._worker_lock:
             if not self._start_worker():
                 return None
@@ -281,7 +344,7 @@ class ClaimContextClassifier:
         label = str(payload.get("label") or "general_factual").lower()
         confidence = float(payload.get("confidence") or 0.0)
         if confidence < self.MODEL_CONFIDENCE_THRESHOLD:
-            fallback = self._heuristic_classify(claim)
+            fallback = self._heuristic_classify(claim, original_claim=original_claim, language=language)
             fallback["decision_source"] = "bootstrap_lexical_low_trained_context_confidence"
             fallback["model_domain"] = label
             fallback["model_confidence"] = round(confidence, 3)
@@ -289,28 +352,60 @@ class ClaimContextClassifier:
             return fallback
 
         claim_text = " ".join((claim or "").strip().lower().split())
-        state_focus = self._detect_state_focus(claim_text)
-        risk_flags = self._detect_risk_flags(claim_text, state_focus)
+        original_text = " ".join((original_claim or "").strip().lower().split())
+        combined_text = " ".join(part for part in (claim_text, original_text) if part).strip()
+        state_focus = self._detect_state_focus(combined_text, language=language)
+        risk_flags = self._detect_risk_flags(combined_text, state_focus)
+        locality = self._detect_language_locality(language, combined_text)
         result = {
             "domain": label,
-            "subcategory": self._best_subcategory_for_domain(claim_text, label),
+            "subcategory": self._best_subcategory_for_domain(combined_text, label),
             "confidence": round(confidence, 3),
             "decision_source": "trained_context_model",
             "risk_flags": risk_flags,
             "state_focus": state_focus,
+            "language": language or "unknown",
+            "query_language": locality.get("query_language"),
+            "region_hints": locality.get("countries", []),
+            "original_claim": original_claim,
             "taxonomy_version": "v1",
             "available_domains": list(CONTEXT_TAXONOMY.keys()),
             "scores": payload.get("scores", {}),
         }
         return result
 
-    def _detect_state_focus(self, claim_text: str) -> str | None:
+    def _detect_state_focus(self, claim_text: str, language: str | None = None) -> str | None:
+        normalized_text = claim_text or ""
         for state_name, aliases in INDIA_STATE_ALIASES.items():
             for alias in aliases:
                 pattern = r"\b" + re.escape(alias.lower()) + r"\b"
-                if re.search(pattern, claim_text):
+                if re.search(pattern, normalized_text):
                     return state_name
+        if language == "te":
+            if any(token in normalized_text for token in ("ఏపీలో", "ఏపీ", "ఆంధ్రప్రదేశ్", "ఆంధ్ర ప్రదేశ్")):
+                return "andhra_pradesh"
+            if any(token in normalized_text for token in ("తెలంగాణ", "టీఎస్", "హైదరాబాద్")):
+                return "telangana"
         return None
+
+    @staticmethod
+    def _detect_language_locality(language: str | None, claim_text: str) -> dict:
+        payload = LANGUAGE_LOCALITY_HINTS.get((language or "").strip().lower(), {})
+        countries = list(payload.get("countries", [])) if payload else []
+        states = list(payload.get("states", [])) if payload else []
+        query_language = payload.get("query_language") if payload else None
+
+        normalized = claim_text or ""
+        if language == "te" and re.search(r"\bin ap\b", normalized):
+            states = ["andhra_pradesh"]
+        if language == "ta" and "chennai" in normalized:
+            states = ["tamil_nadu"]
+
+        return {
+            "countries": countries,
+            "states": states,
+            "query_language": query_language,
+        }
 
     @staticmethod
     def _detect_risk_flags(claim_text: str, state_focus: str | None) -> list[str]:

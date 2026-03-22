@@ -51,6 +51,17 @@ def _is_windows_unsafe_model(model_name):
     return "deberta" in lowered
 
 
+def _sanitize_ipc_text(text, max_chars=1200):
+    value = (text or "").replace("\x00", "")
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    value = "".join(
+        ch for ch in value
+        if ch == "\n" or ch == "\t" or ord(ch) >= 32
+    )
+    value = " ".join(value.split())
+    return value[:max_chars]
+
+
 class NLIModel:
     def __init__(self):
         self._lock = threading.Lock()
@@ -405,7 +416,7 @@ class NLIModel:
             return None
         return predictions[0]
 
-    def _predict_many_with_worker(self, claim, evidences):
+    def _predict_many_with_worker(self, claim, evidences, allow_retry=True):
         if not evidences:
             return []
         with self._worker_lock:
@@ -414,13 +425,18 @@ class NLIModel:
             try:
                 if not self._worker or not self._worker.stdin or not self._worker.stdout:
                     return None
+                safe_claim = _sanitize_ipc_text(claim, max_chars=512)
                 payload = {
                     "items": [
-                        {"claim": claim, "evidence": evidence}
+                        {
+                            "claim": safe_claim,
+                            "evidence": _sanitize_ipc_text(evidence, max_chars=1000),
+                        }
                         for evidence in evidences
                     ]
                 }
-                self._worker.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
+                serialized = json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
+                self._worker.stdin.write(serialized + "\n")
                 self._worker.stdin.flush()
                 result_line = self._worker.stdout.readline().strip()
                 if not result_line:
@@ -438,5 +454,7 @@ class NLIModel:
             except Exception as exc:
                 print(f"Trained NLI worker request failed: {exc}")
                 self._stop_worker()
+                if allow_retry:
+                    return self._predict_many_with_worker(claim, evidences, allow_retry=False)
                 return None
 

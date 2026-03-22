@@ -54,6 +54,17 @@ def _token_set(text):
     }
 
 
+def _sanitize_ipc_text(text, max_chars=1200):
+    value = (text or "").replace("\x00", "")
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    value = "".join(
+        ch for ch in value
+        if ch == "\n" or ch == "\t" or ord(ch) >= 32
+    )
+    value = " ".join(value.split())
+    return value[:max_chars]
+
+
 def _model_cached(model_name):
     candidate_roots = []
     if os.getenv("MODEL_CACHE_DIR"):
@@ -397,7 +408,7 @@ class RelevanceScorer:
             return None
         return round(float(scores[0]), 3)
 
-    def _score_many_with_worker(self, claim, texts):
+    def _score_many_with_worker(self, claim, texts, allow_retry=True):
         if not texts:
             return []
         with self._worker_lock:
@@ -406,13 +417,15 @@ class RelevanceScorer:
             try:
                 if not self._worker or not self._worker.stdin or not self._worker.stdout:
                     return None
+                safe_claim = _sanitize_ipc_text(claim, max_chars=512)
                 payload = {
                     "items": [
-                        {"claim": claim, "text": text}
+                        {"claim": safe_claim, "text": _sanitize_ipc_text(text)}
                         for text in texts
                     ]
                 }
-                self._worker.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
+                serialized = json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
+                self._worker.stdin.write(serialized + "\n")
                 self._worker.stdin.flush()
                 result_line = self._worker.stdout.readline().strip()
                 if not result_line:
@@ -425,4 +438,6 @@ class RelevanceScorer:
             except Exception as exc:
                 print(f"Trained relevance worker request failed: {exc}")
                 self._stop_worker()
+                if allow_retry:
+                    return self._score_many_with_worker(claim, texts, allow_retry=False)
                 return None

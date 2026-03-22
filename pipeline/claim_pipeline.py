@@ -782,10 +782,12 @@ class ClaimPipeline:
         return preview
 
     async def run(self, claim, source_url=None):
+        original_claim = claim
 
         # trace object for debugging pipeline flow
         trace = {
             "claim": claim,
+            "original_claim": original_claim,
             "search_results": [],
             "scraped_pages": [],
             "evidence_selected": [],
@@ -843,7 +845,11 @@ class ClaimPipeline:
         print("Claim type classification:", stage_timings["claim_type_classification"], "sec")
 
         start = time.time()
-        context_result = self.claim_context_classifier.classify(claim)
+        context_result = self.claim_context_classifier.classify(
+            claim,
+            original_claim=original_claim,
+            language=language,
+        )
         trace["claim_context"] = dict(context_result)
         print(
             f"Claim context: {context_result['domain']}/{context_result['subcategory']} "
@@ -866,6 +872,8 @@ class ClaimPipeline:
                 trace=trace,
                 context_result=context_result,
                 claim_type_result=trace["claim_type"],
+                original_claim=original_claim,
+                language=language,
             )
         except asyncio.CancelledError:
             return {

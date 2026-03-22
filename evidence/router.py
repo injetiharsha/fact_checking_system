@@ -188,7 +188,7 @@ class EvidenceRouter:
         os.makedirs("logs/scraped_pages", exist_ok=True)
         os.makedirs("logs/retrieval_debug", exist_ok=True)
 
-    async def get_evidence(self, claim, exclude_domain=None, trace=None, context_result=None, claim_type_result=None):
+    async def get_evidence(self, claim, exclude_domain=None, trace=None, context_result=None, claim_type_result=None, original_claim=None, language=None):
         cache_key = (
             " ".join((claim or "").strip().lower().split()),
             (exclude_domain or "").strip().lower(),
@@ -247,7 +247,13 @@ class EvidenceRouter:
 
         search_start = time.time()
 
-        query_plan = self._build_search_queries(claim, context_result, claim_type_result)
+        query_plan = self._build_search_queries(
+            claim,
+            context_result,
+            claim_type_result,
+            original_claim=original_claim,
+            language=language,
+        )
         if trace is not None:
             trace["search_queries"] = list(query_plan)
 
@@ -529,27 +535,36 @@ class EvidenceRouter:
         if isinstance(content, dict) and content.get("ok"):
             self._domain_backoff.pop(domain, None)
 
-    def _build_search_queries(self, claim, context_result=None, claim_type_result=None):
+    def _build_search_queries(self, claim, context_result=None, claim_type_result=None, original_claim=None, language=None):
         base_claim = " ".join((claim or "").strip().split())
         if not base_claim:
             return []
+        original_query = " ".join((original_claim or "").strip().split())
 
         context_result = context_result or {}
         domain = str(context_result.get("domain") or "general_factual").strip()
         subcategory = str(context_result.get("subcategory") or "").strip()
         state_focus = context_result.get("state_focus")
+        query_language = str(context_result.get("query_language") or language or "").strip().lower()
+        region_hints = list(context_result.get("region_hints", []) or [])
         claim_type = self._claim_type_label(claim_type_result)
 
         candidates = [base_claim]
+        if original_query and original_query != base_claim and query_language and query_language != "en":
+            candidates.append(original_query)
 
         subcategory_hint = self._clean_hint(subcategory)
         if subcategory_hint and subcategory_hint not in {"encyclopedic", "entity property", "general news"}:
             candidates.append(f"{base_claim} {subcategory_hint}")
+            if original_query and original_query != base_claim:
+                candidates.append(f"{original_query} {subcategory_hint}")
 
         for hint in DOMAIN_QUERY_HINTS.get(domain, [])[:2]:
             cleaned_hint = self._clean_hint(hint)
             if cleaned_hint:
                 candidates.append(f"{base_claim} {cleaned_hint}")
+                if original_query and original_query != base_claim:
+                    candidates.append(f"{original_query} {cleaned_hint}")
 
         for hint in CLAIM_TYPE_QUERY_HINTS.get(claim_type, [])[:2]:
             cleaned_hint = self._clean_hint(hint)
@@ -561,13 +576,29 @@ class EvidenceRouter:
             if cleaned_hint:
                 candidates.append(f"{base_claim} {cleaned_hint}")
 
+        if query_language and query_language != "en":
+            candidates.append(f"{base_claim} {query_language}")
+            if original_query and original_query != base_claim:
+                candidates.append(f"{original_query} {query_language}")
+
+        for region in region_hints[:2]:
+            cleaned_region = self._clean_hint(region)
+            if cleaned_region:
+                candidates.append(f"{base_claim} {cleaned_region}")
+                if original_query and original_query != base_claim:
+                    candidates.append(f"{original_query} {cleaned_region}")
+
         local_hints = get_india_state_source_hints(state_focus)
         for domain_hint in local_hints.get("source_domains", [])[:2]:
             candidates.append(f"{base_claim} site:{domain_hint}")
+            if original_query and original_query != base_claim:
+                candidates.append(f"{original_query} site:{domain_hint}")
 
         trusted_variants = self._trusted_source_variants(domain)
         for variant in trusted_variants:
             candidates.append(f"{base_claim} {variant}")
+            if original_query and original_query != base_claim and query_language and query_language != "en":
+                candidates.append(f"{original_query} {variant}")
 
         seen = set()
         ordered = []
@@ -577,7 +608,7 @@ class EvidenceRouter:
             if compact and key not in seen:
                 seen.add(key)
                 ordered.append(compact)
-        return ordered[:5]
+        return ordered[:8]
 
     @staticmethod
     def _pattern_query_hints(claim, domain):
