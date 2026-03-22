@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 
+STOPWORDS = {
+    "a", "an", "the", "is", "are", "was", "were", "of", "in", "on", "for",
+    "to", "and", "or", "by", "with", "from", "that", "this", "it", "as",
+}
+
 
 def _normalize_token(token: str) -> str:
     token = (token or "").lower().strip(".,;:!?()[]{}\"'")
@@ -33,7 +38,7 @@ def _token_set(text: str) -> set[str]:
     tokens = set()
     for raw in (text or "").lower().split():
         normalized = _normalize_token(raw)
-        if normalized:
+        if normalized and normalized not in STOPWORDS:
             tokens.add(normalized)
     return tokens
 

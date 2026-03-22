@@ -10,7 +10,19 @@ class StanceDetector:
     LEXICAL_RESCUE_MIN_OVERLAP = 2
     SUPPORT_MIN_CONFIDENCE = 0.72
     REFUTE_MIN_CONFIDENCE = 0.58
-
+    CAPITAL_ALIASES = {
+        "bangalore": "bengaluru",
+        "bengaluru": "bengaluru",
+        "bombay": "mumbai",
+        "mumbai": "mumbai",
+        "madras": "chennai",
+        "chennai": "chennai",
+        "delhi": "new delhi",
+        "new delhi": "new delhi",
+        "hyderabad": "hyderabad",
+        "kolkata": "kolkata",
+        "calcutta": "kolkata",
+    }
     def __init__(self, v2_mode=False):
         self.model = NLIModel()
         self.v2_mode = v2_mode
@@ -169,6 +181,63 @@ class StanceDetector:
             return int(match.group(1))
         return None
 
+    def _canonical_place(self, text):
+        normalized_text = (text or "").lower()
+        normalized_text = re.sub(r"\([^)]*\)", " ", normalized_text)
+        normalized_text = re.sub(r",\s*(?:also\s+known\s+as|formerly\s+known\s+as|officially\s+known\s+as)[^,]*,?", " ", normalized_text)
+        if "," in normalized_text:
+            normalized_text = normalized_text.split(",", 1)[0]
+        normalized = " ".join(re.findall(r"[a-z]+", normalized_text))
+        normalized = re.sub(r"^(the\s+)?(indian\s+state\s+of|state\s+of|union\s+territory\s+of|national\s+capital\s+territory\s+of)\s+", "", normalized)
+        if normalized in self.CAPITAL_ALIASES:
+            return self.CAPITAL_ALIASES[normalized]
+        for alias, canonical in sorted(self.CAPITAL_ALIASES.items(), key=lambda item: len(item[0]), reverse=True):
+            if normalized.endswith(f" {alias}") or normalized.startswith(f"{alias} "):
+                return canonical
+        return normalized
+
+    def _extract_capital_relation(self, text):
+        normalized = " ".join((text or "").lower().replace("-", " ").split())
+        normalized = re.sub(r"\([^)]*\)", " ", normalized)
+        normalized = re.sub(
+            r",\s*(?:also\s+known\s+as|formerly\s+known\s+as|officially\s+known\s+as)[^,]*,?",
+            " ",
+            normalized,
+        )
+        normalized = re.sub(r",\s*", " ", normalized)
+        patterns = (
+            r"(?P<subject>[a-z\s]+?)\s+is\s+(?:the\s+)?(?P<qualifier>(?:financial|technology|tech|cultural|summer|second|state|joint|common)\s+)?capital(?:\s+city)?\s+of\s+(?P<target>(?:the\s+)?(?:indian\s+state\s+of|state\s+of|union\s+territory\s+of|national\s+capital\s+territory\s+of)?\s*[a-z\s]+)",
+            r"(?:the\s+)?(?P<qualifier>(?:financial|technology|tech|cultural|summer|second|state|joint|common)\s+)?capital(?:\s+city)?\s+of\s+(?P<target>(?:the\s+)?(?:indian\s+state\s+of|state\s+of|union\s+territory\s+of|national\s+capital\s+territory\s+of)?\s*[a-z\s]+?)\s+is\s+(?P<subject>[a-z\s]+)",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, normalized)
+            if not match:
+                continue
+            subject = self._canonical_place(match.group("subject"))
+            target = self._canonical_place(match.group("target"))
+            qualifier = " ".join((match.groupdict().get("qualifier") or "").split()).strip()
+            relation = f"{qualifier}_capital".strip("_") if qualifier else "official_capital"
+            if subject and target:
+                return {"subject": subject, "target": target, "relation": relation}
+        return None
+
+    def _has_qualified_capital_language(self, text):
+        normalized = " ".join((text or "").lower().split())
+        if "silicon valley" in normalized:
+            return True
+        patterns = (
+            r"\bfinancial(?:,\s*[a-z]+)*(?:\s+and\s+[a-z]+)*\s+capital\b",
+            r"\btechnology(?:,\s*[a-z]+)*(?:\s+and\s+[a-z]+)*\s+capital\b",
+            r"\btech(?:,\s*[a-z]+)*(?:\s+and\s+[a-z]+)*\s+capital\b",
+            r"\bcultural(?:,\s*[a-z]+)*(?:\s+and\s+[a-z]+)*\s+capital\b",
+            r"\bsummer\s+capital\b",
+            r"\bsecond\s+capital\b",
+            r"\bstate\s+capital\b",
+            r"\bjoint\s+capital\b",
+            r"\bcommon\s+capital\b",
+        )
+        return any(re.search(pattern, normalized) for pattern in patterns)
+
     def _postfilter_model_stance(self, stance, confidence, claim, evidence):
         if stance == "NEUTRAL":
             return None
@@ -193,11 +262,32 @@ class StanceDetector:
         }
         claim_cmp, claim_rank = self._extract_rank_claim(claim)
         evidence_rank = self._extract_rank_evidence(evidence)
+        claim_capital = self._extract_capital_relation(claim_text)
+        evidence_capital = self._extract_capital_relation(text)
+
+        if claim_capital and evidence_capital:
+            same_subject = claim_capital["subject"] == evidence_capital["subject"]
+            same_target = claim_capital["target"] == evidence_capital["target"]
+            claim_relation = claim_capital.get("relation")
+            evidence_relation = evidence_capital.get("relation")
+            if claim_relation == "official_capital":
+                if same_subject and not same_target:
+                    return "REFUTE"
+                if same_target and not same_subject and evidence_relation == "official_capital":
+                    return "REFUTE"
+                if evidence_relation != "official_capital":
+                    if same_subject or same_target:
+                        return None
+            elif evidence_relation == "official_capital":
+                if same_subject and not same_target:
+                    return "REFUTE"
 
         if claim_cmp and claim_rank and evidence_rank and evidence_rank != claim_rank:
             return "REFUTE"
 
         if stance == "SUPPORT":
+            if claim_capital and self._has_qualified_capital_language(text):
+                return None
             if self.v2_mode and self._has_explicit_refute_language(text):
                 return None
             if self._has_temporal_support_anchor(claim_text, text, token_overlap, confidence):

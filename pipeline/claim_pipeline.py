@@ -180,6 +180,14 @@ def _is_misinformation_sensitive(claim, context_result=None):
     return any(token in claim_text for token in triggers)
 
 
+def _is_capital_relation_claim(claim, context_result=None):
+    claim_text = (claim or "").lower()
+    domain = str((context_result or {}).get("domain") or "").lower()
+    if domain != "geography":
+        return False
+    return "capital of" in claim_text or "capital city of" in claim_text
+
+
 def _claim_reporting_penalty(claim, sentence, source_name=None, context_result=None):
     if not _is_misinformation_sensitive(claim, context_result):
         return 0.0
@@ -1257,6 +1265,7 @@ class ClaimPipeline:
             logic_verdict in {"SUPPORT", "REFUTE"}
             and len(non_neutral) >= 2
             and strong_evidence_count >= self.min_strong_evidence_for_forced_verdict
+            and not _is_capital_relation_claim(claim, context_result)
         ):
             results.append({
                 "source": "logic_engine",

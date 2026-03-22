@@ -264,7 +264,7 @@ class ClaimContextClassifier:
         best_score = 0
         for domain_name, subcategories in DOMAIN_HINTS.items():
             for subcategory_name, hints in subcategories.items():
-                score = sum(1 for hint in hints if hint in combined_text)
+                score = sum(1 for hint in hints if self._hint_matches(combined_text, hint))
                 if score > best_score:
                     best_score = score
                     domain = domain_name
@@ -304,11 +304,22 @@ class ClaimContextClassifier:
         best_subcategory = DOMAIN_TO_DEFAULT_SUBCATEGORY.get(domain, "encyclopedic")
         best_score = 0
         for subcategory_name, hints in subcategories.items():
-            score = sum(1 for hint in hints if hint in claim_text)
+            score = sum(1 for hint in hints if self._hint_matches(claim_text, hint))
             if score > best_score:
                 best_score = score
                 best_subcategory = subcategory_name
         return best_subcategory
+
+    @staticmethod
+    def _hint_matches(text: str, hint: str) -> bool:
+        normalized_text = " ".join((text or "").strip().lower().split())
+        normalized_hint = " ".join((hint or "").strip().lower().split())
+        if not normalized_text or not normalized_hint:
+            return False
+        if " " in normalized_hint:
+            return normalized_hint in normalized_text
+        pattern = r"\b" + re.escape(normalized_hint) + r"\b"
+        return re.search(pattern, normalized_text) is not None
 
     def _classify_with_worker(self, claim: str, original_claim: str | None = None, language: str | None = None):
         with self._worker_lock:
