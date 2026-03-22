@@ -327,11 +327,6 @@ Deferred priorities:
 - new stance promotion
 - new relevance promotion without benchmark gains
 
-## Security Notes
-
-- do not commit real API keys to GitHub
-- rotate any keys that were exposed in local config
-- use `.env` for secrets and keep it out of public commits
 
 ## License
 
