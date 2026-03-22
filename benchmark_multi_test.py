@@ -330,16 +330,74 @@ def evaluate(results):
     }
 
 
+def summarize_stage_timings(results):
+    totals = Counter()
+    per_claim = []
+
+    for row in results:
+        timings = {}
+        output = row.get("pipeline_output", {})
+        if isinstance(output, dict):
+            out_results = output.get("results")
+            if isinstance(out_results, list) and out_results and isinstance(out_results[0], dict):
+                transparency = out_results[0].get("transparency", {})
+                timings = transparency.get("stage_timings_seconds", {}) or {}
+
+        clean_timings = {}
+        for key, value in timings.items():
+            try:
+                numeric = round(float(value), 3)
+            except (TypeError, ValueError):
+                continue
+            totals[key] += numeric
+            clean_timings[key] = numeric
+
+        if clean_timings:
+            per_claim.append({
+                "claim": row.get("claim"),
+                "time_seconds": row.get("time_seconds"),
+                "stage_timings_seconds": clean_timings,
+            })
+
+    rounded_totals = {key: round(value, 3) for key, value in totals.items()}
+
+    dominant_stage = None
+    dominant_value = 0.0
+    for key, value in rounded_totals.items():
+        if key == "total_pipeline":
+            continue
+        if value > dominant_value:
+            dominant_stage = key
+            dominant_value = value
+
+    model_locked_total = round(
+        rounded_totals.get("relevance_model_inference", 0.0)
+        + rounded_totals.get("stance_model_inference", 0.0)
+        + rounded_totals.get("llm_verifier", 0.0),
+        3,
+    )
+
+    return {
+        "stage_timing_totals_seconds": rounded_totals,
+        "dominant_stage": dominant_stage,
+        "dominant_stage_seconds": dominant_value,
+        "model_locked_total_seconds": model_locked_total,
+        "per_claim_stage_timings": per_claim,
+    }
+
+
 # ------------------------------------------------
 # Save results
 # ------------------------------------------------
 
 def save_results(results, metrics, claim_times, total_time, output_path):
+    stage_summary = summarize_stage_timings(results)
 
     output = {
         "benchmark_metrics": metrics,
         "total_time_seconds": total_time,
         "average_claim_time": round(sum(claim_times)/len(claim_times),3),
+        "stage_timing_summary": stage_summary,
         "claims": results
     }
 
@@ -383,6 +441,11 @@ async def main():
     print("failed_by_predicted_verdict :", metrics.get("failed_by_predicted_verdict"))
     print("failed_by_claim_tag :", metrics.get("failed_by_claim_tag"))
     print("failed_by_category :", metrics.get("failed_by_category"))
+
+    stage_summary = summarize_stage_timings(results)
+    print("dominant_stage :", stage_summary.get("dominant_stage"))
+    print("dominant_stage_seconds :", stage_summary.get("dominant_stage_seconds"))
+    print("model_locked_total_seconds :", stage_summary.get("model_locked_total_seconds"))
 
     save_results(results, metrics, claim_times, total_time, args.output)
 

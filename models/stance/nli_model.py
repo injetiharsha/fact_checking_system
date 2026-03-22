@@ -54,6 +54,9 @@ def _is_windows_unsafe_model(model_name):
 class NLIModel:
     def __init__(self):
         self._lock = threading.Lock()
+        self._worker = None
+        self._worker_lock = threading.Lock()
+        self._worker_ready = False
         self._prediction_cache = {}
         runtime = runtime_model_settings("stance")
         requested_device = runtime.get("device")
@@ -116,6 +119,86 @@ class NLIModel:
 
         if self.model is None:
             print("NLIModel fallback: heuristic mode (no cached model)")
+
+    def _start_worker(self):
+        if self._worker_ready and self._worker is not None and self._worker.poll() is None:
+            return True
+        if self.trained_checkpoint is None or not self.helper_script.exists():
+            return False
+
+        command = [
+            sys.executable,
+            str(self.helper_script),
+            "--checkpoint",
+            str(self.trained_checkpoint),
+            "--device",
+            self.trained_device,
+            "--claim",
+            "__serve__",
+            "--evidence",
+            "__serve__",
+            "--serve",
+        ]
+
+        try:
+            self._worker = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                bufsize=1,
+            )
+        except Exception as exc:
+            print(f"Failed to start trained NLI worker: {exc}")
+            self._worker = None
+            self._worker_ready = False
+            return False
+
+        try:
+            ready_line = self._worker.stdout.readline().strip() if self._worker.stdout else ""
+            payload = json.loads(ready_line) if ready_line else {}
+            if payload.get("status") == "ready":
+                self._worker_ready = True
+                print(
+                    "NLIModel using persistent stance worker:",
+                    self.trained_checkpoint,
+                    "on",
+                    self.trained_device,
+                )
+                return True
+        except Exception as exc:
+            print(f"Stance worker failed to initialize: {exc}")
+
+        self._stop_worker()
+        return False
+
+    def _stop_worker(self):
+        worker = self._worker
+        self._worker = None
+        self._worker_ready = False
+        if worker is None:
+            return
+        try:
+            if worker.stdin:
+                worker.stdin.write(json.dumps({"command": "shutdown"}) + "\n")
+                worker.stdin.flush()
+        except Exception:
+            pass
+        try:
+            if worker.stdin:
+                worker.stdin.close()
+        except Exception:
+            pass
+        try:
+            worker.terminate()
+            worker.wait(timeout=2)
+        except Exception:
+            try:
+                worker.kill()
+            except Exception:
+                pass
 
     def predict(self, claim, evidence):
         cache_key = (
@@ -213,6 +296,41 @@ class NLIModel:
         self._prediction_cache[cache_key] = result
         return result
 
+    def predict_many(self, claim, evidences):
+        if not evidences:
+            return []
+
+        outputs = [None] * len(evidences)
+        missing = []
+        for index, evidence in enumerate(evidences):
+            cache_key = (
+                " ".join((claim or "").strip().lower().split()),
+                " ".join((evidence or "").strip().lower().split()),
+            )
+            cached = self._prediction_cache.get(cache_key)
+            if cached is not None:
+                outputs[index] = cached
+            else:
+                missing.append((index, evidence, cache_key))
+
+        if missing:
+            worker_predictions = None
+            if self.trained_checkpoint is not None and (self.model is None or self.tokenizer is None):
+                worker_predictions = self._predict_many_with_worker(
+                    claim,
+                    [item[1] for item in missing],
+                )
+            if worker_predictions is not None:
+                for (index, _, cache_key), prediction in zip(missing, worker_predictions):
+                    self._prediction_cache[cache_key] = prediction
+                    outputs[index] = prediction
+
+        for index, evidence in enumerate(evidences):
+            if outputs[index] is None:
+                outputs[index] = self.predict(claim, evidence)
+
+        return outputs
+
     def _predict_with_cached_model(self, claim, evidence):
         inputs = self.tokenizer(
             claim,
@@ -282,56 +400,43 @@ class NLIModel:
         return stance_map.get(label, "NEUTRAL")
 
     def _predict_with_subprocess(self, claim, evidence):
-        if not self.helper_script.exists():
+        predictions = self._predict_many_with_worker(claim, [evidence])
+        if not predictions:
             return None
+        return predictions[0]
 
-        command = [
-            sys.executable,
-            str(self.helper_script),
-            "--checkpoint",
-            str(self.trained_checkpoint),
-            "--device",
-            self.trained_device,
-            "--claim",
-            claim,
-            "--evidence",
-            evidence,
-        ]
-
-        try:
-            completed = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                timeout=45,
-                check=False,
-            )
-        except Exception as exc:
-            print(f"Trained NLI subprocess failed to start: {exc}")
-            return None
-
-        if completed.returncode != 0:
-            stderr = (completed.stderr or "").strip()
-            if stderr:
-                print(f"Trained NLI subprocess failed: {stderr[:300]}")
-            return None
-
-        stdout = (completed.stdout or "").strip().splitlines()
-        if not stdout:
-            return None
-
-        try:
-            payload = json.loads(stdout[-1])
-        except Exception as exc:
-            print(f"Invalid trained NLI subprocess output: {exc}")
-            return None
-
-        label = payload.get("label")
-        confidence = payload.get("confidence")
-        if label is None or confidence is None:
-            return None
-
-        self.model_name = f"trained_subprocess:{self.trained_checkpoint}"
-        return label, float(confidence)
+    def _predict_many_with_worker(self, claim, evidences):
+        if not evidences:
+            return []
+        with self._worker_lock:
+            if not self._start_worker():
+                return None
+            try:
+                if not self._worker or not self._worker.stdin or not self._worker.stdout:
+                    return None
+                payload = {
+                    "items": [
+                        {"claim": claim, "evidence": evidence}
+                        for evidence in evidences
+                    ]
+                }
+                self._worker.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
+                self._worker.stdin.flush()
+                result_line = self._worker.stdout.readline().strip()
+                if not result_line:
+                    return None
+                payload = json.loads(result_line)
+                predictions = payload.get("predictions")
+                if not isinstance(predictions, list):
+                    return None
+                self.model_name = f"trained_subprocess:{self.trained_checkpoint}"
+                return [
+                    (row.get("label"), float(row.get("confidence")))
+                    for row in predictions
+                    if row.get("label") is not None and row.get("confidence") is not None
+                ]
+            except Exception as exc:
+                print(f"Trained NLI worker request failed: {exc}")
+                self._stop_worker()
+                return None
 

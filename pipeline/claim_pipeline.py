@@ -436,9 +436,9 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
     if relevance_scorer.has_trained_reranker and rescored_candidates:
         ranked = sorted(rescored_candidates, key=lambda item: item[1], reverse=True)
         shortlist = ranked[:5]
+        trained_scores = relevance_scorer.score_many(claim, [item[0] for item in shortlist])
         rescored = []
-        for sent, base_score, semantic_score, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text in shortlist:
-            trained_score = relevance_scorer.score(claim, sent)
+        for (sent, base_score, semantic_score, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text), trained_score in zip(shortlist, trained_scores):
             combined = (
                 (trained_score * 0.8)
                 + (semantic_score * 0.15)
@@ -687,6 +687,7 @@ class ClaimPipeline:
         logic_engine_injected,
         fallback_evidence_preview=None,
         trace=None,
+        stage_timings=None,
     ):
         stance_source_counts = {}
         for item in results:
@@ -762,6 +763,7 @@ class ClaimPipeline:
                 "forced_neutral_due_to_weak_evidence": forced_neutral,
                 "logic_engine_injected": logic_engine_injected,
             },
+            "stage_timings_seconds": dict(stage_timings or {}),
             "fallback_evidence_preview": list(fallback_evidence_preview or []),
         }
 
@@ -796,6 +798,21 @@ class ClaimPipeline:
         }
 
         total_start = time.time()
+        stage_timings = {
+            "logical_analysis": 0.0,
+            "language_normalization": 0.0,
+            "claim_type_classification": 0.0,
+            "claim_context_classification": 0.0,
+            "evidence_retrieval": 0.0,
+            "relevance_quality_total": 0.0,
+            "relevance_model_inference": 0.0,
+            "quality_scoring": 0.0,
+            "stance_total": 0.0,
+            "stance_model_inference": 0.0,
+            "llm_verifier": 0.0,
+            "aggregation": 0.0,
+            "total_pipeline": 0.0,
+        }
 
         print("\n==============================")
         print("Processing claim:", claim)
@@ -803,14 +820,16 @@ class ClaimPipeline:
         # run logical claim analysis
         start = time.time()
         logic_metadata = self.logical_analyzer.analyze(claim)
-        print("Logical analyzer:", round(time.time() - start, 3), "sec")
+        stage_timings["logical_analysis"] = round(time.time() - start, 3)
+        print("Logical analyzer:", stage_timings["logical_analysis"], "sec")
 
         # detect language and normalize claim
         start = time.time()
         language = detect_language(claim)
         claim = translate_to_english(claim, language)
         claim = normalize_claim(claim)
-        print("Language + normalization:", round(time.time() - start, 3), "sec")
+        stage_timings["language_normalization"] = round(time.time() - start, 3)
+        print("Language + normalization:", stage_timings["language_normalization"], "sec")
 
         # classify claim type (FACTUAL, OPINION, NUMERICAL, MIXED)
         start = time.time()
@@ -820,7 +839,8 @@ class ClaimPipeline:
             "type": claim_type_result["type"].value,
         }
         print(f"Claim type: {claim_type_result['type'].value} (confidence: {claim_type_result['confidence']:.2f})")
-        print("Claim type classification:", round(time.time() - start, 3), "sec")
+        stage_timings["claim_type_classification"] = round(time.time() - start, 3)
+        print("Claim type classification:", stage_timings["claim_type_classification"], "sec")
 
         start = time.time()
         context_result = self.claim_context_classifier.classify(claim)
@@ -829,7 +849,8 @@ class ClaimPipeline:
             f"Claim context: {context_result['domain']}/{context_result['subcategory']} "
             f"(confidence: {context_result['confidence']:.2f})"
         )
-        print("Claim context classification:", round(time.time() - start, 3), "sec")
+        stage_timings["claim_context_classification"] = round(time.time() - start, 3)
+        print("Claim context classification:", stage_timings["claim_context_classification"], "sec")
 
         # extract domain to exclude original source
         exclude_domain = None
@@ -861,6 +882,7 @@ class ClaimPipeline:
                     "version": "phase6-v1",
                     "language_detected": language,
                     "status": "cancelled_during_evidence_retrieval",
+                    "stage_timings_seconds": dict(stage_timings),
                 },
             }
 
@@ -873,8 +895,9 @@ class ClaimPipeline:
                 "url": ev.get("url")
             })
 
+        stage_timings["evidence_retrieval"] = round(time.time() - start, 3)
         print("Evidence retrieved:", len(evidence_raw))
-        print("Evidence retrieval:", round(time.time() - start, 3), "sec")
+        print("Evidence retrieval:", stage_timings["evidence_retrieval"], "sec")
 
         # clean weak or irrelevant evidence
         cleaned = []
@@ -975,8 +998,12 @@ class ClaimPipeline:
                         "skipped": "claim_reporting_sentence",
                     })
                     continue
+                relevance_start = time.time()
                 relevance_score = self.relevance_scorer.score(claim, best_sentence)
+                stage_timings["relevance_model_inference"] += time.time() - relevance_start
+                quality_start = time.time()
                 quality_score = self.quality_scorer.score(best_sentence)
+                stage_timings["quality_scoring"] += time.time() - quality_start
                 effective_relevance = round(min(1.0, (relevance_score * 0.85) + (selector_score * 0.15)), 3)
 
                 print("Relevance:", relevance_score)
@@ -1093,6 +1120,7 @@ class ClaimPipeline:
                     logic_engine_injected=False,
                     fallback_evidence_preview=fallback_evidence_preview,
                     trace=trace,
+                    stage_timings=stage_timings,
                 ),
                 "search_queries": list(trace.get("search_queries", [])),
             }
@@ -1118,14 +1146,21 @@ class ClaimPipeline:
             evidence_rows=scored_evidence,
         )
 
-        print("Relevance + quality:", round(time.time() - start, 3), "sec")
+        stage_timings["relevance_quality_total"] = round(time.time() - start, 3)
+        stage_timings["relevance_model_inference"] = round(stage_timings["relevance_model_inference"], 3)
+        stage_timings["quality_scoring"] = round(stage_timings["quality_scoring"], 3)
+        print("Relevance + quality:", stage_timings["relevance_quality_total"], "sec")
 
         # run stance detection
         start = time.time()
 
         results = []
+        stance_results = None
+        if not self.enable_verifier_v2:
+            highlighted_texts = [ev["text"] for ev in scored_evidence]
+            stance_results = self.stance.detect_many(highlighted_texts, claim)
 
-        for ev in scored_evidence:
+        for index, ev in enumerate(scored_evidence):
 
             highlighted = ev["text"]
 
@@ -1140,11 +1175,15 @@ class ClaimPipeline:
             if self.enable_verifier_v2:
                 stance_result = self.verifier_v2.verify(claim, highlighted, verifier_input)
             else:
-                stance_result = self.stance.detect(highlighted, claim)
+                stance_result = stance_results[index]
+
+            print("Stance:", _safe_console_text(stance_result))
 
             if self.enable_llm_verifier and self.llm_verifier.should_verify(len(results), stance_result.get("stance")):
                 try:
+                    llm_start = time.time()
                     llm_result = self.llm_verifier.verify(claim, highlighted, ev.get("context_text"))
+                    stage_timings["llm_verifier"] += time.time() - llm_start
                     if llm_result.get("stance") != "NEUTRAL":
                         stance_result = llm_result
                     elif stance_result.get("stance") == "NEUTRAL":
@@ -1168,8 +1207,6 @@ class ClaimPipeline:
                             "confidence": 0.9 if rank_check == "REFUTE" else 0.86,
                             "source": "heuristic_rank_rescue",
                         }
-
-            print("Stance:", _safe_console_text(stance_result))
 
             results.append({
                 "source": ev["source"],
@@ -1199,7 +1236,10 @@ class ClaimPipeline:
 
         results = self._consolidate_document_results(results, trace=trace)
         print("Document-level evidence items:", len(results))
-        print("Semantic + NLI:", round(time.time() - start, 3), "sec")
+        stage_timings["stance_total"] = round(time.time() - start, 3)
+        stage_timings["stance_model_inference"] = round(max(0.0, stage_timings["stance_total"] - stage_timings["llm_verifier"]), 3)
+        stage_timings["llm_verifier"] = round(stage_timings["llm_verifier"], 3)
+        print("Semantic + NLI:", stage_timings["stance_total"], "sec")
 
         # logic engine reasoning pass
         logic_verdict = self.logic_engine.analyze(claim, results)
@@ -1303,6 +1343,7 @@ class ClaimPipeline:
             logic_engine_injected=logic_engine_injected,
             fallback_evidence_preview=[],
             trace=trace,
+            stage_timings=stage_timings,
         )
 
         trace["final_verdict"] = {
@@ -1315,8 +1356,11 @@ class ClaimPipeline:
         print("Confidence:", confidence)
         print("Conflict:", conflict_summary)
 
-        print("Aggregation:", round(time.time() - start, 3), "sec")
-        print("TOTAL PIPELINE TIME:", round(time.time() - total_start, 3), "sec")
+        stage_timings["aggregation"] = round(time.time() - start, 3)
+        stage_timings["total_pipeline"] = round(time.time() - total_start, 3)
+        transparency["stage_timings_seconds"] = dict(stage_timings)
+        print("Aggregation:", stage_timings["aggregation"], "sec")
+        print("TOTAL PIPELINE TIME:", stage_timings["total_pipeline"], "sec")
 
 
         with open("pipeline_trace.json", "w", encoding="utf-8") as f:

@@ -105,6 +105,9 @@ def _resolve_model_path(model_name):
 class RelevanceScorer:
     def __init__(self):
         self._lock = threading.Lock()
+        self._worker = None
+        self._worker_lock = threading.Lock()
+        self._worker_ready = False
         self._score_cache = {}
         self._semantic_cache = {}
         self.provider_name = "current"
@@ -167,6 +170,85 @@ class RelevanceScorer:
 
         if self.model is None:
             print("RelevanceScorer fallback: lexical overlap mode")
+
+    def _start_worker(self):
+        if self._worker_ready and self._worker is not None and self._worker.poll() is None:
+            return True
+        if self.trained_checkpoint is None or not self.helper_script.exists():
+            return False
+
+        command = [
+            sys.executable,
+            str(self.helper_script),
+            "--checkpoint",
+            str(self.trained_checkpoint),
+            "--device",
+            self.trained_device,
+            "--claim",
+            "__serve__",
+            "--text",
+            "__serve__",
+            "--serve",
+        ]
+        try:
+            self._worker = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                bufsize=1,
+            )
+        except Exception as exc:
+            print(f"Failed to start trained relevance worker: {exc}")
+            self._worker = None
+            self._worker_ready = False
+            return False
+
+        try:
+            ready_line = self._worker.stdout.readline().strip() if self._worker.stdout else ""
+            payload = json.loads(ready_line) if ready_line else {}
+            if payload.get("status") == "ready":
+                self._worker_ready = True
+                print(
+                    "RelevanceScorer using persistent relevance worker:",
+                    self.trained_checkpoint,
+                    "on",
+                    self.trained_device,
+                )
+                return True
+        except Exception as exc:
+            print(f"Relevance worker failed to initialize: {exc}")
+
+        self._stop_worker()
+        return False
+
+    def _stop_worker(self):
+        worker = self._worker
+        self._worker = None
+        self._worker_ready = False
+        if worker is None:
+            return
+        try:
+            if worker.stdin:
+                worker.stdin.write(json.dumps({"command": "shutdown"}) + "\n")
+                worker.stdin.flush()
+        except Exception:
+            pass
+        try:
+            if worker.stdin:
+                worker.stdin.close()
+        except Exception:
+            pass
+        try:
+            worker.terminate()
+            worker.wait(timeout=2)
+        except Exception:
+            try:
+                worker.kill()
+            except Exception:
+                pass
 
     @property
     def has_trained_reranker(self):
@@ -258,64 +340,89 @@ class RelevanceScorer:
         self._score_cache[cache_key] = score
         return score
 
+    def score_many(self, claim, texts):
+        rows = []
+        missing = []
+
+        for text in texts:
+            if not text:
+                rows.append(0.0)
+                continue
+            cache_key = (
+                " ".join((claim or "").strip().lower().split()),
+                " ".join((text or "").strip().lower().split()),
+            )
+            cached = self._score_cache.get(cache_key)
+            if cached is not None:
+                rows.append(cached)
+                continue
+            rows.append(None)
+            missing.append((len(rows) - 1, text, cache_key))
+
+        if missing:
+            missing_texts = [item[1] for item in missing]
+            resolved_scores = None
+            if self.bge_reranker is not None:
+                resolved_scores = self.bge_reranker.score_pairs(claim, missing_texts)
+            elif self.trained_checkpoint is not None:
+                resolved_scores = self._score_many_with_worker(claim, missing_texts)
+
+            if resolved_scores is not None:
+                for (index, _, cache_key), score in zip(missing, resolved_scores):
+                    rounded = round(float(score), 3)
+                    self._score_cache[cache_key] = rounded
+                    rows[index] = rounded
+
+        for index, value in enumerate(rows):
+            if value is None:
+                rows[index] = self.score(claim, texts[index])
+
+        return rows
+
     def rerank(self, claim, texts):
         rows = []
-        for text in texts:
+        scores = self.score_many(claim, texts)
+        for text, score in zip(texts, scores):
             rows.append({
                 "text": text,
-                "score": self.score(claim, text),
+                "score": score,
                 "provider": self.provider_name,
             })
         rows.sort(key=lambda item: float(item.get("score", 0.0)), reverse=True)
         return rows
 
     def _score_with_subprocess(self, claim, text):
-        if not self.helper_script.exists():
+        scores = self._score_many_with_worker(claim, [text])
+        if not scores:
             return None
+        return round(float(scores[0]), 3)
 
-        command = [
-            sys.executable,
-            str(self.helper_script),
-            "--checkpoint",
-            str(self.trained_checkpoint),
-            "--device",
-            self.trained_device,
-            "--claim",
-            claim,
-            "--text",
-            text,
-        ]
-
-        try:
-            completed = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                timeout=45,
-                check=False,
-            )
-        except Exception as exc:
-            print(f"Trained relevance subprocess failed to start: {exc}")
-            return None
-
-        if completed.returncode != 0:
-            stderr = (completed.stderr or "").strip()
-            if stderr:
-                print(f"Trained relevance subprocess failed: {stderr[:300]}")
-            return None
-
-        stdout = (completed.stdout or "").strip().splitlines()
-        if not stdout:
-            return None
-
-        try:
-            payload = json.loads(stdout[-1])
-        except Exception as exc:
-            print(f"Invalid trained relevance subprocess output: {exc}")
-            return None
-
-        score = payload.get("score")
-        if score is None:
-            return None
-        return round(float(score), 3)
+    def _score_many_with_worker(self, claim, texts):
+        if not texts:
+            return []
+        with self._worker_lock:
+            if not self._start_worker():
+                return None
+            try:
+                if not self._worker or not self._worker.stdin or not self._worker.stdout:
+                    return None
+                payload = {
+                    "items": [
+                        {"claim": claim, "text": text}
+                        for text in texts
+                    ]
+                }
+                self._worker.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
+                self._worker.stdin.flush()
+                result_line = self._worker.stdout.readline().strip()
+                if not result_line:
+                    return None
+                result = json.loads(result_line)
+                scores = result.get("scores")
+                if not isinstance(scores, list):
+                    return None
+                return [round(float(score), 3) for score in scores]
+            except Exception as exc:
+                print(f"Trained relevance worker request failed: {exc}")
+                self._stop_worker()
+                return None

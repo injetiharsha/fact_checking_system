@@ -83,6 +83,59 @@ class StanceDetector:
             "source": f"model_low_confidence_or_neutral:{self.model.model_name or 'unknown'}",
         }
 
+    def detect_many(self, evidences, claim):
+        clipped = [(evidence or "")[:800] for evidence in evidences]
+        predictions = self.model.predict_many(claim, clipped)
+        results = []
+        for evidence, (label, confidence) in zip(clipped, predictions):
+            label = (label or "NEUTRAL").upper()
+            stance_map = {
+                "ENTAILMENT": "SUPPORT",
+                "CONTRADICTION": "REFUTE",
+                "NEUTRAL": "NEUTRAL",
+                "LABEL_0": "REFUTE",
+                "LABEL_1": "NEUTRAL",
+                "LABEL_2": "SUPPORT",
+                "SUPPORT": "SUPPORT",
+                "REFUTE": "REFUTE",
+            }
+            stance = stance_map.get(label, "NEUTRAL")
+            filtered = self._postfilter_model_stance(
+                stance=stance,
+                confidence=float(confidence),
+                claim=claim,
+                evidence=evidence,
+            )
+            if filtered is not None:
+                results.append({
+                    "stance": filtered,
+                    "confidence": round(confidence, 3),
+                    "source": f"model:{self.model.model_name or 'unknown'}",
+                })
+                continue
+
+            text = (evidence or "").lower()
+            claim_text = (claim or "").lower()
+            claim_tokens = [
+                t for t in re.findall(r"[a-z0-9]+", claim_text)
+                if len(t) > 2 and t not in {"the", "and", "for", "with", "from", "that"}
+            ]
+            overlap = sum(1 for t in claim_tokens if t in text)
+            refute_cues = (
+                "hoax", "fake", "myth", "false", "debunk", "does not", "doesn't",
+                "cannot", "can't", "no evidence", "not true", "incorrect"
+            )
+            if overlap >= self.LEXICAL_RESCUE_MIN_OVERLAP and any(c in text for c in refute_cues):
+                results.append({"stance": "REFUTE", "confidence": 0.62, "source": "heuristic_refute_rescue"})
+                continue
+
+            results.append({
+                "stance": "NEUTRAL",
+                "confidence": round(confidence, 3),
+                "source": f"model_low_confidence_or_neutral:{self.model.model_name or 'unknown'}",
+            })
+        return results
+
     def _extract_rank_claim(self, text):
         text = (text or "").lower().replace("-", " ")
         patterns = [

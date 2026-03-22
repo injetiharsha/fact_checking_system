@@ -78,3 +78,21 @@ class BGEReranker:
                 logits = self.model(**encoded).logits
         score = torch.sigmoid(logits[0][0]).item()
         return round(float(score), 3)
+
+    def score_pairs(self, claim, texts):
+        if not self.available or not texts:
+            return None
+        encoded = self.tokenizer(
+            [claim] * len(texts),
+            texts,
+            return_tensors="pt",
+            truncation=True,
+            padding=True,
+            max_length=512,
+        )
+        encoded = {k: v.to(self.device) for k, v in encoded.items()}
+        with self._lock:
+            with torch.no_grad():
+                logits = self.model(**encoded).logits
+        scores = torch.sigmoid(logits[:, 0]).tolist()
+        return [round(float(score), 3) for score in scores]
