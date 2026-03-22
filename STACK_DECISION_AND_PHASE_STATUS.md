@@ -242,6 +242,8 @@ Meaning:
 - remaining open issues are narrow and known:
   - `Amazon River` support-side false positive risk
   - `bananas` neutral-despite-evidence behavior in some paths
+- Phase 2 does not need to be reopened immediately because recent multilingual Phase 5 fixes did not expose a better relevance candidate or a new relevance-specific failure pattern
+- operationally, `v9_run1` still stands as the best practical relevance checkpoint
 
 ### Phase 3: Passage Retention And Aggregation Cleanup
 
@@ -261,6 +263,7 @@ What we learned in Phase 3:
 - trained stance must be explicitly enabled or the system can silently fall back in misleading ways
 - `v9` relevance interacts positively with later-stack improvements
 - the combined experimental stack currently gives the best benchmark result, but the simpler `v9` upgrade is the better real-time recommendation
+- the later multilingual fixes benefited from the existing document-level consolidation and multi-passage structure rather than exposing a new Phase 3 architecture gap
 - the remaining benchmark misses are not a clean single Phase 3 problem:
   - `5G networks spread coronavirus` includes stance/logic interaction risk
   - `The Great Wall of China is visible from space` is partly an ambiguity/definition case
@@ -337,7 +340,7 @@ Interpretation:
 
 ### Phase 5: Residual Hardening Before Any New Stance Training
 
-Status: started in early semantic-hardening mode, retraining still gated
+Status: active, materially improved, retraining still gated
 
 Meaning:
 
@@ -348,7 +351,27 @@ Meaning:
   - multilingual routing/context correctness
   - cross-claim session-cache safety
   - capital-relation contradiction handling after translation
+- benchmark run-validity labeling and fast search-collapse detection
+- local admin/payment-style verifier hardening so sensational non-official advice does not become unsafe support
 - stance retraining should still remain later work unless residual failures are clearly isolated as genuine stance failures after these semantic fixes
+
+Current multilingual checkpoint:
+
+- baseline trustworthy multilingual run (`fix2`):
+  - accuracy `0.6`
+  - false-positive rate `0.2`
+- current improved multilingual run:
+  - artifact: `logs/multilingual_regression_batch_v2_results_retry4.json`
+  - accuracy `0.8`
+  - false-positive rate `0.0`
+  - neutral rate `0.2`
+
+Most important claim-level changes:
+
+- `Mumbai is the capital of India` moved from wrong `TRUE` to correct
+- Tamil `Bengaluru is the capital of India` moved from `NEUTRAL` to correct
+- Kannada `Bengaluru is the capital of India` moved from `NEUTRAL` to correct
+- Telugu AP farmer alert moved from unsafe `TRUE` to safer `NEUTRAL`
 
 ## Overall Project Position
 
@@ -361,7 +384,7 @@ Most honest summary:
 - Phase 3 has produced the needed structural evidence and is now paused with deferred edge-case follow-up
 - Phase 4 has passed foundation and similar-claim validation, including one successful tuning pass
 - Phase 4 also passed a broader repeated-query validation across a wider 10-claim slice
-- Phase 5 has started as residual taxonomy plus multilingual semantic hardening, not as stance retraining
+- Phase 5 has now produced a real multilingual safety improvement and remains semantic hardening, not stance retraining
 
 That is meaningful progress toward the project goal:
 

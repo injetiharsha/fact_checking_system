@@ -252,6 +252,7 @@ Phase 3 may begin provisionally with `v9_run1`, but this does not mean Phase 2 i
 - A public-web import path exists for AVeriTeC-style JSON, but `v10` has not been adopted as the preferred next candidate.
 - Because the project goal is minimal heuristics and forward progress matters, `v9_run1` is kept as the provisional experimental relevance checkpoint while broader Phase 2 refinement is deferred.
 - The promoted stable baseline does not automatically change just because Phase 3 work begins.
+- Recent multilingual Phase 5 fixes did not change this Phase 2 conclusion; `v9_run1` remains the best practical working relevance checkpoint.
 
 ### Why `v9` is kept for the next step
 
@@ -341,6 +342,7 @@ All must pass:
   - `The Amazon River is the longest river in the world` is partly a disputed-comparison case
 - Because of that, Phase 3 should not keep expanding unless a clearly non-heuristic, general fix appears.
 - The current recommendation is to pause Phase 3 here and carry the remaining false positives as deferred cleanup, not as a blocker to Phase 4.
+- Later multilingual Phase 5 fixes built successfully on this Phase 3 structure and did not expose a new passage-retention or document-collapse reason to reopen broad Phase 3 work.
 
 ### Evidence to record
 
@@ -491,6 +493,35 @@ All must pass:
 - stance seed provenance summary
 - benchmark delta and promotion decision
 
+### Current phase state
+
+- Phase 5 is active as semantic hardening, not stance retraining.
+- Benchmark reruns now self-label `valid` vs `invalid_search_collapsed`.
+- Search/provider backoff now short-circuits obviously invalid collapsed-network runs.
+- `phase5_multilingual_compare.py` now compares new multilingual reruns directly against the trustworthy `fix2` baseline.
+- A valid multilingual improvement run now exists:
+  - artifact: `logs/multilingual_regression_batch_v2_results_retry4.json`
+  - accuracy `0.8`
+  - false-positive rate `0.0`
+  - neutral rate `0.2`
+- Relative to the trustworthy multilingual `fix2` baseline, this improved:
+  - accuracy `0.6 -> 0.8`
+  - false-positive rate `0.2 -> 0.0`
+  - neutral rate `0.2 -> 0.2`
+
+Important claim-level changes:
+
+- `Mumbai is the capital of India` moved from wrong `TRUE` to correct
+- Tamil `Bengaluru is the capital of India` moved from `NEUTRAL` to correct
+- Kannada `Bengaluru is the capital of India` moved from `NEUTRAL` to correct
+- Telugu AP farmer alert moved from unsafe `TRUE` to safer `NEUTRAL`
+
+Current interpretation:
+
+- Phase 5 is now producing real multilingual safety gains
+- the remaining multilingual issues are no longer dominated by unsafe false positives
+- this is still not enough reason to open a new stance-training loop
+
 ### Do not advance if
 
 - stance training data still contains unresolved retrieval or relation noise
@@ -527,9 +558,10 @@ No reordering unless a blocking reason is documented in writing.
 
 ## Immediate Next Step
 
-Rerun the multilingual residual batch on a healthy live network.
+Reassess whether Phase 2 or Phase 3 actually need reopening before pushing Phase 5 further.
 
-Use that run to decide one of two paths:
+Use the current valid multilingual improvement run as the decision input:
 
-- if the remaining multilingual failures are still mostly semantic/relation issues, keep Phase 5 in cleanup mode and do not train yet
-- if a cleaner stance-only residual set remains, open the first true Phase 5 training-prep step
+- if remaining failures now point back to relevance quality, reopen Phase 2 narrowly
+- if remaining failures now point back to document collapse or aggregation, reopen Phase 3 narrowly
+- otherwise, keep Phase 5 as targeted semantic hardening and do not open stance training yet

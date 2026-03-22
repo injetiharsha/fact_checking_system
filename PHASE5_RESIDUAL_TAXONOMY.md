@@ -231,4 +231,35 @@ Updated Phase 5 reading:
 
 - Phase 5 is now active in residual semantic-hardening mode
 - this is still not the same as opening a new stance-training promotion track
-- the next gate remains a healthy-network multilingual residual rerun
+- the next gate was a healthy-network multilingual residual rerun
+
+## 2026-03-22 Valid Multilingual Improvement Result
+
+A valid improved multilingual rerun now exists:
+
+- artifact: `logs/multilingual_regression_batch_v2_results_retry4.json`
+
+Metrics:
+
+- accuracy: `0.8`
+- false-positive rate: `0.0`
+- neutral rate: `0.2`
+
+Compared with the trustworthy multilingual `fix2` baseline:
+
+- accuracy improved from `0.6 -> 0.8`
+- false-positive rate improved from `0.2 -> 0.0`
+- neutral rate stayed at `0.2`
+
+Important claim-level changes:
+
+- `Mumbai is the capital of India` is now correct
+- Tamil `Bengaluru is the capital of India` is now correct
+- Kannada `Bengaluru is the capital of India` is now correct
+- Telugu AP farmer alert moved from unsafe `TRUE` to safer `NEUTRAL`
+
+Updated gate reading:
+
+- Phase 5 has now demonstrated real multilingual safety improvement
+- the current residual set is less about unsafe multilingual over-support than it was before
+- stance retraining is still gated, because the new gains came from semantic and verifier-path hardening rather than evidence of a clean stance-only failure pool
