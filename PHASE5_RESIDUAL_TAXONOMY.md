@@ -199,6 +199,7 @@ Allowed next actions:
 2. Collect additional residual failures from future live runs.
 3. Add only clearly isolated stance failures to a future `stance v6` or equivalent seed set.
 4. Revisit stance retraining only when there are enough clean stance failures to justify it.
+5. Use narrowly targeted semantic cleanup for multilingual or relation-sensitive failures when the model output is being misread rather than clearly misunderstood.
 
 Not recommended now:
 
@@ -207,9 +208,27 @@ Not recommended now:
 
 ## Current Best Interpretation
 
-The project is ready for Phase 5 analysis, but not yet for Phase 5 stance retraining.
+The project is ready for Phase 5 analysis and early semantic hardening, but not yet for Phase 5 stance retraining.
 
 That means:
 
-- Phase 5 has started only as residual taxonomy and gating
+- Phase 5 has started as residual taxonomy and narrow semantic cleanup
 - Phase 5 model training remains deferred
+
+## 2026-03-22 Multilingual Progress Note
+
+Additional Phase 5 work has now happened beyond the original taxonomy:
+
+- multilingual regression batches were added for India-focused deployment checks
+- context routing was fixed so geography claims like `Mumbai is the capital of India` no longer misroute into `software_ai`
+- session cache matching was tightened so similar capital claims do not contaminate one another
+- capital-relation semantic handling was improved so:
+  - `capital of Maharashtra` does not support `capital of India`
+  - `financial capital of India` does not count as official-capital support
+  - noisy page prefixes and alias forms like `Bombay` are normalized better
+
+Updated Phase 5 reading:
+
+- Phase 5 is now active in residual semantic-hardening mode
+- this is still not the same as opening a new stance-training promotion track
+- the next gate remains a healthy-network multilingual residual rerun

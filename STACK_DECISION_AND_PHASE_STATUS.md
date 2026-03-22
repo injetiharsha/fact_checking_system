@@ -335,16 +335,20 @@ Interpretation:
 - cached matches were usually recognized but not appended because live retrieval resurfaced the same strong evidence
 - this is the desired internet-first behavior for Phase 4
 
-### Phase 5: Stance Retraining On Residual Failures
+### Phase 5: Residual Hardening Before Any New Stance Training
 
-Status: not started as a new promotion track
+Status: started in early semantic-hardening mode, retraining still gated
 
 Meaning:
 
 - the current work has correctly stayed retrieval/relevance/passage-first
-- stance retraining should remain later work unless residual failures are clearly isolated as genuine stance failures
-- the current residual gate is now documented in `PHASE5_RESIDUAL_TAXONOMY.md`
-- current Phase 5 status is analysis-only, not training
+- Phase 5 is no longer just a passive gate; it is now doing narrow residual cleanup for multilingual and relation-sensitive failures
+- the current residual gate is documented in `PHASE5_RESIDUAL_TAXONOMY.md`
+- recent Phase 5 work improved:
+  - multilingual routing/context correctness
+  - cross-claim session-cache safety
+  - capital-relation contradiction handling after translation
+- stance retraining should still remain later work unless residual failures are clearly isolated as genuine stance failures after these semantic fixes
 
 ## Overall Project Position
 
@@ -357,7 +361,7 @@ Most honest summary:
 - Phase 3 has produced the needed structural evidence and is now paused with deferred edge-case follow-up
 - Phase 4 has passed foundation and similar-claim validation, including one successful tuning pass
 - Phase 4 also passed a broader repeated-query validation across a wider 10-claim slice
-- Phase 5 has started only as residual taxonomy and gating, not as stance retraining
+- Phase 5 has started as residual taxonomy plus multilingual semantic hardening, not as stance retraining
 
 That is meaningful progress toward the project goal:
 
@@ -379,15 +383,13 @@ If only one stack should be recommended as the current real-time candidate, choo
 
 ## Immediate Next Step
 
-Commit the Phase 4 implementation and validation docs, then either:
-
-- keep Phase 4 as the current stopping point, or
-- extend it with a broader benchmark-style repeated-query study
+Rerun multilingual residual validation on a healthy live network and use that result to decide whether Phase 5 stays semantic-only or becomes a true training-prep phase.
 
 Current practical stop point:
 
-- Phase 4 is a good stopping point
-- Phase 5 remains analysis-only until a clean stance-only failure set exists
+- Phase 4 is already a solid completed foundation
+- Phase 5 is now the active phase
+- Phase 5 retraining remains gated until a clean stance-only failure set exists
 
 Keep these as deferred non-blocking cleanup items:
 

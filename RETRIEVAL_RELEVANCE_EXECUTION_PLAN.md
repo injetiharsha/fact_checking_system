@@ -439,11 +439,15 @@ All must pass:
 
 ## Phase 5: Stance Retraining On Residual Failures Only
 
-Status: Ready to execute after Phases 1 through 3
+Status: In progress as residual semantic hardening; retraining still gated
 
 ### Goal
 
-Retrain stance only after retrieval and passage quality have been improved enough to isolate true stance mistakes.
+Use post-Phase-4 residuals to separate:
+
+- semantic/relation failures that can be cleaned up without retraining
+- multilingual/local-language failures caused by routing or post-translation interpretation
+- genuine stance-model failures that would justify a later training round
 
 ### Why this phase is last
 
@@ -451,40 +455,46 @@ Many apparent stance problems are actually retrieval or evidence-selection probl
 
 ### Scope
 
-- Use post-Phase-3 live failures only.
-- Exclude failures fixed by retrieval, relevance, or passage-selection improvements.
+- Use post-Phase-4 live failures only.
+- Exclude failures fixed by retrieval, relevance, passage-selection, cache, or semantic postfilter improvements.
 - Keep the real-time internet-first runtime as the evaluation target.
+- For multilingual deployment, preserve original-language retrieval and evaluate post-translation semantic behavior explicitly.
 
 ### Work items
 
-1. Re-run focused claims and the full benchmark after Phases 1 through 3.
+1. Re-run focused claims and multilingual residual claims after Phases 1 through 4.
 2. Label remaining failures by root cause:
    - retrieval failure
    - relevance/ranking failure
    - passage retention failure
+   - multilingual semantic/relation failure
    - genuine stance decision failure
-3. Build stance v4 seeds from genuine stance failures only.
-4. Train and compare against the currently promoted stance checkpoint.
-5. Promote only if benchmark evidence is clearly positive and false-positive risk does not rise.
+3. Apply narrow semantic fixes first where the failure is clearly post-translation relation handling rather than model ignorance.
+4. Build stance seeds only from genuine stance failures that remain after the semantic cleanup pass.
+5. Train and compare against the currently promoted stance checkpoint only if that clean seed set is large enough to justify it.
+6. Promote only if benchmark evidence is clearly positive and false-positive risk does not rise.
 
 ### Completion checks
 
 All must pass:
 
 - residual failures are root-caused in writing
-- stance training data excludes retrieval-origin noise
-- candidate stance model improves live benchmark behavior
+- multilingual semantic failures are separated from pure stance failures
+- stance training data excludes retrieval-origin and relation-origin noise
+- any candidate stance model improves live benchmark behavior
 - false-positive risk does not worsen
 
 ### Evidence to record
 
 - residual failure taxonomy
+- multilingual residual benchmark and retry notes
 - stance seed provenance summary
 - benchmark delta and promotion decision
 
 ### Do not advance if
 
-- stance training data still contains unresolved retrieval noise
+- stance training data still contains unresolved retrieval or relation noise
+- multilingual residuals are still dominated by routing or semantic contradictions that do not require retraining
 - the new stance model only looks better offline
 - live benchmark behavior becomes less reliable
 
@@ -517,6 +527,9 @@ No reordering unless a blocking reason is documented in writing.
 
 ## Immediate Next Step
 
-Freeze Phase 4 here as a good stopping point unless a full-benchmark repeated-query study is explicitly needed.
+Rerun the multilingual residual batch on a healthy live network.
 
-Do not reopen broad Phase 3 work unless a clearly general, non-heuristic fix appears for the deferred edge cases.
+Use that run to decide one of two paths:
+
+- if the remaining multilingual failures are still mostly semantic/relation issues, keep Phase 5 in cleanup mode and do not train yet
+- if a cleaner stance-only residual set remains, open the first true Phase 5 training-prep step
