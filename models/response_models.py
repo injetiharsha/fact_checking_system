@@ -22,3 +22,4 @@ class ClaimResponse(BaseModel):
     logical_analysis: Dict[str, Any]
     explanation: str
     transparency: Dict[str, Any] = Field(default_factory=dict)
+    ux_warnings: List[Dict[str, Any]] = Field(default_factory=list)

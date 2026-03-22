@@ -15,6 +15,8 @@ const resetTranslateBtn = document.getElementById("reset-translate-btn");
 const translateStatus = document.getElementById("translate-status");
 const inlineSourcePreview = document.getElementById("inline-source-preview");
 const inlineSourcePreviewBody = document.getElementById("inline-source-preview-body");
+const claimAdvisoryNode = document.getElementById("claim-advisory");
+const claimTextNode = document.getElementById("claim-text");
 
 let mode = "claim";
 let currentController = null;
@@ -68,6 +70,7 @@ for (const tab of tabs) {
     blocks.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
     resultsNode.innerHTML = "";
     statusNode.textContent = "";
+    renderTopAdvisory(null);
     hideReportTools();
     resetProgressPanel();
   });
@@ -115,9 +118,21 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   runBtn.disabled = true;
   cancelBtn.hidden = false;
-  statusNode.textContent = "Analyzing...";
+  const localWarnings = getLocalClaimWarnings();
+  const blockingWarning = localWarnings.find((warning) => warning?.block);
+  const advisoryMessage = localWarnings[0] ? String(localWarnings[0].message || "") : getPrimaryAdvisoryMessage();
+  statusNode.textContent = advisoryMessage ? `Analyzing... ${advisoryMessage}` : "Analyzing...";
   resultsNode.innerHTML = "";
+  renderTopAdvisory({ ux_warnings: localWarnings });
   hideReportTools();
+
+  if (blockingWarning) {
+    statusNode.textContent = "Add a little more context before analysis.";
+    resetProgressPanel();
+    runBtn.disabled = false;
+    cancelBtn.hidden = true;
+    return;
+  }
 
   startProgressForCurrentInput();
   currentController = new AbortController();
@@ -129,6 +144,7 @@ form.addEventListener("submit", async (event) => {
     enrichProgressWithResponse(data);
     completeProgress();
     renderResult(renderedReport);
+    renderTopAdvisory(renderedReport);
     showReportTools();
     statusNode.textContent = "Done.";
   } catch (error) {
@@ -138,6 +154,7 @@ form.addEventListener("submit", async (event) => {
     } else {
       statusNode.textContent = "Failed.";
       stepsNode.insertAdjacentHTML("beforeend", `<li><div class="step-title">Error</div><div class="step-detail">${escapeHtml(error.message)}</div></li>`);
+      renderTopAdvisory(null);
       resultsNode.innerHTML = cardHtml("Error", `<p>${escapeHtml(error.message)}</p>`);
     }
   } finally {
@@ -202,7 +219,8 @@ function startProgressForCurrentInput() {
   processPanel.hidden = false;
   activeSteps = [...(stepTitles[mode] || stepTitles.claim)];
   basePreview = getCurrentInputPreview();
-  previewNode.textContent = `Preview: ${basePreview}`;
+  const advisoryMessage = getPrimaryAdvisoryMessage();
+  previewNode.textContent = advisoryMessage ? `Preview: ${basePreview} | Advisory: ${advisoryMessage}` : `Preview: ${basePreview}`;
 
   stepFlowQueues = initialFlowQueues(basePreview);
   stepFlowPos = stepFlowQueues.map(() => 0);
@@ -220,7 +238,8 @@ function startProgressForCurrentInput() {
     setStepState(progressIndex, "done");
     progressIndex += 1;
     setStepState(progressIndex, "active");
-    previewNode.textContent = `Preview: ${basePreview} | Stage: ${activeSteps[progressIndex]}`;
+    const advisoryMessage = getPrimaryAdvisoryMessage();
+    previewNode.textContent = advisoryMessage ? `Preview: ${basePreview} | Advisory: ${advisoryMessage} | Stage: ${activeSteps[progressIndex]}` : `Preview: ${basePreview} | Stage: ${activeSteps[progressIndex]}`;
     renderSteps();
   }, 2300);
 
@@ -272,6 +291,7 @@ function completeProgress() {
 function resetProgressPanel() {
   stopProgressTimers();
   processPanel.hidden = true;
+  renderTopAdvisory(null);
   previewNode.textContent = "Submit a claim, URL, PDF, or image to start.";
   stepsNode.innerHTML = "";
   activeSteps = [];
@@ -400,12 +420,139 @@ function renderDocumentResult(data) {
   ].join("");
 }
 
+
+function getLocalCheckabilityBlock() {
+  if (mode !== "claim" || !claimTextNode) return null;
+  const claim = String(claimTextNode.value || "").trim();
+  if (!claim) {
+    return {
+      code: "empty_claim",
+      severity: "error",
+      block: true,
+      message: "Enter a fact-checkable claim before analysis.",
+    };
+  }
+
+  const lowered = claim.toLowerCase();
+  const personalPatterns = [
+    /^this is me$/,
+    /^this is us$/,
+    /^this is mine$/,
+    /^my name is/,
+    /^i am/,
+    /^i'm/,
+    /^i feel/,
+    /^i love/,
+    /^i hate/,
+    /^this is my/,
+  ];
+  if (personalPatterns.some((pattern) => pattern.test(lowered))) {
+    return {
+      code: "not_checkable_personal_statement",
+      severity: "error",
+      block: true,
+      message: "This looks like a personal statement, not a fact-checkable claim.",
+    };
+  }
+
+  if (claim.endsWith("?")) {
+    return {
+      code: "question_input",
+      severity: "error",
+      block: true,
+      message: "Questions are not directly fact-checked. Rephrase it as a claim.",
+    };
+  }
+
+  return null;
+}
+
+function getPrimaryAdvisoryMessage() {
+  const warnings = getLocalClaimWarnings();
+  if (!warnings.length) return "";
+  return String(warnings[0].message || "");
+}
+
+function getLocalClaimWarnings() {
+  if (mode !== "claim" || !claimTextNode) return [];
+  const block = getLocalCheckabilityBlock();
+  if (block) return [block];
+  const claim = String(claimTextNode.value || "").trim();
+  if (!claim) return [];
+  const wordCount = claim.split(/\s+/).filter(Boolean).length;
+  if (wordCount < 5) {
+    return [{
+      code: "short_claim_block",
+      severity: "error",
+      block: true,
+      message: "Claims under 5 words are too short to verify reliably. Add more context to continue.",
+      word_count: wordCount,
+    }];
+  }
+  if (wordCount <= 7) {
+    return [{
+      code: "short_claim",
+      severity: "warn",
+      block: false,
+      message: "Short claim detected. Adding a little more context may improve search quality.",
+      word_count: wordCount,
+    }];
+  }
+  return [];
+}
+
+function renderTopAdvisory(data) {
+  if (!claimAdvisoryNode) return;
+  const responseWarnings = Array.isArray(data?.ux_warnings) ? data.ux_warnings : [];
+  const warnings = responseWarnings.length ? responseWarnings : getLocalClaimWarnings();
+  if (!warnings.length) {
+    claimAdvisoryNode.hidden = true;
+    claimAdvisoryNode.className = "claim-advisory";
+    claimAdvisoryNode.innerHTML = "";
+    return;
+  }
+
+  const severity = warnings.some((warning) => warning?.severity === "error" || warning?.block)
+    ? "error"
+    : "warn";
+  const items = warnings
+    .map((warning) => `<li>${escapeHtml(String(warning?.message || "This claim may need more context."))}</li>`)
+    .join("");
+
+  claimAdvisoryNode.className = `claim-advisory ${severity}`;
+  claimAdvisoryNode.innerHTML = `
+    <strong>Claim advisory</strong>
+    <ul>${items}</ul>
+  `;
+  claimAdvisoryNode.hidden = false;
+}
+
 function renderClaimResult(data) {
   const filteredEvidence = getDisplayEvidence(data);
   renderInlineSourcePreview(filteredEvidence);
   resultsNode.innerHTML = [
     claimResultHtml(data, null, false),
   ].join("");
+}
+
+
+function renderUxWarnings(data) {
+  const warnings = Array.isArray(data?.ux_warnings) ? data.ux_warnings : [];
+  if (!warnings.length) return "";
+
+  const items = warnings
+    .map((warning) => {
+      const message = warning?.message ? String(warning.message) : "This claim may need more context.";
+      return `<li>${escapeHtml(message)}</li>`;
+    })
+    .join("");
+
+  return `
+    <div class="ux-warning-card" role="note" aria-label="Claim advisory">
+      <strong>Claim advisory</strong>
+      <ul>${items}</ul>
+    </div>
+  `;
 }
 
 function claimResultHtml(data, index = null, includeSourcePreview = false) {
@@ -420,6 +567,7 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
   const claimTextLine = data.claim ? escapeHtml(data.claim) : "N/A";
   const summaryDetails = buildSummaryDetails(data, filteredEvidence, cleanConflictText);
   const transparencyBlock = renderTransparency(transparency);
+  const warningBlock = renderUxWarnings(data);
   const citations = (data.citations || [])
     .filter((c) => !String(c).includes("internal://logic_engine") && !String(c).includes("logic_engine"))
     .map((c) => `<li>${escapeHtml(String(c))}</li>`)
@@ -463,6 +611,7 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
         <p><strong>Summary:</strong></p>
         ${summaryDetails}
       </div>
+      ${warningBlock}
       <div class="kpi">
         <div class="tile"><span>Verdict</span><strong><span class="pill ${verdictClass}">${escapeHtml(verdict)}</span></strong></div>
         <div class="tile"><span>Confidence</span><strong>${formatPct(data.confidence)}</strong></div>

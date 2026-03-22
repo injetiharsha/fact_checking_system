@@ -26,6 +26,7 @@ from nlp.language import detect_language
 from nlp.translate import translate_to_english
 from claim_detection.normalizer import normalize_claim
 from claim_detection.claim_type_classifier import ClaimTypeClassifier
+from claim_detection.claim_checkability import ClaimCheckabilityClassifier
 from claim_detection.claim_context_classifier import ClaimContextClassifier
 from evidence.domain_diversity_filter import DomainDiversityFilter
 from evidence.india_source_registry import get_india_state_source_hints
@@ -65,6 +66,22 @@ def _safe_console_text(value):
     out = str(value)
     enc = getattr(sys.stdout, "encoding", None) or "utf-8"
     return out.encode(enc, errors="replace").decode(enc, errors="replace")
+
+
+def _build_ux_warnings(claim):
+    claim_text = " ".join((claim or "").strip().split())
+    if not claim_text:
+        return []
+
+    word_count = len(claim_text.split())
+    warnings = []
+    if word_count <= 7 and word_count >= 5:
+        warnings.append({
+            "code": "short_claim",
+            "message": "Short claim detected. Adding a little more context may improve search quality.",
+            "word_count": word_count,
+        })
+    return warnings
 
 
 def _relation_bonus(claim, sentence):
@@ -537,6 +554,7 @@ class ClaimPipeline:
         self.router = EvidenceRouter()
         self.logical_analyzer = LogicalAnalyzer()
         self.claim_type_classifier = ClaimTypeClassifier()
+        self.claim_checkability = ClaimCheckabilityClassifier()
         self.claim_context_classifier = ClaimContextClassifier()
         self.domain_diversity_filter = DomainDiversityFilter(max_per_domain=2)
         self.quality_scorer = QualityScorer()
@@ -807,6 +825,7 @@ class ClaimPipeline:
 
     async def run(self, claim, source_url=None):
         original_claim = claim
+        ux_warnings = _build_ux_warnings(claim)
 
         # trace object for debugging pipeline flow
         trace = {
@@ -882,6 +901,53 @@ class ClaimPipeline:
         stage_timings["claim_context_classification"] = round(time.time() - start, 3)
         print("Claim context classification:", stage_timings["claim_context_classification"], "sec")
 
+        checkability = self.claim_checkability.classify(
+            claim,
+            claim_type_result=claim_type_result,
+            logical_metadata=logic_metadata,
+        )
+        trace["claim_checkability"] = {
+            **checkability,
+            "label": getattr(checkability.get("label"), "value", checkability.get("label")),
+            "subtype": getattr(checkability.get("subtype"), "value", checkability.get("subtype")),
+        }
+        if not checkability.get("allowed", True):
+            warning = {
+                "code": checkability.get("code", "not_checkable"),
+                "severity": "error",
+                "block": True,
+                "message": checkability.get("message", "This input is not a fact-checkable claim."),
+            }
+            combined_warnings = [warning] + list(ux_warnings or [])
+            transparency = {
+                "version": "phase6-v1",
+                "language_detected": language,
+                "status": "blocked_not_checkable",
+                "claim_type": {
+                    **claim_type_result,
+                    "type": claim_type_result["type"].value,
+                },
+                "claim_context": dict(context_result),
+                "claim_checkability": {
+                    **trace["claim_checkability"],
+                },
+                "stage_timings_seconds": dict(stage_timings),
+            }
+            return {
+                "claim": claim,
+                "language": language,
+                "evidence": [],
+                "final_verdict": "NEUTRAL",
+                "confidence": 0.0,
+                "conflict_analysis": "Input is not a fact-checkable claim",
+                "citations": [],
+                "logical_analysis": logic_metadata,
+                "explanation": checkability.get("message", "This input is not a fact-checkable claim."),
+                "transparency": transparency,
+                "search_queries": [],
+                "ux_warnings": combined_warnings,
+            }
+
         # extract domain to exclude original source
         exclude_domain = None
         if source_url:
@@ -916,6 +982,7 @@ class ClaimPipeline:
                     "status": "cancelled_during_evidence_retrieval",
                     "stage_timings_seconds": dict(stage_timings),
                 },
+                "ux_warnings": ux_warnings,
             }
 
         evidence_retrieved_count = len(evidence_raw)
@@ -1155,6 +1222,7 @@ class ClaimPipeline:
                     stage_timings=stage_timings,
                 ),
                 "search_queries": list(trace.get("search_queries", [])),
+                "ux_warnings": ux_warnings,
             }
 
         # sort evidence by combined score
@@ -1424,6 +1492,7 @@ class ClaimPipeline:
             "explanation": explanation,
             "transparency": transparency,
             "search_queries": list(trace.get("search_queries", [])),
+            "ux_warnings": ux_warnings,
         }
 
 

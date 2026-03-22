@@ -9,6 +9,11 @@ except Exception:  # pragma: no cover - import guard for environments without Py
 
 
 RUNTIME_ENV_MAP = {
+    "claim_checkability": {
+        "enabled": "ENABLE_TRAINED_CLAIM_CHECKABILITY",
+        "checkpoint": "CLAIM_CHECKABILITY_CHECKPOINT",
+        "device": "CLAIM_CHECKABILITY_DEVICE",
+    },
     "claim_type": {
         "enabled": "ENABLE_TRAINED_CLAIM_TYPE",
         "checkpoint": "CLAIM_TYPE_CHECKPOINT",

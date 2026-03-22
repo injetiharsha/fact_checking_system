@@ -34,7 +34,7 @@ claims = [
     "Lake Baikal is the deepest lake on Earth",
 
     "Sound travels faster in water than in air",
-    "Humans share about 50 percent of their DNA with bananas",
+    "DNA is shaped like a double helix",
     "Lightning is hotter than the surface of the Sun",
     "Water expands when it freezes",
     "Venus rotates in the opposite direction to most planets",

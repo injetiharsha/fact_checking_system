@@ -449,3 +449,62 @@ pre {
     grid-template-columns: 1fr;
   }
 }
+
+
+
+.ux-warning-card {
+  margin: 14px 0 2px;
+  padding: 12px 14px;
+  border: 1px solid rgba(154, 108, 0, 0.28);
+  border-left: 4px solid var(--warn);
+  border-radius: 12px;
+  background: #fff8e6;
+}
+
+.ux-warning-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: inherit;
+}
+
+.ux-warning-card ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+}
+
+.ux-warning-card li {
+  margin: 0;
+}
+
+
+
+.claim-advisory {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+.claim-advisory.warn {
+  border: 1px solid rgba(154, 108, 0, 0.26);
+  border-left: 4px solid var(--warn);
+  background: #fff8e6;
+}
+
+.claim-advisory.error {
+  border: 1px solid rgba(160, 38, 38, 0.28);
+  border-left: 4px solid var(--bad);
+  background: #fff0f0;
+}
+
+.claim-advisory strong {
+  display: block;
+  margin-bottom: 6px;
+  color: inherit;
+}
+
+.claim-advisory ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+}
