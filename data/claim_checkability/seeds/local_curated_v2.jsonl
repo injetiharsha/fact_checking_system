@@ -1,0 +1,230 @@
+{"id": "local_curated_v2_1", "text": "The RBI kept the repo rate unchanged in April 2025.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_2", "text": "PM-KISAN gives income support to eligible farmers.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_3", "text": "ISRO launched Chandrayaan-3 in 2023.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_4", "text": "Delhi is the capital of India.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_5", "text": "Heavy rain is expected in coastal Andhra Pradesh today.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_6", "text": "The Election Commission of India conducts national elections.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_7", "text": "The IMD issues weather forecasts for India.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_8", "text": "The Indian Constitution came into effect in 1950.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_9", "text": "The rupee is the currency of India.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_10", "text": "ISRO is India's space agency.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_11", "text": "The Ganges flows through northern India.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_12", "text": "The Lok Sabha is part of India's Parliament.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_13", "text": "GST is a tax system used in India.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_14", "text": "The Supreme Court of India is in New Delhi.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_15", "text": "The Indian Railways is government-owned.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_16", "text": "Cyclone warnings are issued by IMD.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_17", "text": "Aadhaar is an identity system used in India.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_18", "text": "The RBI regulates India's monetary policy.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_19", "text": "The monsoon affects agriculture in India.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_20", "text": "PIB publishes government press releases in India.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_21", "text": "Mars has two moons.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_22", "text": "The Sun is a star.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_23", "text": "Water expands when it freezes.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_24", "text": "Lightning is hotter than the surface of the Sun.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_25", "text": "Saturn has rings.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_26", "text": "The Pacific Ocean is the largest ocean on Earth.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_27", "text": "The Earth revolves around the Sun.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_28", "text": "The Great Wall of China is in China.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_29", "text": "Mount Everest is in the Himalayas.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_30", "text": "The moon reflects sunlight.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_31", "text": "This is my sister.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_32", "text": "I am at the station now.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_33", "text": "My father works in Vijayawada.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_34", "text": "I feel sick today.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_35", "text": "This is our new house.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_36", "text": "I am at home right now.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_37", "text": "My phone battery is dead.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_38", "text": "I am feeling better now.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_39", "text": "This is my new bike.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_40", "text": "I live near the station.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_41", "text": "My brother is in college.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_42", "text": "I am waiting for my train.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_43", "text": "I am not feeling well today.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_44", "text": "This is my office.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_45", "text": "My parents are visiting us.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_46", "text": "I am learning Python now.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_47", "text": "My daughter is at school.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_48", "text": "I am in Hyderabad today.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_49", "text": "This is my room.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_50", "text": "I have a new laptop.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_51", "text": "I am with my cousins.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_52", "text": "My uncle works in the bank.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_53", "text": "This is our shop.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_54", "text": "I am getting ready now.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_55", "text": "My mother is calling me.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_56", "text": "I am excited for the trip.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_57", "text": "This is my village.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_58", "text": "I am sitting in traffic.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_59", "text": "My friend is with me.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_60", "text": "I am hungry right now.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_61", "text": "This is our classroom.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_62", "text": "I am waiting outside.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_63", "text": "My bag is missing.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_64", "text": "I am tired after work.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_65", "text": "This is my neighborhood.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_66", "text": "I am at the hospital.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_67", "text": "My son is playing outside.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_68", "text": "This is my account.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_69", "text": "I am going to sleep.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_70", "text": "My teacher knows me.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_71", "text": "I am feeling cold today.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_72", "text": "This is my aunt.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_73", "text": "My wife is at work.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_74", "text": "I am in the office.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_75", "text": "This is our family car.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_76", "text": "I am standing near the gate.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_77", "text": "My cousin is in Chennai.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_78", "text": "This is my house key.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_79", "text": "I am on the bus.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_80", "text": "My father is at the market.", "label": "personal_statement", "source": "local_curated_v2"}
+{"id": "local_curated_v2_81", "text": "This actor is overrated.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_82", "text": "That speech was inspiring.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_83", "text": "This app has a terrible design.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_84", "text": "The film was boring.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_85", "text": "This policy feels unfair.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_86", "text": "This phone has a great camera.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_87", "text": "That restaurant is overrated.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_88", "text": "The new logo looks awful.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_89", "text": "This song is amazing.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_90", "text": "That movie is too slow.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_91", "text": "This candidate sounds convincing.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_92", "text": "That ad is annoying.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_93", "text": "The coach made a smart decision.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_94", "text": "This update feels unnecessary.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_95", "text": "The design looks outdated.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_96", "text": "This article is biased.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_97", "text": "That speech was boring.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_98", "text": "The app feels clunky.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_99", "text": "This phone is overpriced.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_100", "text": "The trailer looks exciting.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_101", "text": "That team played brilliantly.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_102", "text": "This brand is unreliable.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_103", "text": "The mayor gave a strong speech.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_104", "text": "That feature is confusing.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_105", "text": "This show is underrated.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_106", "text": "The policy sounds unrealistic.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_107", "text": "This camera is fantastic.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_108", "text": "The new layout looks messy.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_109", "text": "That decision was irresponsible.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_110", "text": "The report feels one-sided.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_111", "text": "This plan is impressive.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_112", "text": "The service was disappointing.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_113", "text": "That comment was offensive.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_114", "text": "This game is addictive.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_115", "text": "The interface looks clean.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_116", "text": "That announcement was misleading.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_117", "text": "This caf? is overpriced.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_118", "text": "The presentation was excellent.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_119", "text": "That message sounds fake.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_120", "text": "This product feels cheap.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_121", "text": "The headline is sensational.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_122", "text": "That argument is weak.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_123", "text": "This politician sounds honest.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_124", "text": "The plot was predictable.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_125", "text": "That ruling feels unfair.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_126", "text": "This ad campaign is clever.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_127", "text": "The new design is beautiful.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_128", "text": "That app is frustrating.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_129", "text": "This article is thoughtful.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_130", "text": "The speech was powerful.", "label": "opinion", "source": "local_curated_v2"}
+{"id": "local_curated_v2_131", "text": "Did ISRO announce a new mission?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_132", "text": "Is this government notice real?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_133", "text": "What happened in Andhra Pradesh?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_134", "text": "Can humans survive on Mars?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_135", "text": "Is this viral message true?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_136", "text": "Did NASA confirm this?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_137", "text": "Is this policy still active?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_138", "text": "What did the RBI say?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_139", "text": "Is this image genuine?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_140", "text": "Did IMD issue a warning?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_141", "text": "Was this report published today?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_142", "text": "Can this be verified?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_143", "text": "Did PIB release this statement?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_144", "text": "Is this election claim true?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_145", "text": "What is the source for this?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_146", "text": "Did the government approve this?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_147", "text": "Is this farmer scheme update real?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_148", "text": "Can we trust this message?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_149", "text": "Was this speech authentic?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_150", "text": "Did WHO publish this?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_151", "text": "Is this quote accurate?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_152", "text": "What does the official notice say?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_153", "text": "Can this rumor be verified?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_154", "text": "Did the CM announce this?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_155", "text": "Is this headline fake?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_156", "text": "Was this order actually passed?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_157", "text": "Can this alert be trusted?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_158", "text": "Did the minister say this?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_159", "text": "What does ISRO's notice say?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_160", "text": "Is this screenshot edited?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_161", "text": "Did the police issue this advisory?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_162", "text": "Can this post be verified?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_163", "text": "Was this claim debunked?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_164", "text": "Did the election panel confirm this?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_165", "text": "Is this a real circular?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_166", "text": "Did the court make this ruling?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_167", "text": "Can this statement be checked?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_168", "text": "What does the official source say?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_169", "text": "Is this scheme deadline real?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_170", "text": "Did the RBI change rates?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_171", "text": "Was this notice withdrawn?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_172", "text": "Can this weather alert be verified?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_173", "text": "Did the district collector say this?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_174", "text": "Is this government order valid?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_175", "text": "What does the ministry website say?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_176", "text": "Did the chief minister post this?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_177", "text": "Can this claim be fact-checked?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_178", "text": "Is this a real press note?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_179", "text": "Was this video taken in India?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_180", "text": "Did the agency deny this?", "label": "question_or_rewrite", "source": "local_curated_v2"}
+{"id": "local_curated_v2_181", "text": "must share", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_182", "text": "watch till end", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_183", "text": "big update", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_184", "text": "forward this now", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_185", "text": "shocking visuals", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_186", "text": "unbelievable clip", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_187", "text": "see this now", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_188", "text": "full video here", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_189", "text": "breaking now", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_190", "text": "look at this", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_191", "text": "must watch", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_192", "text": "viral post", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_193", "text": "crazy stuff", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_194", "text": "what a scene", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_195", "text": "huge news", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_196", "text": "omg", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_197", "text": "so true", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_198", "text": "share fast", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_199", "text": "read this now", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_200", "text": "important update", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_201", "text": "send to everyone", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_202", "text": "don't miss this", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_203", "text": "wow", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_204", "text": "seriously?", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_205", "text": "no way", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_206", "text": "trending clip", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_207", "text": "full details inside", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_208", "text": "final warning", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_209", "text": "superb", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_210", "text": "epic", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_211", "text": "mind blowing", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_212", "text": "forward immediately", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_213", "text": "everyone is sharing this", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_214", "text": "massive update", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_215", "text": "latest buzz", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_216", "text": "big alert", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_217", "text": "truth exposed", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_218", "text": "watch this clip", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_219", "text": "must read", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_220", "text": "see full post", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_221", "text": "too good", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_222", "text": "too bad", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_223", "text": "very sad", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_224", "text": "very shocking", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_225", "text": "crazy update", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_226", "text": "viral video", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_227", "text": "urgent share", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_228", "text": "big surprise", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_229", "text": "look carefully", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_230", "text": "breaking alert", "label": "other_uncheckable", "source": "local_curated_v2"}

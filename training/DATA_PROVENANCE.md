@@ -56,6 +56,22 @@ artifacts. Append new entries here whenever public data is introduced.
 
 ---
 
+## 2026-03-23
+
+### ClaimBuster
+- `date`: 2026-03-23
+- `task`: claim_checkability
+- `dataset`: `ClaimBuster_Datasets`
+- `provider`: Zenodo / ClaimBuster project
+- `source_url`: `https://zenodo.org/records/3836810`
+- `access_method`: downloaded zip to `data/public/claim_checkability/claimbuster/ClaimBuster_Datasets.zip`, then mapped with `training/common/build_claim_checkability_public_mappings.py --claimbuster-file data/public/claim_checkability/claimbuster/unzipped/ClaimBuster_Datasets/datasets/2xNCS.json`
+- `config_or_split`: `2xNCS.json`
+- `sample_limit`: `8282` mapped rows after dedupe
+- `output_usage`: `data/claim_checkability/v2`
+- `purpose`: add a real public check-worthiness backbone for the claim-checkability gate, especially `factual_claim` vs `other_uncheckable`
+
+---
+
 ## Rule
 
 If any new public or external dataset is downloaded, add an entry here at the
