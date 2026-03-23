@@ -198,8 +198,21 @@ def evaluate(results):
     failed_by_tag = Counter()
     failed_claims = []
     failed_by_category = Counter()
+    blocked_not_checkable = 0
+    blocked_claims = []
 
-    def infer_failure_category(pred, truth, tags, evidence_items):
+    adjusted_total = 0
+    adjusted_correct = 0
+    adjusted_neutral = 0
+    adjusted_tp = 0
+    adjusted_tn = 0
+    adjusted_fp = 0
+    adjusted_fn = 0
+
+    def infer_failure_category(pred, truth, tags, evidence_items, blocked=False):
+        if blocked:
+            return "blocked_not_checkable"
+
         support_n = sum(1 for e in evidence_items if e.get("stance") == "SUPPORT")
         refute_n = sum(1 for e in evidence_items if e.get("stance") == "REFUTE")
 
@@ -225,12 +238,25 @@ def evaluate(results):
         return "other"
 
     for r in results:
-
         pred = r["predicted_verdict"]
         truth = r["expected_verdict"]
         analysis = r.get("logical_analysis", {})
         is_pos = truth == "TRUE"
         pred_pos = pred == "TRUE"
+
+        evidence_items = []
+        transparency = {}
+        output = r.get("pipeline_output", {})
+        if isinstance(output, dict):
+            out_results = output.get("results")
+            if isinstance(out_results, list) and out_results and isinstance(out_results[0], dict):
+                evidence_items = out_results[0].get("evidence", []) or []
+                transparency = out_results[0].get("transparency", {}) or {}
+            elif "evidence" in output:
+                evidence_items = output.get("evidence", []) or []
+                transparency = output.get("transparency", {}) or {}
+
+        blocked = transparency.get("status") == "blocked_not_checkable"
 
         if pred == truth:
             correct += 1
@@ -257,6 +283,30 @@ def evaluate(results):
         else:
             tn += 1
 
+        if blocked:
+            blocked_not_checkable += 1
+            blocked_claims.append({
+                "claim": r["claim"],
+                "expected_verdict": truth,
+                "predicted_verdict": pred,
+                "time_seconds": r.get("time_seconds"),
+                "transparency": transparency,
+            })
+        else:
+            adjusted_total += 1
+            if pred == truth:
+                adjusted_correct += 1
+            if pred == "NEUTRAL":
+                adjusted_neutral += 1
+            if pred_pos and is_pos:
+                adjusted_tp += 1
+            elif pred_pos and not is_pos:
+                adjusted_fp += 1
+            elif not pred_pos and is_pos:
+                adjusted_fn += 1
+            else:
+                adjusted_tn += 1
+
         if pred != truth:
             failed_by_expected[truth] += 1
             failed_by_predicted[pred] += 1
@@ -276,16 +326,7 @@ def evaluate(results):
             for tag in tags:
                 failed_by_tag[tag] += 1
 
-            evidence_items = []
-            output = r.get("pipeline_output", {})
-            if isinstance(output, dict):
-                out_results = output.get("results")
-                if isinstance(out_results, list) and out_results and isinstance(out_results[0], dict):
-                    evidence_items = out_results[0].get("evidence", []) or []
-                elif "evidence" in output:
-                    evidence_items = output.get("evidence", []) or []
-
-            category = infer_failure_category(pred, truth, tags, evidence_items)
+            category = infer_failure_category(pred, truth, tags, evidence_items, blocked=blocked)
             failed_by_category[category] += 1
             failed_claims.append({
                 "claim": r["claim"],
@@ -304,11 +345,18 @@ def evaluate(results):
         if (precision + recall) else 0.0
     )
 
+    adjusted_precision = adjusted_tp / (adjusted_tp + adjusted_fp) if (adjusted_tp + adjusted_fp) else 0.0
+    adjusted_recall = adjusted_tp / (adjusted_tp + adjusted_fn) if (adjusted_tp + adjusted_fn) else 0.0
+    adjusted_f1 = (
+        2 * adjusted_precision * adjusted_recall / (adjusted_precision + adjusted_recall)
+        if (adjusted_precision + adjusted_recall) else 0.0
+    )
+
     return {
         "total_claims": total,
         "correct_predictions": correct,
-        "accuracy": round(correct / total, 3),
-        "neutral_rate": round(neutral / total, 3),
+        "accuracy": round(correct / total, 3) if total else 0.0,
+        "neutral_rate": round(neutral / total, 3) if total else 0.0,
         "actual_positive": actual_positive,
         "actual_negative": actual_negative,
         "predicted_positive": predicted_positive,
@@ -317,16 +365,27 @@ def evaluate(results):
         "tn": tn,
         "fp": fp,
         "fn": fn,
-        "false_positive_rate": round(fp / total, 3),
-        "false_negative_rate": round(fn / total, 3),
+        "false_positive_rate": round(fp / total, 3) if total else 0.0,
+        "false_negative_rate": round(fn / total, 3) if total else 0.0,
         "precision_true_class": round(precision, 3),
         "recall_true_class": round(recall, 3),
         "f1_true_class": round(f1, 3),
+        "blocked_not_checkable_count": blocked_not_checkable,
+        "adjusted_total_claims": adjusted_total,
+        "adjusted_correct_predictions": adjusted_correct,
+        "adjusted_accuracy_excluding_blocked": round(adjusted_correct / adjusted_total, 3) if adjusted_total else 0.0,
+        "adjusted_neutral_rate_excluding_blocked": round(adjusted_neutral / adjusted_total, 3) if adjusted_total else 0.0,
+        "adjusted_false_positive_rate_excluding_blocked": round(adjusted_fp / adjusted_total, 3) if adjusted_total else 0.0,
+        "adjusted_false_negative_rate_excluding_blocked": round(adjusted_fn / adjusted_total, 3) if adjusted_total else 0.0,
+        "adjusted_precision_true_class_excluding_blocked": round(adjusted_precision, 3),
+        "adjusted_recall_true_class_excluding_blocked": round(adjusted_recall, 3),
+        "adjusted_f1_true_class_excluding_blocked": round(adjusted_f1, 3),
         "failed_by_expected_verdict": dict(failed_by_expected),
         "failed_by_predicted_verdict": dict(failed_by_predicted),
         "failed_by_claim_tag": dict(failed_by_tag),
         "failed_by_category": dict(failed_by_category),
-        "failed_claims": failed_claims
+        "failed_claims": failed_claims,
+        "blocked_claims": blocked_claims,
     }
 
 
@@ -447,11 +506,17 @@ async def main():
 
     summary_keys = [
         "total_claims", "correct_predictions", "accuracy", "neutral_rate",
+        "blocked_not_checkable_count", "adjusted_total_claims", "adjusted_correct_predictions",
+        "adjusted_accuracy_excluding_blocked", "adjusted_neutral_rate_excluding_blocked",
         "actual_positive", "actual_negative",
         "predicted_positive", "predicted_negative",
         "tp", "tn", "fp", "fn",
         "false_positive_rate", "false_negative_rate",
-        "precision_true_class", "recall_true_class", "f1_true_class"
+        "adjusted_false_positive_rate_excluding_blocked", "adjusted_false_negative_rate_excluding_blocked",
+        "precision_true_class", "recall_true_class", "f1_true_class",
+        "adjusted_precision_true_class_excluding_blocked",
+        "adjusted_recall_true_class_excluding_blocked",
+        "adjusted_f1_true_class_excluding_blocked"
     ]
     for key in summary_keys:
         print(key, ":", metrics.get(key))

@@ -86,6 +86,10 @@ class StanceDetector:
             "cannot", "can't", "no evidence", "not true", "incorrect"
         )
 
+        neutral_rescue = self._neutral_refute_rescue(claim, evidence, overlap)
+        if neutral_rescue is not None:
+            return {"stance": neutral_rescue, "confidence": 0.62, "source": "heuristic_refute_rescue"}
+
         if overlap >= self.LEXICAL_RESCUE_MIN_OVERLAP and any(c in text for c in refute_cues):
             return {"stance": "REFUTE", "confidence": 0.62, "source": "heuristic_refute_rescue"}
 
@@ -137,6 +141,10 @@ class StanceDetector:
                 "hoax", "fake", "myth", "false", "debunk", "does not", "doesn't",
                 "cannot", "can't", "no evidence", "not true", "incorrect"
             )
+            neutral_rescue = self._neutral_refute_rescue(claim, evidence, overlap)
+            if neutral_rescue is not None:
+                results.append({"stance": neutral_rescue, "confidence": 0.62, "source": "heuristic_refute_rescue"})
+                continue
             if overlap >= self.LEXICAL_RESCUE_MIN_OVERLAP and any(c in text for c in refute_cues):
                 results.append({"stance": "REFUTE", "confidence": 0.62, "source": "heuristic_refute_rescue"})
                 continue
@@ -238,6 +246,85 @@ class StanceDetector:
         )
         return any(re.search(pattern, normalized) for pattern in patterns)
 
+    def _extract_is_a_predicate(self, text):
+        normalized = " ".join((text or "").lower().replace("-", " ").split())
+        match = re.search(r"\b[a-z\s]+?\s+is\s+(?:a|an|the)\s+([a-z\s]+?)(?:\.|,|;|$)", normalized)
+        if not match:
+            return None
+        predicate = " ".join(re.findall(r"[a-z]+", match.group(1))).strip()
+        predicate = re.sub(r"\b(?:that|which|who|because|and|but)\b.*$", "", predicate).strip()
+        return predicate or None
+
+    def _extract_than_comparison(self, text):
+        normalized = " ".join((text or "").lower().replace("-", " ").split())
+        patterns = (
+            r"(?P<subject>[a-z\s]+?)\s+is\s+(?P<cmp>longer|shorter|larger|smaller|older|younger|deeper|higher|taller)\s+than\s+(?P<object>[a-z\s]+?)(?:\.|,|;|$)",
+            r"(?P<subject>[a-z\s]+?)\s+are\s+(?P<cmp>longer|shorter|larger|smaller|older|younger|deeper|higher|taller)\s+than\s+(?P<object>[a-z\s]+?)(?:\.|,|;|$)",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, normalized)
+            if not match:
+                continue
+            subject = " ".join(re.findall(r"[a-z]+", match.group("subject"))).strip()
+            obj = " ".join(re.findall(r"[a-z]+", match.group("object"))).strip()
+            cmp_word = match.group("cmp").strip()
+            if subject and obj and cmp_word:
+                return {"subject": subject, "object": obj, "cmp": cmp_word}
+        return None
+
+    def _has_reporting_quote_context(self, text):
+        normalized = (text or "").lower()
+        reporting_markers = (
+            " said ", " says ", " declared ", " wrote ", " tweeted ", " posted ",
+            " claimed ", " joke", " joked ", " laughed", " according to ", " i saw ",
+            " quote", " quoted ", " asked ", " told ", " described ", " calling ",
+        )
+        quote_markers = ('“', '”', '"', "'")
+        has_quote = any(marker in (text or "") for marker in quote_markers)
+        return has_quote and any(marker in normalized for marker in reporting_markers)
+
+    def _neutral_refute_rescue(self, claim, evidence, overlap):
+        if overlap < self.LEXICAL_RESCUE_MIN_OVERLAP:
+            return None
+
+        claim_text = (claim or "").lower()
+        evidence_text = (evidence or "").lower()
+
+        claim_capital = self._extract_capital_relation(claim_text)
+        evidence_capital = self._extract_capital_relation(evidence_text)
+        if claim_capital and evidence_capital:
+            same_subject = claim_capital["subject"] == evidence_capital["subject"]
+            same_target = claim_capital["target"] == evidence_capital["target"]
+            if same_subject and not same_target:
+                return "REFUTE"
+            if same_target and not same_subject and evidence_capital.get("relation") == "official_capital":
+                return "REFUTE"
+
+        predicate = self._extract_is_a_predicate(claim_text)
+        if predicate:
+            direct_negations = (
+                f"not a {predicate}",
+                f"not an {predicate}",
+                f"not the {predicate}",
+                f"neither a {predicate}",
+                f"nor a {predicate}",
+                f"rather than a {predicate}",
+                f"rather than being a {predicate}",
+            )
+            if any(marker in evidence_text for marker in direct_negations):
+                return "REFUTE"
+
+        comparison = self._extract_than_comparison(claim_text)
+        if comparison and comparison["cmp"] == "longer":
+            subject = comparison["subject"]
+            obj = comparison["object"]
+            if subject in evidence_text and obj in evidence_text:
+                if "second longest" in evidence_text or "second-longest" in evidence_text:
+                    if f"longest river is the {obj}" in evidence_text or f"with the {subject}" in evidence_text:
+                        return "REFUTE"
+
+        return None
+
     def _postfilter_model_stance(self, stance, confidence, claim, evidence):
         if stance == "NEUTRAL":
             return None
@@ -286,6 +373,8 @@ class StanceDetector:
             return "REFUTE"
 
         if stance == "SUPPORT":
+            if self._has_reporting_quote_context(text):
+                return None
             if claim_capital and self._has_qualified_capital_language(text):
                 return None
             if self.v2_mode and self._has_explicit_refute_language(text):

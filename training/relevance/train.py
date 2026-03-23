@@ -85,10 +85,12 @@ def main() -> None:
         tokens["labels"] = batch["label"]
         return tokens
 
+    split_column_sets = [set(split.column_names) for split in dataset.values()]
+    removable_columns = sorted(set.intersection(*split_column_sets)) if split_column_sets else []
     encoded = dataset.map(
         preprocess,
         batched=True,
-        remove_columns=dataset["train"].column_names,
+        remove_columns=removable_columns,
     )
     training_args = TrainingArguments(
         output_dir=config["output"]["checkpoint_dir"],
