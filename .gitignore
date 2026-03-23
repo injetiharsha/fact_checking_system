@@ -86,3 +86,8 @@ playwright-report/
 # - markdown corpus files
 # - checked-in JSON fixtures
 # - checked-in PDFs/images when intentionally added
+# JSON / YAML artifacts
+*.json
+*.yaml
+*.yml
+

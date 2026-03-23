@@ -8,6 +8,13 @@ const resultsNode = document.getElementById("results");
 const processPanel = document.getElementById("process-panel");
 const previewNode = document.getElementById("process-preview");
 const stepsNode = document.getElementById("process-steps");
+const progressTimerNode = document.createElement("p");
+progressTimerNode.className = "process-timer";
+progressTimerNode.textContent = "Time: 00:00";
+const processHeading = processPanel ? processPanel.querySelector("h3") : null;
+if (processHeading && processHeading.parentNode) {
+  processHeading.insertAdjacentElement("afterend", progressTimerNode);
+}
 const reportTools = document.getElementById("report-tools");
 const reportLang = document.getElementById("report-lang");
 const translateBtn = document.getElementById("translate-btn");
@@ -22,7 +29,9 @@ let mode = "claim";
 let currentController = null;
 let progressTimer = null;
 let detailPulseTimer = null;
+let elapsedTimer = null;
 let progressIndex = 0;
+let progressStartedAt = null;
 let activeSteps = [];
 let stepDetails = [];
 let stepFlowQueues = [];
@@ -31,6 +40,33 @@ let basePreview = "";
 let originalReport = null;
 let renderedReport = null;
 let reportLanguageOverride = null;
+
+function setActiveInputLocked(locked) {
+  if (mode === "claim") {
+    const node = document.getElementById("claim-text");
+    if (node) node.readOnly = locked;
+    return;
+  }
+  if (mode === "url") {
+    const node = document.getElementById("url-text");
+    if (node) node.readOnly = locked;
+    return;
+  }
+  if (mode === "pdf") {
+    const node = document.getElementById("pdf-file");
+    if (node) node.disabled = locked;
+    return;
+  }
+  const node = document.getElementById("image-file");
+  if (node) node.disabled = locked;
+}
+
+function getProgressPreviewLabel() {
+  if (mode === "claim") return "Claim analysis in progress";
+  if (mode === "url") return "URL analysis in progress";
+  if (mode === "pdf") return "PDF analysis in progress";
+  return "Image analysis in progress";
+}
 
 const stepTitles = {
   claim: [
@@ -118,10 +154,10 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   runBtn.disabled = true;
   cancelBtn.hidden = false;
+  setActiveInputLocked(true);
   const localWarnings = getLocalClaimWarnings();
   const blockingWarning = localWarnings.find((warning) => warning?.block);
-  const advisoryMessage = localWarnings[0] ? String(localWarnings[0].message || "") : getPrimaryAdvisoryMessage();
-  statusNode.textContent = advisoryMessage ? `Analyzing... ${advisoryMessage}` : "Analyzing...";
+  statusNode.textContent = "Analyzing...";
   resultsNode.innerHTML = "";
   renderTopAdvisory({ ux_warnings: localWarnings });
   hideReportTools();
@@ -131,6 +167,7 @@ form.addEventListener("submit", async (event) => {
     resetProgressPanel();
     runBtn.disabled = false;
     cancelBtn.hidden = true;
+    setActiveInputLocked(false);
     return;
   }
 
@@ -162,6 +199,7 @@ form.addEventListener("submit", async (event) => {
     currentController = null;
     runBtn.disabled = false;
     cancelBtn.hidden = true;
+    setActiveInputLocked(false);
   }
 });
 
@@ -217,12 +255,13 @@ function initialFlowQueues(preview) {
 
 function startProgressForCurrentInput() {
   processPanel.hidden = false;
+  progressStartedAt = Date.now();
   activeSteps = [...(stepTitles[mode] || stepTitles.claim)];
-  basePreview = getCurrentInputPreview();
+  basePreview = getProgressPreviewLabel();
   const advisoryMessage = getPrimaryAdvisoryMessage();
-  previewNode.textContent = advisoryMessage ? `Preview: ${basePreview} | Advisory: ${advisoryMessage}` : `Preview: ${basePreview}`;
+  previewNode.textContent = advisoryMessage ? `${basePreview} | Advisory: ${advisoryMessage}` : basePreview;
 
-  stepFlowQueues = initialFlowQueues(basePreview);
+  stepFlowQueues = initialFlowQueues(getCurrentInputPreview());
   stepFlowPos = stepFlowQueues.map(() => 0);
   stepDetails = stepFlowQueues.map((q) => q[0]);
 
@@ -231,6 +270,8 @@ function startProgressForCurrentInput() {
   setStepState(progressIndex, "active");
 
   stopProgressTimers();
+  updateElapsedTimer();
+  elapsedTimer = setInterval(updateElapsedTimer, 1000);
   progressTimer = setInterval(() => {
     if (progressIndex >= activeSteps.length - 1) {
       return;
@@ -238,8 +279,7 @@ function startProgressForCurrentInput() {
     setStepState(progressIndex, "done");
     progressIndex += 1;
     setStepState(progressIndex, "active");
-    const advisoryMessage = getPrimaryAdvisoryMessage();
-    previewNode.textContent = advisoryMessage ? `Preview: ${basePreview} | Advisory: ${advisoryMessage} | Stage: ${activeSteps[progressIndex]}` : `Preview: ${basePreview} | Stage: ${activeSteps[progressIndex]}`;
+    previewNode.textContent = `${basePreview} | Stage: ${activeSteps[progressIndex]}`;
     renderSteps();
   }, 2300);
 
@@ -263,29 +303,26 @@ function enrichProgressWithResponse(data) {
   if (activeSteps[2]) stepDetails[2] = `Top sources: ${sources.length ? sources.join(", ") : "No strong sources returned"}`;
   if (activeSteps[4]) stepDetails[4] = `Final verdict: ${verdict}`;
 
-  previewNode.textContent = `Preview: ${basePreview} | Final verdict: ${verdict}`;
+  previewNode.textContent = `${basePreview} | Final verdict: ${verdict}`;
   renderSteps();
 }
 
 function renderSteps() {
-  const visibleCount = Math.min(progressIndex + 1, activeSteps.length);
-  stepsNode.innerHTML = activeSteps
-    .slice(0, visibleCount)
-    .map((title, idx) => {
-      const detail = stepDetails[idx] ? `<div class="step-detail">${escapeHtml(stepDetails[idx])}</div>` : "";
-      return `<li data-step-idx="${idx}"><div class="step-title">${escapeHtml(title)}</div>${detail}</li>`;
-    })
-    .join("");
+  if (!activeSteps.length) {
+    stepsNode.innerHTML = "";
+    return;
+  }
+  const idx = Math.min(progressIndex, activeSteps.length - 1);
+  const title = activeSteps[idx];
+  const detail = stepDetails[idx] ? `<div class="step-detail">${escapeHtml(stepDetails[idx])}</div>` : "";
+  stepsNode.innerHTML = `<li class="active current-step" data-step-idx="${idx}"><div class="step-title">${escapeHtml(title)}</div>${detail}</li>`;
 }
 
 function completeProgress() {
   stopProgressTimers();
-  const items = stepsNode.querySelectorAll("li");
-  items.forEach((item) => {
-    item.classList.remove("active");
-    item.classList.add("done");
-  });
-  stepsNode.insertAdjacentHTML("beforeend", '<li class="done"><div class="step-title">Completed</div><div class="step-detail">Report generated successfully.</div></li>');
+  const elapsedLabel = formatElapsedDuration();
+  stepsNode.innerHTML = `<li class="done"><div class="step-title">Completed</div><div class="step-detail">Report generated successfully. Total time: ${escapeHtml(elapsedLabel)}.</div></li>`;
+  progressTimerNode.textContent = `Time: ${elapsedLabel}`;
 }
 
 function resetProgressPanel() {
@@ -293,6 +330,7 @@ function resetProgressPanel() {
   processPanel.hidden = true;
   renderTopAdvisory(null);
   previewNode.textContent = "Submit a claim, URL, PDF, or image to start.";
+  progressTimerNode.textContent = "Time: 00:00";
   stepsNode.innerHTML = "";
   activeSteps = [];
   stepDetails = [];
@@ -310,6 +348,22 @@ function stopProgressTimers() {
     clearInterval(detailPulseTimer);
     detailPulseTimer = null;
   }
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
+}
+
+function updateElapsedTimer() {
+  progressTimerNode.textContent = `Time: ${formatElapsedDuration()}`;
+}
+
+function formatElapsedDuration() {
+  if (!progressStartedAt) return "00:00";
+  const totalSeconds = Math.max(0, Math.floor((Date.now() - progressStartedAt) / 1000));
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
 }
 
 function setStepState(index, state) {
@@ -563,7 +617,7 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
   const header = index ? `Claim ${index}` : "Claim Result";
   const cleanExplanationText = sanitizeNarrative(data.explanation || "");
   const cleanConflictText = sanitizeNarrative(data.conflict_analysis || "N/A");
-  const englishExplanation = buildEnglishExplanation(data, filteredEvidence, cleanExplanationText);
+  const explanationDetails = buildExplanationDetails(data, filteredEvidence, cleanExplanationText);
   const claimTextLine = data.claim ? escapeHtml(data.claim) : "N/A";
   const summaryDetails = buildSummaryDetails(data, filteredEvidence, cleanConflictText);
   const transparencyBlock = renderTransparency(transparency);
@@ -618,7 +672,7 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
         <div class="tile"><span>Language</span><strong>${escapeHtml(languageLabel)}</strong></div>
       </div>
       <h4>Explanation</h4>
-      <p>${escapeHtml(englishExplanation)}</p>
+      ${explanationDetails}
       <h4>Decision Transparency</h4>
       ${transparencyBlock}
       ${includeSourcePreview ? `<h4>Strong Source Preview</h4>${renderSourceMedia(filteredEvidence)}` : ""}
@@ -779,95 +833,216 @@ function sanitizeNarrative(text) {
     .trim();
 }
 
+function formatSourceList(items) {
+  const names = (items || []).filter(Boolean);
+  if (!names.length) return "";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
 function buildSummaryDetails(data, filteredEvidence, fallbackText) {
-  const topSources = extractTopSources(data);
-  const topEvidence = (filteredEvidence || [])
-    .filter((ev) => ev && ev.text)
-    .slice(0, 3)
-    .map((ev) => ev.text);
+  const evidenceGroups = getEvidenceGroups(filteredEvidence);
+  const verdict = String(data.final_verdict || "NEUTRAL").toUpperCase();
+  const sourceNames = extractTopSources(data);
+  const claimText = String(data.claim || "");
+  const leadSupport = pickBestEvidenceContext(evidenceGroups.support, claimText);
+  const leadRefute = pickBestEvidenceContext(evidenceGroups.refute, claimText);
+  const leadNeutral = pickBestEvidenceContext(evidenceGroups.neutral, claimText);
 
   const lines = [];
+  lines.push(`Evidence reviewed: ${evidenceGroups.support.length} supporting, ${evidenceGroups.refute.length} contradicting, and ${evidenceGroups.neutral.length} neutral items.`);
 
-  if (topSources.length) {
-    lines.push(`Top references include ${topSources.slice(0, 3).join(", ")}.`);
+  if (sourceNames.length) {
+    lines.push(`Main sources: ${formatSourceList(sourceNames.slice(0, 3))}.`);
   }
 
-  if (topEvidence.length) {
-    lines.push(truncate(topEvidence[0], 180));
+  if (verdict === "TRUE" && leadSupport) {
+    lines.push(`Why it was marked TRUE: the strongest supporting evidence directly matches the claim.`);
+  } else if (verdict === "FALSE" && leadRefute) {
+    lines.push(`Why it was marked FALSE: the strongest contradictory evidence directly conflicts with the claim.`);
+  } else if (verdict === "NEUTRAL") {
+    lines.push("Why it was marked NEUTRAL: the evidence was mixed, weak, or not decisive enough.");
   }
-  if (topEvidence.length > 1) {
-    lines.push(truncate(topEvidence[1], 180));
+
+  if (leadSupport) {
+    lines.push(`Supporting context available: yes.`);
+  }
+  if (leadRefute) {
+    lines.push(`Contradicting context available: yes.`);
+  }
+  if (leadNeutral) {
+    lines.push(`Neutral background context available: yes.`);
+  }
+
+  if (!lines.length && fallbackText) {
+    lines.push(fallbackText);
   }
 
   if (!lines.length) {
-    lines.push(fallbackText || "No summary data available.");
+    lines.push("No summary data available.");
   }
 
-  return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
+  return `<ul class="summary-list">${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`;
 }
 
-function buildEnglishExplanation(data, filteredEvidence, fallbackText) {
-  const supportItems = filteredEvidence.filter((ev) => String(ev.stance || "").toUpperCase() === "SUPPORT");
-  const refuteItems = filteredEvidence.filter((ev) => String(ev.stance || "").toUpperCase() === "REFUTE");
-  const neutralItems = filteredEvidence.filter((ev) => String(ev.stance || "").toUpperCase() === "NEUTRAL");
-  const supportCount = supportItems.length;
-  const refuteCount = refuteItems.length;
-  const neutralCount = neutralItems.length;
+function buildExplanationDetails(data, filteredEvidence, fallbackText) {
+  const evidenceGroups = getEvidenceGroups(filteredEvidence);
   const verdict = String(data.final_verdict || "NEUTRAL").toUpperCase();
-
-  const topSupport = pickBestEvidenceSnippet(supportItems);
-  const topRefute = pickBestEvidenceSnippet(refuteItems);
-
-  const lines = [];
+  const confidence = formatPct(data.confidence);
+  const sourceNames = extractTopSources(data);
+  const intro = [];
 
   if (verdict === "TRUE") {
-    lines.push(`Most evidence aligns with the claim (${supportCount} supporting vs ${refuteCount} contradicting).`);
-    if (topSupport) {
-      lines.push(`A key supporting point is: "${topSupport}"`);
-    }
-    if (refuteCount > 0 && topRefute) {
-      lines.push(`There is some contradictory evidence: "${topRefute}", but it is weaker overall.`);
-    }
-    return lines.join(" ");
+    intro.push("Most evidence aligns with the claim.");
+  } else if (verdict === "FALSE") {
+    intro.push("Most evidence contradicts the claim.");
+  } else {
+    intro.push("The available evidence does not lead to a decisive conclusion.");
   }
 
-  if (verdict === "FALSE") {
-    lines.push(`Most evidence contradicts the claim (${refuteCount} contradicting vs ${supportCount} supporting).`);
-    if (topRefute) {
-      lines.push(`A key contradictory point is: "${topRefute}"`);
-    }
-    if (supportCount > 0 && topSupport) {
-      lines.push(`There is some supporting evidence: "${topSupport}", but it is weaker overall.`);
-    }
-    return lines.join(" ");
+  intro.push(`Evidence mix: ${evidenceGroups.support.length} supporting, ${evidenceGroups.refute.length} contradicting, and ${evidenceGroups.neutral.length} neutral.`);
+  intro.push(`Confidence: ${confidence}.`);
+
+  if (sourceNames.length) {
+    intro.push(`Main sources reviewed: ${formatSourceList(sourceNames.slice(0, 4))}.`);
   }
 
-  if (supportCount > 0 || refuteCount > 0) {
-    lines.push(`The evidence is mixed (${supportCount} supporting, ${refuteCount} contradicting, ${neutralCount} neutral).`);
-    if (topSupport) {
-      lines.push(`Supporting side: "${topSupport}"`);
-    }
-    if (topRefute) {
-      lines.push(`Contradicting side: "${topRefute}"`);
-    }
-    return lines.join(" ");
+  const claimText = String(data.claim || "");
+  const supportHtml = renderExplanationSection("Supporting", evidenceGroups.support, claimText);
+  const refuteHtml = renderExplanationSection("Contradicting", evidenceGroups.refute, claimText);
+  const neutralHtml = renderExplanationSection("Neutral", evidenceGroups.neutral, claimText);
+  const notes = [];
+
+  if (!filteredEvidence.length && fallbackText) {
+    notes.push(`<p>${escapeHtml(fallbackText)}</p>`);
   }
 
-  if (fallbackText) {
-    return "No clear supporting or contradicting evidence was found.";
-  }
-  return "No clear evidence was found to align with or contradict the claim.";
+  return `
+    <div class="explanation-block">
+      <p>${escapeHtml(intro.join(" "))}</p>
+      ${supportHtml}
+      ${refuteHtml}
+      ${neutralHtml}
+      ${notes.join("")}
+    </div>
+  `;
 }
 
-function pickBestEvidenceSnippet(items) {
-  if (!items || !items.length) return null;
-  const scored = [...items].sort((a, b) => {
-    const aScore = Number(a.relevance_score || 0) * Number(a.quality_score || 0) * Number(a.confidence || 0);
-    const bScore = Number(b.relevance_score || 0) * Number(b.quality_score || 0) * Number(b.confidence || 0);
-    return bScore - aScore;
-  });
-  const text = scored[0]?.text;
-  return text ? truncate(text, 140) : null;
+function renderExplanationSection(title, items, claimText = "") {
+  const picked = pickTopEvidenceItems(items, claimText, 1);
+  const body = picked.length
+    ? `<ul class="explanation-list">${picked.map((item) => renderExplanationItem(item)).join("")}</ul>`
+    : `<p class="explanation-none">None.</p>`;
+  return `
+    <section class="explanation-section">
+      <p><strong>${escapeHtml(title)}:</strong></p>
+      ${body}
+    </section>
+  `;
+}
+
+function renderExplanationItem(item) {
+  const context = pickEvidenceContext(item, 520) || "No detailed evidence text available.";
+  const source = item && item.source ? String(item.source).trim() : "Unknown source";
+  return `<li><p>${escapeHtml(context)}</p><p class="meta">Source: ${escapeHtml(source)}</p></li>`;
+}
+
+function getEvidenceGroups(filteredEvidence) {
+  return {
+    support: filteredEvidence.filter((ev) => String(ev.stance || "").toUpperCase() === "SUPPORT"),
+    refute: filteredEvidence.filter((ev) => String(ev.stance || "").toUpperCase() === "REFUTE"),
+    neutral: filteredEvidence.filter((ev) => String(ev.stance || "").toUpperCase() === "NEUTRAL"),
+  };
+}
+
+function pickTopEvidenceItems(items, claimText = "", limit = 1) {
+  if (!items || !items.length) return [];
+  return [...items]
+    .sort((a, b) => scoreEvidenceItem(b, claimText) - scoreEvidenceItem(a, claimText))
+    .slice(0, limit);
+}
+
+function scoreEvidenceItem(item, claimText = "") {
+  const relevance = Number(item?.relevance_score ?? 0);
+  const quality = Number(item?.quality_score ?? 0);
+  const confidence = Number(item?.confidence ?? 0);
+  const weight = Number(item?.weight ?? 0);
+  const overlap = computeClaimOverlap(item, claimText);
+  const numberBonus = computeNumberAlignmentBonus(item, claimText);
+  return (relevance * 3) + (quality * 2) + confidence + weight + overlap + numberBonus;
+}
+
+function computeClaimOverlap(item, claimText = "") {
+  const claimTokens = tokenizeForMatch(claimText);
+  if (!claimTokens.length) return 0;
+  const evidenceTokens = new Set(tokenizeForMatch(pickEvidenceContext(item, 900) || item?.text || ""));
+  let matches = 0;
+  for (const token of claimTokens) {
+    if (evidenceTokens.has(token)) matches += 1;
+  }
+  return matches / claimTokens.length;
+}
+
+function computeNumberAlignmentBonus(item, claimText = "") {
+  const claimNumbers = extractNumericTokens(claimText);
+  if (!claimNumbers.length) return 0;
+  const evidenceText = `${pickEvidenceContext(item, 900) || ""} ${String(item?.text || "")}`;
+  const evidenceNumbers = new Set(extractNumericTokens(evidenceText));
+  let matched = 0;
+  for (const num of claimNumbers) {
+    if (evidenceNumbers.has(num)) matched += 1;
+  }
+  return matched ? matched * 2.5 : -1.5;
+}
+
+function tokenizeForMatch(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 2);
+}
+
+function extractNumericTokens(text) {
+  return (String(text || "").match(/\b\d+[\d,]*\b/g) || []).map((value) => value.replace(/,/g, ""));
+}
+
+function pickBestEvidenceContext(items, claimText = "", maxLen = 280) {
+  const picked = pickTopEvidenceItems(items, claimText, 1);
+  return picked.length ? pickEvidenceContext(picked[0], maxLen) : null;
+}
+
+function pickEvidenceContext(item, maxLen = 280) {
+  if (!item) return null;
+  const passages = Array.isArray(item.retained_passages)
+    ? item.retained_passages.filter(Boolean).map((part) => String(part).trim())
+    : [];
+  const candidates = [
+    item.context_text,
+    passages.length ? passages.slice(0, 2).join(" ") : "",
+    item.text,
+  ]
+    .filter(Boolean)
+    .map((value) => sanitizeNarrative(String(value)).replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  if (!candidates.length) return null;
+
+  const best = candidates.sort((a, b) => b.length - a.length)[0];
+  return truncateAtSentence(best, maxLen);
+}
+
+function truncateAtSentence(text, maxLen) {
+  if (!text) return "";
+  if (!maxLen || text.length <= maxLen) return text;
+  const trimmed = text.slice(0, maxLen);
+  const boundary = Math.max(trimmed.lastIndexOf(". "), trimmed.lastIndexOf("? "), trimmed.lastIndexOf("! "));
+  if (boundary >= 80) {
+    return `${trimmed.slice(0, boundary + 1).trim()}`;
+  }
+  return `${trimmed.trim()}...`;
 }
 
 function extractVerdict(data) {
