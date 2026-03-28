@@ -90,4 +90,6 @@ playwright-report/
 *.json
 *.yaml
 *.yml
+*.pdf
+*.jsonl
 

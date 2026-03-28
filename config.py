@@ -27,6 +27,3 @@ NEWS_API_KEY = os.getenv("NEWS_API_KEY") or _read_env_value(ENV_PATH, "NEWS_API_
 
 if NEWS_API_KEY:
     NEWS_API_KEY = NEWS_API_KEY.strip()
-
-if not NEWS_API_KEY:
-    raise ValueError(f"NEWS_API_KEY not found in environment variables or {ENV_PATH}")

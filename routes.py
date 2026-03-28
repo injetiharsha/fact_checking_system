@@ -1,6 +1,7 @@
 import os
 import uuid
 import asyncio
+import tempfile
 from fastapi import APIRouter, UploadFile, File
 from deep_translator import GoogleTranslator
 
@@ -11,8 +12,22 @@ from pipeline.document_pipeline import DocumentPipeline
 
 router = APIRouter()
 
-claim_pipeline = ClaimPipeline()
-document_pipeline = DocumentPipeline()
+_claim_pipeline = None
+_document_pipeline = None
+
+
+def get_claim_pipeline():
+    global _claim_pipeline
+    if _claim_pipeline is None:
+        _claim_pipeline = ClaimPipeline()
+    return _claim_pipeline
+
+
+def get_document_pipeline():
+    global _document_pipeline
+    if _document_pipeline is None:
+        _document_pipeline = DocumentPipeline()
+    return _document_pipeline
 
 
 def _translate_value(value, translator):
@@ -46,7 +61,7 @@ def _translate_value(value, translator):
 @router.post("/check")
 async def check_claim(data: ClaimRequest):
     try:
-        return await claim_pipeline.run(data.claim)
+        return await get_claim_pipeline().run(data.claim)
     except asyncio.CancelledError:
         return {"error": "Request cancelled during server reload/shutdown. Please retry."}
 
@@ -55,7 +70,7 @@ async def check_claim(data: ClaimRequest):
 @router.post("/analyze_url")
 async def analyze_url(data: URLRequest):
     try:
-        return await document_pipeline.run(data.url)
+        return await get_document_pipeline().run(data.url)
     except asyncio.CancelledError:
         return {"error": "Request cancelled during server reload/shutdown. Please retry."}
 
@@ -66,18 +81,19 @@ async def analyze_pdf(file: UploadFile = File(...)):
     if not file.filename.endswith(".pdf"):
         return {"error": "Only PDF files allowed"}
 
-    temp_filename = f"temp_{uuid.uuid4()}.pdf"
+    temp_filename = None
 
     try:
-        with open(temp_filename, "wb") as f:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f:
+            temp_filename = f.name
             f.write(await file.read())
 
         try:
-            return await document_pipeline.process_pdf(temp_filename)
+            return await get_document_pipeline().process_pdf(temp_filename)
         except asyncio.CancelledError:
             return {"error": "Request cancelled during server reload/shutdown. Please retry."}
     finally:
-        if os.path.exists(temp_filename):
+        if temp_filename and os.path.exists(temp_filename):
             os.remove(temp_filename)
 
 
@@ -87,18 +103,20 @@ async def analyze_image(file: UploadFile = File(...)):
     if not file.filename.lower().endswith((".png", ".jpg", ".jpeg")):
         return {"error": "Only image files allowed"}
 
-    temp_filename = f"temp_{uuid.uuid4()}.png"
+    temp_filename = None
 
     try:
-        with open(temp_filename, "wb") as f:
+        suffix = os.path.splitext(file.filename or "")[1].lower() or ".png"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+            temp_filename = f.name
             f.write(await file.read())
 
         try:
-            return await document_pipeline.process_image(temp_filename)
+            return await get_document_pipeline().process_image(temp_filename)
         except asyncio.CancelledError:
             return {"error": "Request cancelled during server reload/shutdown. Please retry."}
     finally:
-        if os.path.exists(temp_filename):
+        if temp_filename and os.path.exists(temp_filename):
             os.remove(temp_filename)
 
 

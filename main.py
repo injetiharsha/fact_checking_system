@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 model_cache_root = Path(
-    os.getenv("MODEL_CACHE_DIR", r"F:\fact_checking_system\.venv\model_cache")
+    os.getenv("MODEL_CACHE_DIR", str(BASE_DIR / ".venv" / "model_cache"))
 ).expanduser()
 
 cache_paths = {
