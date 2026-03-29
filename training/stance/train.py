@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import json
 import sys
 from datetime import datetime, timezone
@@ -42,8 +42,8 @@ class ProgressWriter:
             "stage": stage,
             **extra,
         }
-        self.status_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        with self.log_path.open("a", encoding="utf-8") as handle:
+        self.status_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8-sig")
+        with self.log_path.open("a", encoding="utf-8-sig") as handle:
             handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
@@ -104,7 +104,7 @@ def _read_jsonl(path: Path, split_name: str, progress: ProgressWriter | None = N
     print(f"Reading {split_name} from {path}...", flush=True)
     if progress is not None:
         progress.update("reading_split", split=split_name, path=str(path))
-    with path.open("r", encoding="utf-8") as handle:
+    with path.open("r", encoding="utf-8-sig") as handle:
         for idx, line in enumerate(handle, start=1):
             line = line.strip()
             if not line:
@@ -318,3 +318,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
