@@ -132,6 +132,8 @@ class SearchEngine:
         self._provider_backoff[backend] = {"until": until}
 
     def _backend_order(self):
+        if (os.getenv("BENCHMARK_PRIMARY_SEARCH_ONLY") or "0").strip() == "1":
+            return [self._resolved_backend()]
         policy = self.search_policy
         if policy == "cheap":
             return ["duckduckgo"]

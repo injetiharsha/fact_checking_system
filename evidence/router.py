@@ -205,23 +205,29 @@ class EvidenceRouter:
 
         api_start = time.time()
 
-        api_tasks = [
-            asyncio.to_thread(self.worldbank.fetch, claim),
-            asyncio.to_thread(self.un_api.fetch, claim),
-            asyncio.to_thread(self.rbi.fetch, claim),
-            asyncio.to_thread(self.mospi.fetch, claim),
-            asyncio.to_thread(self.who.fetch, claim),
-            asyncio.to_thread(self.oecd.fetch, claim),
-            asyncio.to_thread(self.nasa.fetch, claim),
-            asyncio.to_thread(self.openfda.fetch, claim),
-            asyncio.to_thread(self.news_api.fetch, claim)
-        ]
+        disable_structured_apis = (os.getenv("BENCHMARK_DISABLE_STRUCTURED_APIS") or "0").strip() == "1"
+        api_tasks = []
+        if not disable_structured_apis:
+            api_tasks = [
+                asyncio.to_thread(self.worldbank.fetch, claim),
+                asyncio.to_thread(self.un_api.fetch, claim),
+                asyncio.to_thread(self.rbi.fetch, claim),
+                asyncio.to_thread(self.mospi.fetch, claim),
+                asyncio.to_thread(self.who.fetch, claim),
+                asyncio.to_thread(self.oecd.fetch, claim),
+                asyncio.to_thread(self.nasa.fetch, claim),
+                asyncio.to_thread(self.openfda.fetch, claim),
+                asyncio.to_thread(self.news_api.fetch, claim)
+            ]
 
-        try:
-            results = await asyncio.gather(*api_tasks, return_exceptions=True)
-        except asyncio.CancelledError:
-            print("Evidence retrieval cancelled during structured API fetch.")
-            return evidence_list
+        if api_tasks:
+            try:
+                results = await asyncio.gather(*api_tasks, return_exceptions=True)
+            except asyncio.CancelledError:
+                print("Evidence retrieval cancelled during structured API fetch.")
+                return evidence_list
+        else:
+            results = []
 
         for result in results:
 

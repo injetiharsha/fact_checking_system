@@ -2,17 +2,29 @@ import asyncio
 import argparse
 import json
 import os
+import sys
 import time
 from collections import Counter
 from pathlib import Path
 
-from pipeline.document_pipeline import DocumentPipeline
+from pipeline.claim_pipeline import ClaimPipeline
 
-pipeline = DocumentPipeline()
+os.environ.setdefault("BENCHMARK_DISABLE_STRUCTURED_APIS", "1")
+os.environ.setdefault("FACTLENS_CACHE_RETRIEVAL", "1")
+os.environ.setdefault("BENCHMARK_PRIMARY_SEARCH_ONLY", "1")
+
+pipeline = ClaimPipeline()
 
 # limit concurrent pipelines (important for scraping stability)
-MAX_CONCURRENT = int(os.getenv("BENCHMARK_MAX_CONCURRENT", "4"))
+MAX_CONCURRENT = int(os.getenv("BENCHMARK_MAX_CONCURRENT", "1"))
+CLAIM_DELAY_SECONDS = float(os.getenv("BENCHMARK_CLAIM_DELAY_SECONDS", "0.75"))
 semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+
+
+def _safe_console_text(value):
+    text = str(value)
+    enc = sys.stdout.encoding or "utf-8"
+    return text.encode(enc, errors="replace").decode(enc, errors="replace")
 
 
 # ------------------------------------------------
@@ -107,13 +119,13 @@ async def process_claim(i, claim, active_claims, active_truth):
 
         print("\n==============================")
         print(f"Processing claim {i+1}/{len(active_claims)}")
-        print("Claim:", claim)
+        print("Claim:", _safe_console_text(claim))
 
         start = time.time()
 
         error_text = None
         try:
-            res = await pipeline._process_text(claim)
+            res = await pipeline.run(claim)
         except Exception as exc:
             res = {
                 "final_verdict": "NEUTRAL",
@@ -122,7 +134,7 @@ async def process_claim(i, claim, active_claims, active_truth):
                 "error": str(exc),
             }
             error_text = str(exc)
-            print("Claim processing error:", error_text)
+            print("Claim processing error:", _safe_console_text(error_text))
 
         elapsed = round(time.time() - start, 3)
 
@@ -141,6 +153,9 @@ async def process_claim(i, claim, active_claims, active_truth):
 
         print("Verdict:", verdict)
         print("Time:", elapsed, "sec")
+
+        if CLAIM_DELAY_SECONDS > 0:
+            await asyncio.sleep(CLAIM_DELAY_SECONDS)
 
         return {
             "claim": claim,

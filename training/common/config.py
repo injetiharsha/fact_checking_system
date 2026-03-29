@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 from pathlib import Path
 from typing import Any, Dict
 
@@ -7,6 +8,10 @@ try:
 except Exception:  # pragma: no cover - import guard for environments without PyYAML
     yaml = None
 
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+ENV_PATH = ROOT_DIR / '.env'
+load_dotenv(ENV_PATH, override=False)
 
 RUNTIME_ENV_MAP = {
     "claim_checkability": {
@@ -60,6 +65,7 @@ def checkpoint_path(task: str) -> Path | None:
     path = Path(value).expanduser()
     if path.exists():
         return path
+    print(f"WARNING: configured {task} checkpoint does not exist: {path}")
     return None
 
 
