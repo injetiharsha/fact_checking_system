@@ -48,6 +48,20 @@ class ClaimCheckabilityClassifier:
         if self.trained_checkpoint is not None:
             trained = self._classify_with_subprocess(claim)
             if trained is not None:
+                if self._should_rescue_as_factual(
+                    claim,
+                    trained,
+                    claim_type_result=claim_type_result,
+                    logical_metadata=logical_metadata,
+                ):
+                    return self._build_result(
+                        label=ClaimCheckabilityLabel.CHECKABLE,
+                        subtype=ClaimCheckabilitySubtype.FACTUAL_CLAIM,
+                        confidence=max(0.72, 1.0 - float(trained.get("confidence", 0.0))),
+                        reasoning="Sentence-level factual cues overrode an 'other_uncheckable' gate prediction.",
+                        code="checkable_factual_rescue",
+                        message="",
+                    )
                 return trained
         return self._heuristic_classify(
             claim,
@@ -137,6 +151,54 @@ class ClaimCheckabilityClassifier:
             "code": code,
             "message": message,
         }
+
+    def _should_rescue_as_factual(self, claim: str, trained: dict, claim_type_result=None, logical_metadata=None) -> bool:
+        if trained.get("label") != ClaimCheckabilityLabel.UNCHECKABLE:
+            return False
+        if trained.get("subtype") != ClaimCheckabilitySubtype.OTHER_UNCHECKABLE:
+            return False
+
+        claim_text = " ".join((claim or "").strip().split())
+        lowered = claim_text.lower()
+        if not claim_text or claim_text.endswith("?"):
+            return False
+
+        claim_type = str((claim_type_result or {}).get("type", "")).lower()
+        if claim_type.endswith("opinion"):
+            return False
+
+        tokens = re.findall(r"\w+", lowered, flags=re.UNICODE)
+        if len(tokens) < 4:
+            return False
+
+        if logical_metadata and logical_metadata.get("is_opinion"):
+            return False
+
+        factual_cues = (
+            " is ",
+            " are ",
+            " was ",
+            " were ",
+            " has ",
+            " have ",
+            " had ",
+            " became ",
+            " become ",
+            " can ",
+            " cannot ",
+            " cant ",
+            " does ",
+            " do ",
+            " did ",
+        )
+        has_factual_cue = any(cue in f" {lowered} " for cue in factual_cues)
+        has_digit = any(ch.isdigit() for ch in claim_text)
+        has_non_ascii = any(ord(ch) > 127 for ch in claim_text)
+        capitalized_entity = bool(re.search(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b", claim))
+        ends_like_statement = claim_text.endswith(".") or claim_text[-1].isalnum()
+        native_script_factual_shape = has_non_ascii and has_digit and ends_like_statement
+
+        return ends_like_statement and (has_factual_cue or has_digit or capitalized_entity or native_script_factual_shape)
 
     def _heuristic_classify(self, claim: str, claim_type_result=None, logical_metadata=None) -> dict:
         claim_text = " ".join((claim or "").strip().split())

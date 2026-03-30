@@ -860,7 +860,7 @@ class ClaimPipeline:
         }
 
         print("\n==============================")
-        print("Processing claim:", claim)
+        print("Processing claim:", _safe_console_text(claim))
 
         # run logical claim analysis
         start = time.time()
