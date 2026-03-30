@@ -1,8 +1,8 @@
-# Project Status Detailed
+﻿# Project Status Detailed
 
 ## Overall State
 
-The project is in a much stronger state than before, but it is not finished in the sense of having fully reliable fact-check quality across claim types, source types, and languages. The system now has a real claim-checkability gate, a stronger stance checkpoint, cleaner frontend behavior, and a much better benchmark workflow. The biggest remaining limitation is still downstream: retrieval quality, source selection, and decisive evidence survival.
+The project is in a much stronger state than before, and the main system recovery is complete. The runtime now has a stable claim-checkability gate, a recovered and strengthened stance line, cleaner frontend behavior, and a reliable benchmark workflow again. The biggest remaining limitation is still downstream: retrieval quality, source selection, and decisive evidence survival.
 
 At a high level, the system is now good enough to operate as a serious prototype and iterate safely, but not yet good enough to claim best-in-class reliability.
 
@@ -11,14 +11,14 @@ At a high level, the system is now good enough to operate as a serious prototype
 This is the best known practical stack right now and should be treated as the runtime baseline unless a future checkpoint clearly beats it in benchmarks:
 
 - Relevance checkpoint: `checkpoints/relevance/v9_run1`
-- Stance checkpoint: `checkpoints/stance/stage2_hardcases_v3_bias`
+- Stance checkpoint: `checkpoints/stance/stage2_hardcases_v3_bias_restorefast_patch2`
 - Claim-checkability checkpoint: `checkpoints/claim_checkability/v2_run2`
 - `ENABLE_RETRIEVAL_V2=0`
 - `ENABLE_VERIFIER_V2=0`
 - `ENABLE_LLM_VERIFIER=1`
 - `LLM_VERIFIER_POLICY=neutral_only`
 
-This stack was selected because it gives the best quality/safety/runtime balance among the variants tested so far.
+This stack was selected because it gives the best quality/safety/runtime balance among the variants tested so far, including the recovered `restorefast_patch2` stance line.
 
 ## What Has Been Finished
 
@@ -77,7 +77,28 @@ Current status:
 - finished enough for runtime use
 - still not perfect on all contradiction styles, but clearly better than before
 
-### 3. Frontend and UX cleanup
+### 3. Stance recovery and patch cycle
+
+Later in the project, the stance line had to be rebuilt because the earlier promoted checkpoint path was missing and benchmark execution had become unstable.
+
+What was completed:
+- rebuilt a usable stage-1 base as `stage1_public_small_restorefast`
+- rebuilt the stage-2 stance line as `stage2_hardcases_v3_bias_restorefast`
+- identified the exact 30-claim regressions that remained
+- created `patch1` from the 4 flipped 30-claim regressions
+- created `patch2` from the remaining 50-claim English + multilingual/native-script residuals
+- promoted `stage2_hardcases_v3_bias_restorefast_patch2`
+
+Recovered benchmark outcomes:
+- 30-claim: accuracy `0.867`
+- mixed 50-claim: accuracy `0.820`, adjusted accuracy `0.854`
+- mixed 68-claim: accuracy `0.794`, adjusted accuracy `0.806`
+
+What this means:
+- the stance line is no longer merely recovered
+- `patch2` is now the strongest practical stance checkpoint in the repo
+
+### 4. Frontend and UX cleanup
 
 The interface is substantially better than earlier versions.
 
@@ -98,15 +119,15 @@ Current status:
 - not a project blocker anymore
 - only incremental polish remains
 
-### 4. Benchmarking and evaluation flow
+### 5. Benchmarking and evaluation flow
 
 The benchmarking and follow-up workflow is now far stronger than before.
 
 Completed:
 - 8-claim support-bias packet
 - 30-claim benchmark artifacts
+- 50-claim mixed benchmark flow
 - 68-claim mixed benchmark flow
-- 100-claim mixed seed flow
 - checkability evaluation packet
 - multilingual benchmark packet
 - adjusted metrics excluding `blocked_not_checkable`
@@ -212,33 +233,18 @@ Current status:
 - identified as real
 - not yet fully fixed
 
-## What Still Needs to Start Properly
+## What Still Needs To Start Properly
 
 These are the next real workstreams that should be treated as project priorities:
 
-1. Retrieval/source audit on recurring benchmark misses
-2. Claim-level source-selection residual collection
-3. Multilingual factual-claim checkability collection
-4. Only then the next training pass, if justified by the evidence
+1. retrieval/source audit on recurring benchmark misses
+2. claim-level source-selection residual collection
+3. multilingual factual-claim checkability collection
+4. only then the next training pass, if justified by the evidence
 
 This is the logic behind `REAL_BOTTLENECKS_PHASED_PLAN.md`.
 
-## Incomplete Plans
-
-The main unfinished plan is already documented in `REAL_BOTTLENECKS_PHASED_PLAN.md`.
-
-Its unfinished parts are:
-- retrieval audit on recurring neutral-despite-evidence misses
-- source-selection residual growth
-- multilingual wrongly-blocked claim collection
-- next training decision after better data, not before
-
-Additional partially complete but unfinished lines:
-- multilingual relevance replacement for `v9_run1`
-- broader multilingual runtime robustness
-- retrieval/source-quality residual expansion at scale
-
-## How This Affects the Project Goal
+## How This Affects The Project Goal
 
 If the project goal is better product behavior for users:
 - the system is already in a decent place
@@ -260,11 +266,12 @@ A fair current read is:
 
 - front-door input quality / claim gating: strong
 - stance safety / support-bias reduction: strong
+- stance recovery / patch cycle: strong
 - frontend usability: good
 - benchmarking discipline: good
 - relevance replacement experiments: explored, not successful enough
 - retrieval/source-quality core problem: still open and high priority
-- multilingual robustness: partially explored, not production-strong
+- multilingual robustness: partially improved, not fully solved at the data level
 
 ## What Can Be Done To Make It Best-In-Class
 
@@ -352,7 +359,8 @@ Best practice going forward:
 - run experiments off to the side
 - only promote new checkpoints when they beat baseline on:
   - 30-claim benchmark
-  - 68-claim benchmark
+  - 50-claim mixed benchmark
+  - 68-claim mixed benchmark
   - support-bias packet
   - multilingual packet, if multilingual is the purpose
 
