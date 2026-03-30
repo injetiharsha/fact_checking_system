@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 
 
@@ -21,3 +21,5 @@ class ClaimResponse(BaseModel):
     citations: List[str]
     logical_analysis: Dict[str, Any]
     explanation: str
+    transparency: Dict[str, Any] = Field(default_factory=dict)
+    ux_warnings: List[Dict[str, Any]] = Field(default_factory=list)

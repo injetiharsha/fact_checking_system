@@ -14,33 +14,42 @@ class DocumentPipeline:
         self.extractor = ClaimExtractor()
         self.claim_pipeline = ClaimPipeline()
 
-    def run(self, url):
+    async def run(self, url):
         text = self.web_ingestor.extract_text(url)
-        return self._process_text(text, source_url=url)
+        return await self._process_text(text, source_url=url)
 
-    def process_pdf(self, file_path):
+    async def process_pdf(self, file_path):
         text = extract_pdf(file_path)
-        return self._process_text(text)
+        return await self._process_text(text)
 
-    def process_image(self, file_path):
+    async def process_image(self, file_path):
         text = extract_image_text(file_path)
-        return self._process_text(text)
+        return await self._process_text(text)
 
-    def _process_text(self, text, source_url=None):
+    async def _process_text(self, text, source_url=None):
 
         if not text:
             return {"error": "Could not extract text"}
 
-        claims = self.extractor.extract_claims(text)
+        words = (text or "").strip().split()
+        if source_url is None and 3 <= len(words) <= 20:
+            main_claim = (text or "").strip()
+        else:
+            main_claim = self.extractor.extract_main_claim(text)
+        if not main_claim:
+            return {
+                "error": (
+                    "Text was extracted but no valid claims were detected. "
+                    "Try a cleaner article PDF/URL or provide direct claim text."
+                )
+            }
 
         results = []
-
-        for claim in claims:
-            claim_result = self.claim_pipeline.run(
-                claim,
-                source_url=source_url
-            )
-            results.append(claim_result)
+        claim_result = await self.claim_pipeline.run(
+            main_claim,
+            source_url=source_url
+        )
+        results.append(claim_result)
 
         document_score = score_document(results)
 

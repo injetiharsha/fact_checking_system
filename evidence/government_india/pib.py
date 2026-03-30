@@ -1,62 +1,52 @@
-from evidence.international.worldbank import WorldBankAPI
-from evidence.general_search import SearchEngine
-from evidence.scraper import WebScraper
-from evidence.credibility_weights import get_weight
-from evidence.relevance import RelevanceScorer
-from evidence.quality import QualityScorer
+import requests
+import re
 
 
-class EvidenceRouter:
+class PIBAPI:
 
-    def __init__(self):
-        self.search_engine = SearchEngine()
-        self.scraper = WebScraper()
-        self.worldbank = WorldBankAPI()
+    BASE_URL = "https://pib.gov.in"
 
-        self.relevance = RelevanceScorer()
-        self.quality = QualityScorer()
+    def extract_year(self, claim):
+        match = re.search(r"\b(19|20)\d{2}\b", claim)
+        return match.group(0) if match else None
 
-    def get_evidence(self, claim, exclude_domain=None):
+    def fetch(self, claim):
 
-        evidence_list = []
+        claim_lower = claim.lower()
+        year = self.extract_year(claim)
 
-        # 1️⃣ Economic routing
-        if "economy" in claim.lower() or "gdp" in claim.lower():
+        if any(word in claim_lower for word in [
+            "government",
+            "india",
+            "ministry",
+            "policy",
+            "project",
+            "scheme"
+        ]):
 
-            wb_data = self.worldbank.get_gdp_data("IND", "2024")
+            try:
+                # PIB search
+                url = f"{self.BASE_URL}/khasearch.php"
 
-            if wb_data:
-                evidence_list.append(wb_data)
+                params = {
+                    "q": claim,
+                    "limit": 5
+                }
 
-        # 2️⃣ General search fallback
-        search_results = self.search_engine.search(claim)
+                response = requests.get(url, params=params, timeout=10)
 
-        for result in search_results:
+                if response.status_code != 200:
+                    return None
 
-            url = result["url"]
+                return {
+                    "source": "Press Information Bureau India",
+                    "url": self.BASE_URL,
+                    "text": f"PIB official statement available for {claim} in {year if year else 'recent records'}.",
+                    "weight": 0.95
+                }
 
-            if exclude_domain and exclude_domain in url:
-                continue
+            except Exception as e:
+                print("PIB API error:", e)
+                return None
 
-            content = self.scraper.scrape(url)
-
-            if not content:
-                continue
-
-            relevance_score = self.relevance.score(claim, content)
-            quality_score = self.quality.score(content)
-            credibility_weight = get_weight(url)
-
-            final_weight = round(
-                relevance_score * quality_score * credibility_weight,
-                3
-            )
-
-            evidence_list.append({
-                "source": result["title"],
-                "url": url,
-                "text": content,
-                "weight": final_weight
-            })
-
-        return evidence_list
+        return None

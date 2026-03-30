@@ -1,95 +1,132 @@
-# =========================
-# OS FILES
-# =========================
+# OS files
 .DS_Store
 Thumbs.db
 Desktop.ini
 
-# =========================
-# EDITOR / IDE
-# =========================
+# Editors / IDEs
 .vscode/
 .idea/
 *.iml
 
-# =========================
-# PYTHON
-# =========================
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Virtual environments
-venv/
-env/
-ENV/
-.venv/
-
-# Python distribution
-build/
-dist/
-*.egg-info/
-.eggs/
-
-# =========================
-# LOGS
-# =========================
-*.log
-logs/
-
-# =========================
-# JUPYTER
-# =========================
-.ipynb_checkpoints/
-
-# =========================
-# TESTING / CACHE
-# =========================
 .pytest_cache/
 .mypy_cache/
 .coverage
 htmlcov/
 
-# =========================
-# MACHINE LEARNING
-# =========================
-# Model weights
-*.h5
-*.pt
-*.pth
-*.ckpt
-*.onnx
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
 
-# Training checkpoints
-checkpoints/
-runs/
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
 
-# =========================
-# DATASETS
-# =========================
-data/
-datasets/
-*.csv
-*.tsv
-*.jsonl
+# Logs and runtime caches
+*.log
+logs/
+.cache/
 
-# =========================
-# ENVIRONMENT VARIABLES
-# =========================
+# Environment / secrets
 .env
 .env.*
 *.env
 secrets.json
-config.json
 
-# =========================
-# TEMP FILES
-# =========================
+# Local model and training artifacts
+checkpoints/
+training_artifacts/
+trained_models/
+runs/
+.gradio/
+
+# Generated benchmark/debug outputs
+batch_results.json
+multi_test_results.json
+parallel_test_results.json
+pipeline_trace.json
+benchmark_trained.log
+benchmark_trained_stdout.log
+benchmark_trained_stderr.log
+baseline_prev.json
+
+# Temporary files
 *.tmp
+*.temp
 *.bak
 *.swp
+temp_*.pdf
+temp_*.png
+temp_test.py
+temp_test2.py
 
-# =========================
-# Docker (if you use later)
-# =========================
-docker-compose.override.yml
+# Jupyter
+.ipynb_checkpoints/
+
+# Downloaded / generated datasets and caches
+datasets/
+data/**/train.jsonl
+data/**/validation.jsonl
+data/**/test.jsonl
+data/**/dataset.jsonl
+data/**/review_queue.json
+data/public
+
+# Browser / automation
+playwright-report/
+
+# Keep source assets tracked by default:
+# - markdown corpus files
+# - checked-in JSON fixtures
+# - checked-in PDFs/images when intentionally added
+# JSON / YAML artifacts
+*.json
+*.yaml
+*.yml
+*.pdf
+*.jsonl
+
+# Local experimental docs / notes
+DIVERSE_MULTILINGUAL_PUBLIC_CLAIMS_v2.md
+HF_MULTILINGUAL_STANCE_EXPANSION_v2.md
+MULTILINGUAL_FAILURE_RESIDUAL_PACKET_v1.md
+MULTILINGUAL_PUBLIC_LARGE_PLAN.md
+PROJECT_COMPLETION_EXECUTION_PLAN.md
+PROJECT_MODEL_HISTORY_PROMPT.md
+PUBLIC_DATASETS_RETRIEVAL_SOURCE_PLAN_v1.md
+RETRIEVAL_SOURCE_RESIDUAL_AUDIT_v1.md
+TRAINING_PUBLIC_STATEMENT_FAMILIES_v1.md
+training/MULTILINGUAL_RESIDUAL_DATASETS_V1.md
+training/MULTILINGUAL_RESIDUAL_TRAINING_V1.md
+
+# Local experimental scripts
+scripts/build_metrics_summaries.py
+scripts/build_stack_upgrade_history.py
+scripts/generate_version_history_assets.py
+scripts/metrics_coverage_report.py
+scripts/plot_all_components_progression.py
+scripts/plot_benchmark_packets.py
+scripts/plot_combined_relevance_versions.py
+scripts/plot_stack_upgrade_matrix.py
+scripts/plot_training_metrics.py
+scripts/plot_version_comparisons.py
+scripts/recover_training_metrics.py
+
+# Local experimental training builders
+training/common/build_claim_checkability_v3_multilingual.py
+training/common/build_claim_checkability_v4_multilingual_internet.py
+training/common/build_claim_checkability_v5_public_large_multilingual.py
+training/common/build_multilingual_public_large_claims_v1.py
+training/common/build_relevance_v14_targeted.py
+training/common/build_stance_public_hf_multilingual_v2.py
+training/common/build_stance_public_large_multilingual_v1.py
+training/common/build_stance_stage2_hardcases_v4_multilingual.py
+training/common/build_stance_stage2_hardcases_v5_multilingual_internet.py
+

@@ -1,3 +1,5 @@
+import os
+import time
 import requests
 from config import NEWS_API_KEY
 
@@ -12,40 +14,66 @@ class TrustedNewsAPI:
         "bbc.com",
         "thehindu.com",
         "indianexpress.com",
-        "apnews.com"
+        "apnews.com",
+        "finance.yahoo.com",
+        "marketwatch.com",
+        "cnbc.com",
+        "bloomberg.com",
     ]
 
+    def __init__(self):
+        self._backoff_until = 0.0
+
     def fetch(self, claim):
+        if time.time() < self._backoff_until:
+            return []
+        return self._dedupe_evidence(self._fetch_newsdata(claim))
+
+    def _fetch_newsdata(self, claim):
+        if not NEWS_API_KEY:
+            return []
 
         params = {
             "q": claim,
             "language": "en",
-            "sortBy": "relevancy",
-            "pageSize": 5,
-            "apiKey": NEWS_API_KEY
+            "apikey": NEWS_API_KEY,
         }
 
         try:
             response = requests.get(self.BASE_URL, params=params, timeout=10)
-
             if response.status_code != 200:
+                print("News API error:", response.status_code, response.text[:300])
+                if response.status_code in {401, 403, 429}:
+                    self._backoff_until = time.time() + 900
                 return []
 
             data = response.json()
-
-            articles = data.get("articles", [])
+            articles = data.get("results", [])
             evidence_list = []
 
             for article in articles:
-                url = article.get("url", "")
+                url = article.get("link", "") or article.get("url", "")
 
                 if not any(domain in url for domain in self.TRUSTED_DOMAINS):
                     continue
 
+                source_name = (
+                    article.get("source_name")
+                    or article.get("source_id")
+                    or "Trusted News"
+                )
+                text = (
+                    article.get("description", "")
+                    or article.get("title", "")
+                    or article.get("content", "")
+                )
+                if not text:
+                    continue
+
                 evidence_list.append({
-                    "source": article.get("source", {}).get("name", "Trusted News"),
+                    "source": source_name,
                     "url": url,
-                    "text": article.get("description", "") or article.get("title", ""),
+                    "text": text,
                     "weight": 0.85
                 })
 
@@ -53,4 +81,19 @@ class TrustedNewsAPI:
 
         except Exception as e:
             print("News API error:", e)
+            if isinstance(e, requests.exceptions.ConnectionError):
+                self._backoff_until = time.time() + 180
+            elif isinstance(e, requests.exceptions.Timeout):
+                self._backoff_until = time.time() + 180
             return []
+
+    def _dedupe_evidence(self, rows):
+        deduped = []
+        seen = set()
+        for row in rows:
+            key = ((row.get("url") or "").strip(), (row.get("text") or "").strip())
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(row)
+        return deduped
