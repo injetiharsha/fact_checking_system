@@ -1,11 +1,11 @@
 {
   "version": "v2",
-  "total_rows": 1070,
-  "train_rows": 750,
-  "validation_rows": 160,
-  "test_rows": 160,
+  "total_rows": 1105,
+  "train_rows": 773,
+  "validation_rows": 166,
+  "test_rows": 166,
   "label_distribution": {
-    "factual_claim": 436,
+    "factual_claim": 471,
     "personal_statement": 60,
     "opinion": 58,
     "question_or_rewrite": 60,
@@ -13,7 +13,7 @@
   },
   "sources": {
     "seed_v1": 50,
-    "local_curated_v2": 220,
+    "local_curated_v2": 255,
     "claimbuster": 800
   },
   "local_curated_file": "data/claim_checkability/seeds/local_curated_v2.jsonl",

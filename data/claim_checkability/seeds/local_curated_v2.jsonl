@@ -228,3 +228,43 @@
 {"id": "local_curated_v2_228", "text": "big surprise", "label": "other_uncheckable", "source": "local_curated_v2"}
 {"id": "local_curated_v2_229", "text": "look carefully", "label": "other_uncheckable", "source": "local_curated_v2"}
 {"id": "local_curated_v2_230", "text": "breaking alert", "label": "other_uncheckable", "source": "local_curated_v2"}
+{"id": "local_curated_v2_221", "text": "Humans need oxygen to survive.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_222", "text": "Birds lay eggs.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_223", "text": "A spider is not an insect.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_224", "text": "The Moon is Earth's natural satellite.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_225", "text": "The Moon is not a planet.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_226", "text": "Venus is not the closest planet to the Sun.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_227", "text": "Mercury is the closest planet to the Sun.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_228", "text": "DNA is shaped like a double helix.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_229", "text": "An octopus has three hearts.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_230", "text": "Mahatma Gandhi was born in Porbandar.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_231", "text": "Mahatma Gandhi was born in Gujarat.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_232", "text": "The Great Wall of China is in China.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_233", "text": "The Great Wall of China is not visible from space with the naked eye.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_234", "text": "Lightning can strike the same place more than once.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_235", "text": "Saturn has rings.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_236", "text": "Bats are mammals.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_237", "text": "Bats are not blind.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_238", "text": "Bananas are fruits.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_239", "text": "Bananas are not vegetables.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_240", "text": "The Sahara is in Africa.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_241", "text": "The Sahara is not in South America.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_242", "text": "Humans cannot breathe in space without equipment.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_243", "text": "The Sun is a star.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_244", "text": "Jupiter is the largest planet in the solar system.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_245", "text": "Neptune is a planet in the solar system.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_246", "text": "Sharks are fish.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_247", "text": "Sharks are not mammals.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_248", "text": "The Pacific Ocean is larger than the Atlantic Ocean.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_249", "text": "The Amazon River is not longer than the Nile River.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_250", "text": "The Berlin Wall fell in 1989.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_251", "text": "The Titanic sank in the Atlantic Ocean.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_252", "text": "Water freezes at 0 degrees Celsius at standard pressure.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_253", "text": "The Indian rupee is the currency of India.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_254", "text": "New Delhi is the capital of India.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_255", "text": "Hyderabad is the capital of Telangana.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_256", "text": "Chennai is the capital of Tamil Nadu.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_257", "text": "Bengaluru is the capital of Karnataka.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_258", "text": "The Earth revolves around the Sun.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_259", "text": "The atmosphere of Earth contains oxygen.", "label": "factual_claim", "source": "local_curated_v2"}
+{"id": "local_curated_v2_260", "text": "Octopuses are marine animals.", "label": "factual_claim", "source": "local_curated_v2"}
