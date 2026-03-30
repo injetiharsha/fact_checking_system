@@ -93,3 +93,40 @@ playwright-report/
 *.pdf
 *.jsonl
 
+# Local experimental docs / notes
+DIVERSE_MULTILINGUAL_PUBLIC_CLAIMS_v2.md
+HF_MULTILINGUAL_STANCE_EXPANSION_v2.md
+MULTILINGUAL_FAILURE_RESIDUAL_PACKET_v1.md
+MULTILINGUAL_PUBLIC_LARGE_PLAN.md
+PROJECT_COMPLETION_EXECUTION_PLAN.md
+PROJECT_MODEL_HISTORY_PROMPT.md
+PUBLIC_DATASETS_RETRIEVAL_SOURCE_PLAN_v1.md
+RETRIEVAL_SOURCE_RESIDUAL_AUDIT_v1.md
+TRAINING_PUBLIC_STATEMENT_FAMILIES_v1.md
+training/MULTILINGUAL_RESIDUAL_DATASETS_V1.md
+training/MULTILINGUAL_RESIDUAL_TRAINING_V1.md
+
+# Local experimental scripts
+scripts/build_metrics_summaries.py
+scripts/build_stack_upgrade_history.py
+scripts/generate_version_history_assets.py
+scripts/metrics_coverage_report.py
+scripts/plot_all_components_progression.py
+scripts/plot_benchmark_packets.py
+scripts/plot_combined_relevance_versions.py
+scripts/plot_stack_upgrade_matrix.py
+scripts/plot_training_metrics.py
+scripts/plot_version_comparisons.py
+scripts/recover_training_metrics.py
+
+# Local experimental training builders
+training/common/build_claim_checkability_v3_multilingual.py
+training/common/build_claim_checkability_v4_multilingual_internet.py
+training/common/build_claim_checkability_v5_public_large_multilingual.py
+training/common/build_multilingual_public_large_claims_v1.py
+training/common/build_relevance_v14_targeted.py
+training/common/build_stance_public_hf_multilingual_v2.py
+training/common/build_stance_public_large_multilingual_v1.py
+training/common/build_stance_stage2_hardcases_v4_multilingual.py
+training/common/build_stance_stage2_hardcases_v5_multilingual_internet.py
+
