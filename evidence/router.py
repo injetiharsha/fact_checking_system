@@ -22,7 +22,7 @@ from evidence.local_rag import LocalRAGRetriever
 from evidence.scraper import WebScraper
 from evidence.credibility_weights import get_weight
 from evidence.reference_fallback import ReferenceFallback
-from evidence.india_source_registry import get_india_state_source_hints
+from evidence.india_source_registry import get_india_state_source_hints, get_india_national_source_domains
 
 
 # domains that should never be scraped
@@ -38,6 +38,8 @@ BLOCKED_DOMAINS = [
     "x.com",
     "news.google.com",
 ]
+
+INDIAN_MULTILINGUAL_LANGUAGES = {"hi", "te", "ta", "bn", "mr", "gu", "kn", "ml", "pa", "ur", "or", "as"}
 
 WEAK_RESULT_URL_MARKERS = (
     "/video/",
@@ -188,7 +190,7 @@ class EvidenceRouter:
         os.makedirs("logs/scraped_pages", exist_ok=True)
         os.makedirs("logs/retrieval_debug", exist_ok=True)
 
-    async def get_evidence(self, claim, exclude_domain=None, trace=None, context_result=None, claim_type_result=None, original_claim=None, language=None):
+    async def get_evidence(self, claim, exclude_domain=None, trace=None, context_result=None, claim_type_result=None, original_claim=None, language=None, source_text=None):
         cache_key = (
             " ".join((claim or "").strip().lower().split()),
             (exclude_domain or "").strip().lower(),
@@ -198,6 +200,16 @@ class EvidenceRouter:
             return [dict(item) for item in cached]
 
         evidence_list = []
+
+        if source_text:
+            cleaned_source_text = " ".join((source_text or "").split())
+            if cleaned_source_text:
+                evidence_list.append({
+                    "source": "OCR Context",
+                    "url": "internal://ocr_context",
+                    "text": cleaned_source_text,
+                    "weight": 1.25,
+                })
 
         # ----------------------------
         # 1. Structured APIs
@@ -558,6 +570,7 @@ class EvidenceRouter:
         query_language = str(context_result.get("query_language") or language or "").strip().lower()
         region_hints = list(context_result.get("region_hints", []) or [])
         claim_type = self._claim_type_label(claim_type_result)
+        use_india_scope_sources = query_language in INDIAN_MULTILINGUAL_LANGUAGES
 
         candidates = [base_claim]
         if original_query and original_query != base_claim and query_language and query_language != "en":
@@ -598,17 +611,22 @@ class EvidenceRouter:
                 if original_query and original_query != base_claim:
                     candidates.append(f"{original_query} {cleaned_region}")
 
-        local_hints = get_india_state_source_hints(state_focus)
-        for domain_hint in local_hints.get("source_domains", [])[:2]:
+        state_domains = get_india_state_source_hints(state_focus).get("source_domains", [])
+        if use_india_scope_sources:
+            source_domain_hints = list(dict.fromkeys(list(state_domains) + get_india_national_source_domains()))
+        else:
+            source_domain_hints = state_domains
+        for domain_hint in source_domain_hints[:4]:
             candidates.append(f"{base_claim} site:{domain_hint}")
             if original_query and original_query != base_claim:
                 candidates.append(f"{original_query} site:{domain_hint}")
 
-        trusted_variants = self._trusted_source_variants(domain)
-        for variant in trusted_variants:
-            candidates.append(f"{base_claim} {variant}")
-            if original_query and original_query != base_claim and query_language and query_language != "en":
-                candidates.append(f"{original_query} {variant}")
+        if not use_india_scope_sources:
+            trusted_variants = self._trusted_source_variants(domain)
+            for variant in trusted_variants:
+                candidates.append(f"{base_claim} {variant}")
+                if original_query and original_query != base_claim and query_language and query_language != "en":
+                    candidates.append(f"{original_query} {variant}")
 
         seen = set()
         ordered = []

@@ -1,5 +1,9 @@
 ﻿const tabs = document.querySelectorAll(".tab");
+const tabsContainer = document.querySelector(".tabs");
+const tabIndicator = document.querySelector(".tab-indicator");
 const blocks = document.querySelectorAll(".mode-block");
+const modeTipNode = document.getElementById("mode-tip");
+const controlsPanel = document.querySelector(".controls");
 const form = document.getElementById("analyzer-form");
 const runBtn = document.getElementById("run-btn");
 const cancelBtn = document.getElementById("cancel-btn");
@@ -24,6 +28,9 @@ const inlineSourcePreview = document.getElementById("inline-source-preview");
 const inlineSourcePreviewBody = document.getElementById("inline-source-preview-body");
 const claimAdvisoryNode = document.getElementById("claim-advisory");
 const claimTextNode = document.getElementById("claim-text");
+const appMainNode = document.getElementById("app-main");
+const welcomeNode = document.getElementById("welcome-screen");
+const enterAppBtn = document.getElementById("enter-app-btn");
 
 let mode = "claim";
 let currentController = null;
@@ -40,15 +47,96 @@ let basePreview = "";
 let originalReport = null;
 let renderedReport = null;
 let reportLanguageOverride = null;
+let modeSwitchTimeout = null;
+
+const modeTips = {
+  claim: "Tip: include a concrete subject, timeframe, and measurable fact for better evidence retrieval.",
+  pdf: "Tip: scanned and text-layer PDFs are supported. Long technical pages may use hybrid selection.",
+  image: "Tip: clearer text and tighter crops improve OCR precision and evidence ranking quality.",
+};
+
+function moveTabIndicatorToActive() {
+  if (!tabsContainer || !tabIndicator) return;
+  const activeTab = tabsContainer.querySelector(".tab.active");
+  if (!activeTab) return;
+
+  const containerRect = tabsContainer.getBoundingClientRect();
+  const activeRect = activeTab.getBoundingClientRect();
+  const left = activeRect.left - containerRect.left;
+  const width = activeRect.width;
+
+  tabIndicator.style.width = `${width}px`;
+  tabIndicator.style.transform = `translateX(${left}px)`;
+}
+
+function setMode(nextMode) {
+  mode = nextMode;
+  tabs.forEach((t) => t.classList.toggle("active", t.dataset.mode === mode));
+  blocks.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  if (modeTipNode) modeTipNode.textContent = modeTips[mode] || modeTips.claim;
+  moveTabIndicatorToActive();
+
+  if (controlsPanel) {
+    controlsPanel.classList.add("is-switching");
+    if (modeSwitchTimeout) clearTimeout(modeSwitchTimeout);
+    modeSwitchTimeout = setTimeout(() => {
+      controlsPanel.classList.remove("is-switching");
+    }, 220);
+  }
+}
+
+function enterMainApp() {
+  document.body.classList.remove("home-mode");
+  document.body.classList.add("app-mode");
+
+  if (welcomeNode) {
+    welcomeNode.style.pointerEvents = "none";
+    welcomeNode.classList.add("is-leaving");
+  }
+
+  if (appMainNode) {
+    appMainNode.hidden = false;
+    appMainNode.classList.add("app-preenter");
+    requestAnimationFrame(() => {
+      appMainNode.classList.remove("app-preenter");
+      appMainNode.classList.add("app-enter");
+    });
+    appMainNode.scrollTop = 0;
+  }
+
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
+  const finalizeHideWelcome = () => {
+    if (!welcomeNode) return;
+    welcomeNode.hidden = true;
+    welcomeNode.classList.remove("is-leaving");
+    welcomeNode.style.pointerEvents = "";
+  };
+
+  if (welcomeNode) {
+    welcomeNode.addEventListener("transitionend", finalizeHideWelcome, { once: true });
+  }
+  setTimeout(finalizeHideWelcome, 320);
+
+  moveTabIndicatorToActive();
+}
+
+function initWelcomeFlow() {
+  if (!appMainNode) return;
+  document.body.classList.add("home-mode");
+  appMainNode.hidden = true;
+  if (welcomeNode) welcomeNode.hidden = false;
+
+  if (enterAppBtn) {
+    enterAppBtn.addEventListener("click", () => {
+      enterMainApp();
+    });
+  }
+}
 
 function setActiveInputLocked(locked) {
   if (mode === "claim") {
     const node = document.getElementById("claim-text");
-    if (node) node.readOnly = locked;
-    return;
-  }
-  if (mode === "url") {
-    const node = document.getElementById("url-text");
     if (node) node.readOnly = locked;
     return;
   }
@@ -63,7 +151,6 @@ function setActiveInputLocked(locked) {
 
 function getProgressPreviewLabel() {
   if (mode === "claim") return "Claim analysis in progress";
-  if (mode === "url") return "URL analysis in progress";
   if (mode === "pdf") return "PDF analysis in progress";
   return "Image analysis in progress";
 }
@@ -72,13 +159,6 @@ const stepTitles = {
   claim: [
     "Validating claim text",
     "Detecting language and normalizing",
-    "Retrieving evidence sources",
-    "Scoring relevance and quality",
-    "Stance analysis and verdict aggregation",
-  ],
-  url: [
-    "Fetching article content",
-    "Extracting main claim",
     "Retrieving evidence sources",
     "Scoring relevance and quality",
     "Stance analysis and verdict aggregation",
@@ -101,9 +181,7 @@ const stepTitles = {
 
 for (const tab of tabs) {
   tab.addEventListener("click", () => {
-    mode = tab.dataset.mode;
-    tabs.forEach((t) => t.classList.toggle("active", t === tab));
-    blocks.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+    setMode(tab.dataset.mode);
     resultsNode.innerHTML = "";
     statusNode.textContent = "";
     renderTopAdvisory(null);
@@ -111,6 +189,11 @@ for (const tab of tabs) {
     resetProgressPanel();
   });
 }
+
+window.addEventListener("resize", moveTabIndicatorToActive);
+
+initWelcomeFlow();
+setMode(mode);
 
 cancelBtn.addEventListener("click", () => {
   if (currentController) {
@@ -155,6 +238,17 @@ form.addEventListener("submit", async (event) => {
   runBtn.disabled = true;
   cancelBtn.hidden = false;
   setActiveInputLocked(true);
+  const claimInput = claimTextNode ? String(claimTextNode.value || "").trim() : "";
+  if (mode === "claim" && !claimInput) {
+    statusNode.textContent = "Please enter a claim.";
+    resultsNode.innerHTML = "";
+    renderTopAdvisory(null);
+    runBtn.disabled = false;
+    cancelBtn.hidden = true;
+    setActiveInputLocked(false);
+    return;
+  }
+
   const localWarnings = getLocalClaimWarnings();
   const blockingWarning = localWarnings.find((warning) => warning?.block);
   statusNode.textContent = "Analyzing...";
@@ -207,10 +301,6 @@ function getCurrentInputPreview() {
   if (mode === "claim") {
     const claim = document.getElementById("claim-text").value.trim();
     return claim ? `Claim: ${truncate(claim, 240)}` : "Claim: No claim entered";
-  }
-  if (mode === "url") {
-    const url = document.getElementById("url-text").value.trim();
-    return url ? `URL: ${truncate(url, 240)}` : "URL: No URL entered";
   }
   if (mode === "pdf") {
     const file = document.getElementById("pdf-file").files[0];
@@ -329,7 +419,7 @@ function resetProgressPanel() {
   stopProgressTimers();
   processPanel.hidden = true;
   renderTopAdvisory(null);
-  previewNode.textContent = "Submit a claim, URL, PDF, or image to start.";
+  previewNode.textContent = "Submit a claim, PDF, or image to start.";
   progressTimerNode.textContent = "Time: 00:00";
   stepsNode.innerHTML = "";
   activeSteps = [];
@@ -396,11 +486,6 @@ async function callApiForMode(signal) {
     if (!claim) throw new Error("Please enter a claim.");
     return postJson("/check", { claim }, signal);
   }
-  if (mode === "url") {
-    const url = document.getElementById("url-text").value.trim();
-    if (!url) throw new Error("Please enter a URL.");
-    return postJson("/analyze_url", { url }, signal);
-  }
   if (mode === "pdf") {
     const file = document.getElementById("pdf-file").files[0];
     if (!file) throw new Error("Please choose a PDF.");
@@ -454,38 +539,118 @@ function renderResult(data) {
 }
 
 function renderDocumentResult(data) {
+  resultsNode.classList.add("document-mode");
+  resultsNode.classList.remove("claim-mode");
+
+  const verdictLabel = escapeHtml(data.document_verdict || "Unknown");
+  const credibilityLabel = formatPct(data.document_credibility_score);
+  const claimsLabel = num(data.claims_analyzed);
+  const verdictBreakdown = `${num(data.true_claims)} / ${num(data.false_claims)} / ${num(data.neutral_claims)}`;
   const summary = `
+    <div class="document-topline">
+      <div class="document-title-stack">
+        <p class="document-kicker">Document Overview</p>
+        <h4>Overall Assessment</h4>
+      </div>
+      <span class="pill neutral">${verdictLabel}</span>
+    </div>
     <div class="kpi">
-      <div class="tile"><span>Document verdict</span><strong>${escapeHtml(data.document_verdict || "Unknown")}</strong></div>
-      <div class="tile"><span>Credibility score</span><strong>${formatPct(data.document_credibility_score)}</strong></div>
-      <div class="tile"><span>Claims analyzed</span><strong>${num(data.claims_analyzed)}</strong></div>
-      <div class="tile"><span>True / False / Neutral</span><strong>${num(data.true_claims)} / ${num(data.false_claims)} / ${num(data.neutral_claims)}</strong></div>
+      <div class="tile"><span>Document verdict</span><strong>${verdictLabel}</strong></div>
+      <div class="tile"><span>Credibility score</span><strong>${credibilityLabel}</strong></div>
+      <div class="tile"><span>Claims analyzed</span><strong>${claimsLabel}</strong></div>
+      <div class="tile"><span>True / False / Neutral</span><strong>${verdictBreakdown}</strong></div>
+    </div>
+    <div class="document-stat-strip">
+      <p><strong>Signal:</strong> ${credibilityLabel} credibility across ${claimsLabel} extracted claims.</p>
+      <p><strong>Mix:</strong> ${verdictBreakdown} (true / false / neutral).</p>
     </div>
   `;
 
   const sourceUrl = data.source_url ? `<p class="meta">Source: <a href="${escapeAttr(data.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(data.source_url)}</a></p>` : "";
   const primaryClaim = Array.isArray(data.results) && data.results[0] ? data.results[0] : null;
-  const primary = primaryClaim ? claimResultHtml(primaryClaim, null, false) : "<p>No claim result returned.</p>";
+  const pdfAnalysisSentence = buildPdfAnalysisSentence(data);
+  const primaryView = primaryClaim
+    ? {
+      ...primaryClaim,
+      claim: pdfAnalysisSentence,
+    }
+    : null;
+  const primary = primaryClaim
+    ? claimResultHtml(primaryView, null, false, {
+      header: "PDF Analysis Result",
+      extraClass: "document-primary-claim-card",
+    })
+    : "<p>No claim result returned.</p>";
   const sourceEvidence = primaryClaim ? getDisplayEvidence(primaryClaim) : [];
+  const analyzedContext = renderPdfAnalyzedContext(data);
   renderInlineSourcePreview(sourceEvidence);
   resultsNode.innerHTML = [
-    cardHtml("Document Summary", `${sourceUrl}${summary}`),
+    cardHtml("Document Summary", `${sourceUrl}${summary}`, "document-summary-card"),
+    analyzedContext,
     primary,
   ].join("");
+}
+
+function buildPdfAnalysisSentence(data) {
+  const pages = Number(data.pages_analyzed || data.claims_analyzed || 0);
+  const sections = Array.isArray(data.section_overview) ? data.section_overview.length : 0;
+  if (pages > 0 && sections > 0) {
+    return `PDF analyzed page-by-page across ${pages} pages and ${sections} sections.`;
+  }
+  if (pages > 0) {
+    return `PDF analyzed page-by-page across ${pages} pages.`;
+  }
+  return "PDF analyzed section-by-section for evidence-backed verification.";
+}
+
+function renderPdfAnalyzedContext(data) {
+  const sections = Array.isArray(data.section_overview) ? data.section_overview : [];
+  const pages = Array.isArray(data.page_results) ? data.page_results : [];
+
+  const sectionItems = sections.length
+    ? `<ul class="summary-list">${sections.slice(0, 8).map((section) => {
+      const topic = escapeHtml(section.section_topic || "Document section");
+      const verdict = escapeHtml(section.section_verdict || "Mixed / Needs Review");
+      const sectionPages = Array.isArray(section.pages) && section.pages.length ? section.pages.join(", ") : "N/A";
+      const context = escapeHtml(String(section.section_context_summary || "").trim() || "No section context summary available.");
+      return `<li><strong>${topic}</strong> (pages: ${escapeHtml(String(sectionPages))}) - ${verdict}<br>${context}</li>`;
+    }).join("")}</ul>`
+    : "<p>No section-level context returned.</p>";
+
+  const pageItems = pages.length
+    ? `<ul class="summary-list">${pages.slice(0, 8).map((page) => {
+      const pageNumber = escapeHtml(String(page.page_number ?? "?"));
+      const topic = escapeHtml(page.section_topic || "Document Overview");
+      const context = escapeHtml(String(page.page_context_summary || page.text_preview || "").trim() || "No page context summary available.");
+      return `<li><strong>Page ${pageNumber}</strong> - ${topic}<br>${context}</li>`;
+    }).join("")}</ul>`
+    : "<p>No page-level context returned.</p>";
+
+  return cardHtml(
+    "Analyzed Context",
+    `
+      <details class="analysis-collapse">
+        <summary>Sections analyzed</summary>
+        <div class="analysis-collapse-body">
+          ${sectionItems}
+        </div>
+      </details>
+      <details class="analysis-collapse">
+        <summary>Page context analyzed</summary>
+        <div class="analysis-collapse-body">
+          ${pageItems}
+        </div>
+      </details>
+    `,
+    "document-context-card",
+  );
 }
 
 
 function getLocalCheckabilityBlock() {
   if (mode !== "claim" || !claimTextNode) return null;
   const claim = String(claimTextNode.value || "").trim();
-  if (!claim) {
-    return {
-      code: "empty_claim",
-      severity: "error",
-      block: true,
-      message: "Enter a fact-checkable claim before analysis.",
-    };
-  }
+  if (!claim) return null;
 
   const lowered = claim.toLowerCase();
   const personalPatterns = [
@@ -582,6 +747,8 @@ function renderTopAdvisory(data) {
 }
 
 function renderClaimResult(data) {
+  resultsNode.classList.add("claim-mode");
+  resultsNode.classList.remove("document-mode");
   const filteredEvidence = getDisplayEvidence(data);
   renderInlineSourcePreview(filteredEvidence);
   resultsNode.innerHTML = [
@@ -609,12 +776,13 @@ function renderUxWarnings(data) {
   `;
 }
 
-function claimResultHtml(data, index = null, includeSourcePreview = false) {
+function claimResultHtml(data, index = null, includeSourcePreview = false, options = {}) {
   const filteredEvidence = getDisplayEvidence(data);
   const transparency = (data && data.transparency) || {};
   const verdict = (data.final_verdict || "NEUTRAL").toUpperCase();
   const verdictClass = verdict === "SUPPORT" ? "support" : verdict === "REFUTE" ? "refute" : "neutral";
-  const header = index ? `Claim ${index}` : "Claim Result";
+  const header = options.header || (index ? `Claim ${index}` : "Claim Result");
+  const extraClass = options.extraClass || "";
   const cleanExplanationText = sanitizeNarrative(data.explanation || "");
   const cleanConflictText = sanitizeNarrative(data.conflict_analysis || "N/A");
   const explanationDetails = buildExplanationDetails(data, filteredEvidence, cleanExplanationText);
@@ -624,11 +792,12 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
   const warningBlock = renderUxWarnings(data);
   const citations = (data.citations || [])
     .filter((c) => !String(c).includes("internal://logic_engine") && !String(c).includes("logic_engine"))
-    .map((c) => `<li>${escapeHtml(String(c))}</li>`)
+    .map((c) => `<li>${escapeHtml(cleanCitationText(c))}</li>`)
     .join("");
 
   const evidenceItems = filteredEvidence
     .map((ev) => {
+      const sourceLabel = sourceLabelForEvidence(ev);
       const stanceClass = (ev.stance || "NEUTRAL").toUpperCase() === "SUPPORT"
         ? "support"
         : (ev.stance || "NEUTRAL").toUpperCase() === "REFUTE"
@@ -641,7 +810,7 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
           </div>
           <p>${escapeHtml(ev.text || "")}</p>
           <p class="meta">
-            Source: ${escapeHtml(ev.source || "Unknown")} |
+            Source: ${escapeHtml(sourceLabel)} |
             Confidence: ${formatPct(ev.confidence)} |
             Weight: ${num(ev.weight)}
           </p>
@@ -682,7 +851,8 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
       <p>${escapeHtml(cleanConflictText)}</p>
       <h4>Citations</h4>
       ${citations ? `<ol>${citations}</ol>` : "<p>No citations returned.</p>"}
-    `
+    `,
+    extraClass,
   );
 }
 
@@ -774,11 +944,12 @@ function renderSourceMedia(evidence) {
     const domain = extractDomain(ev.url || "");
     if (!domain) return "";
     const logo = `https://logo.clearbit.com/${domain}`;
+    const sourceLabel = sourceLabelForEvidence(ev);
     return `
       <a class="source-media-item" href="${escapeAttr(ev.url)}" target="_blank" rel="noopener noreferrer">
         <img src="${escapeAttr(logo)}" alt="${escapeHtml(domain)} logo" loading="lazy" onerror="this.src='https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64'">
         <div>
-          <div>${escapeHtml(ev.source || domain)}</div>
+          <div>${escapeHtml(sourceLabel || domain)}</div>
           <p class="meta">${escapeHtml(domain)}</p>
         </div>
       </a>
@@ -830,6 +1001,12 @@ function sanitizeNarrative(text) {
     .replace(/logic_engine/gi, "reasoning engine")
     .replace(/\binternal:\/\/logic_engine\b/gi, "")
     .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function cleanCitationText(value) {
+  return String(value || "")
+    .replace(/^\s*\[\d+\]\s*/u, "")
     .trim();
 }
 
@@ -918,9 +1095,11 @@ function buildExplanationDetails(data, filteredEvidence, fallbackText) {
     notes.push(`<p>${escapeHtml(fallbackText)}</p>`);
   }
 
+  const introList = `<ul class="explanation-intro-list">${intro.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`;
+
   return `
     <div class="explanation-block">
-      <p>${escapeHtml(intro.join(" "))}</p>
+      ${introList}
       ${supportHtml}
       ${refuteHtml}
       ${neutralHtml}
@@ -943,9 +1122,9 @@ function renderExplanationSection(title, items, claimText = "") {
 }
 
 function renderExplanationItem(item) {
-  const context = pickEvidenceContext(item, 520) || "No detailed evidence text available.";
-  const source = item && item.source ? String(item.source).trim() : "Unknown source";
-  return `<li><p>${escapeHtml(context)}</p><p class="meta">Source: ${escapeHtml(source)}</p></li>`;
+  const context = cleanEvidenceContext(pickEvidenceContext(item, 520)) || "No detailed evidence text available.";
+  const source = sourceLabelForEvidence(item);
+  return `<li><p class="explanation-context">${escapeHtml(context)}</p><p class="meta explanation-source">Source: ${escapeHtml(source)}</p></li>`;
 }
 
 function getEvidenceGroups(filteredEvidence) {
@@ -1056,8 +1235,7 @@ function extractTopSources(data) {
   const names = [];
   const pushSource = (ev) => {
     if (!ev) return;
-    if (String(ev.source || "") === "logic_engine") return;
-    const val = String(ev.source || "").trim();
+    const val = normalizeSourceName(ev.source || "", "");
     if (!val) return;
     if (!names.includes(val)) names.push(val);
   };
@@ -1069,6 +1247,34 @@ function extractTopSources(data) {
     });
   }
   return names.slice(0, 3);
+}
+
+function normalizeSourceName(value, fallback = "Unknown source") {
+  const raw = String(value || "").trim();
+  if (!raw) return fallback;
+  const compact = raw.toLowerCase().replace(/[_\-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (compact === "logic engine" || compact === "logic_engine") return fallback;
+  if (/^ocr( context| text| extraction)?$/.test(compact)) return fallback;
+  if (compact.includes("ocr context")) return fallback;
+  if (compact.includes("internal://")) return fallback;
+  return raw;
+}
+
+function sourceLabelForEvidence(ev) {
+  const cleaned = normalizeSourceName(ev && ev.source, "");
+  if (cleaned) return cleaned;
+  const domain = extractDomain((ev && ev.url) || "");
+  return domain || "Unknown source";
+}
+
+function cleanEvidenceContext(text) {
+  if (!text) return "";
+  let out = sanitizeNarrative(String(text));
+  out = out.replace(/[\r\n]+/g, " ");
+  out = out.replace(/^\s*[-*•–—]+\s*/u, "");
+  out = out.replace(/\s+[\-–—]\s+/gu, "; ");
+  out = out.replace(/\s{2,}/g, " ").trim();
+  return out;
 }
 
 function guessTopSources(preview) {
@@ -1087,8 +1293,9 @@ function guessLanguageFromPreview(preview) {
   return "en";
 }
 
-function cardHtml(title, body) {
-  return `<section class="card"><h3>${escapeHtml(title)}</h3>${body}</section>`;
+function cardHtml(title, body, extraClass = "") {
+  const className = ["card", extraClass].filter(Boolean).join(" ");
+  return `<section class="${className}"><h3>${escapeHtml(title)}</h3>${body}</section>`;
 }
 
 function formatPct(value) {

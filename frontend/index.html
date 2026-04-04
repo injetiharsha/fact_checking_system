@@ -7,38 +7,54 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/frontend/styles.css?v=20260324f">
+  <link rel="stylesheet" href="/frontend/styles.css?v=20260404c">
 </head>
 <body>
+  <section id="welcome-screen" class="welcome-screen" aria-label="Welcome">
+    <div class="welcome-card">
+      <p class="eyebrow">Welcome</p>
+      <h1>FactLens</h1>
+      <p>Analyze claims, PDFs, and images with evidence-backed verdicts in a focused verification workspace.</p>
+      <button id="enter-app-btn" type="button">Start Analysis</button>
+    </div>
+  </section>
+
+  <div class="bg-grid" aria-hidden="true"></div>
   <div class="bg-orb orb-a"></div>
   <div class="bg-orb orb-b"></div>
+  <div class="bg-orb orb-c"></div>
 
-  <main class="page">
+  <main id="app-main" class="page" hidden>
     <section class="hero">
-      <p class="eyebrow">Intelligence Layer</p>
+      <p class="eyebrow">Verification Console</p>
       <h1>FactLens</h1>
-      <p class="subtitle">A focused workspace for claim checks, URL credibility scans, and document evidence analysis.</p>
+      <p class="subtitle">Run claim checks, PDF extraction, and image evidence analysis in one high-signal workspace.</p>
+      <div class="hero-chips" aria-label="Key capabilities">
+        <span>Multilingual analysis</span>
+        <span>Document evidence tracing</span>
+        <span>Live verdict confidence</span>
+      </div>
     </section>
 
     <section class="workspace">
       <div class="left-stack">
         <section class="panel controls">
+          <div class="controls-head">
+            <h3>Start A Verification Run</h3>
+            <p>Choose an input mode, submit content, then review sourced evidence and final verdict details.</p>
+          </div>
+
           <div class="tabs" role="tablist" aria-label="Analysis type">
             <button class="tab active" data-mode="claim" role="tab">Claim</button>
-            <button class="tab" data-mode="url" role="tab">URL</button>
             <button class="tab" data-mode="pdf" role="tab">PDF</button>
             <button class="tab" data-mode="image" role="tab">Image</button>
+            <span class="tab-indicator" aria-hidden="true"></span>
           </div>
 
           <form id="analyzer-form">
             <div class="field mode-block active" data-mode="claim">
               <label for="claim-text">Claim text</label>
               <textarea id="claim-text" rows="4" placeholder="Example: India's inflation was below 4% in 2024."></textarea>
-            </div>
-
-            <div class="field mode-block" data-mode="url">
-              <label for="url-text">Article URL</label>
-              <input id="url-text" type="url" placeholder="https://example.com/article">
             </div>
 
             <div class="field mode-block file mode-block-inline" data-mode="pdf">
@@ -50,6 +66,7 @@
               <label for="image-file">Upload image</label>
               <input id="image-file" type="file" accept=".png,.jpg,.jpeg">
             </div>
+            <p id="mode-tip" class="mode-hint">Tip: include a concrete subject, timeframe, and measurable fact for better evidence retrieval.</p>
 
             <div class="actions">
               <button id="run-btn" type="submit">Run Analysis</button>
@@ -69,7 +86,7 @@
 
       <aside class="panel process-panel" id="process-panel" hidden>
         <h3>Fact-Check Progress</h3>
-        <p id="process-preview" class="meta">Submit a claim, URL, PDF, or image to start.</p>
+        <p id="process-preview" class="meta">Submit a claim, PDF, or image to start.</p>
         <ul id="process-steps" class="steps"></ul>
       </aside>
     </section>
@@ -95,6 +112,6 @@
     <section id="results" class="results"></section>
   </main>
 
-  <script src="/frontend/app.js?v=20260324f"></script>
+  <script src="/frontend/app.js?v=20260404c"></script>
 </body>
 </html>

@@ -61,8 +61,44 @@ INDIA_STATE_SOURCE_HINTS = {
     },
 }
 
+INDIA_NATIONAL_SOURCE_DOMAINS = [
+    "pib.gov.in",
+    "gov.in",
+    "nic.in",
+    "imd.gov.in",
+    "ndma.gov.in",
+    "ddnews.gov.in",
+    "thehindu.com",
+    "indianexpress.com",
+    "hindustantimes.com",
+    "ndtv.com",
+    "news18.com",
+    "timesofindia.indiatimes.com",
+    "theprint.in",
+    "business-standard.com",
+    "livemint.com",
+    "moneycontrol.com",
+    "newindianexpress.com",
+]
+
 
 def get_india_state_source_hints(state_name: str | None) -> dict:
     if not state_name:
         return {"languages": [], "source_domains": []}
     return INDIA_STATE_SOURCE_HINTS.get(state_name, {"languages": [], "source_domains": []})
+
+
+def get_india_national_source_domains() -> list[str]:
+    return list(INDIA_NATIONAL_SOURCE_DOMAINS)
+
+
+def get_all_india_state_source_domains() -> list[str]:
+    domains = []
+    seen = set()
+    for item in INDIA_STATE_SOURCE_HINTS.values():
+        for domain in item.get("source_domains", []):
+            key = str(domain or "").strip().lower()
+            if key and key not in seen:
+                seen.add(key)
+                domains.append(key)
+    return domains

@@ -5,10 +5,6 @@ class ClaimRequest(BaseModel):
     claim: str
 
 
-class URLRequest(BaseModel):
-    url: str
-
-
 class TranslateReportRequest(BaseModel):
     report: Dict[str, Any]
     target_lang: str

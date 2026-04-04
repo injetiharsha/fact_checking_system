@@ -58,7 +58,7 @@ The current project direction is real-time fact-checking, not local-corpus-first
 - [main.py](/abs/path/f:/fact_checking_system/main.py): FastAPI app entrypoint
 - [routes.py](/abs/path/f:/fact_checking_system/routes.py): API routes
 - [pipeline/claim_pipeline.py](/abs/path/f:/fact_checking_system/pipeline/claim_pipeline.py): main claim-check pipeline
-- [pipeline/document_pipeline.py](/abs/path/f:/fact_checking_system/pipeline/document_pipeline.py): URL, PDF, and image flows
+- [pipeline/document_pipeline.py](/abs/path/f:/fact_checking_system/pipeline/document_pipeline.py): PDF and image document flows
 - [evidence/router.py](/abs/path/f:/fact_checking_system/evidence/router.py): evidence routing logic
 - [evidence/general_search.py](/abs/path/f:/fact_checking_system/evidence/general_search.py): live search backend selection
 - [semantic/llm_verifier.py](/abs/path/f:/fact_checking_system/semantic/llm_verifier.py): optional OpenAI-compatible verifier
@@ -90,18 +90,6 @@ Request:
 ```json
 {
   "claim": "Mars has two moons."
-}
-```
-
-### `POST /analyze_url`
-
-Analyze a live webpage URL.
-
-Request:
-
-```json
-{
-  "url": "https://example.com/article"
 }
 ```
 
