@@ -2,13 +2,16 @@ import os
 import uuid
 import asyncio
 import tempfile
-from fastapi import APIRouter, UploadFile, File
+import time
+from fastapi import APIRouter, UploadFile, File, Request
 from deep_translator import GoogleTranslator
+import numpy as np
 
-from models.request_models import ClaimRequest, URLRequest, TranslateReportRequest
+from models.request_models import ClaimRequest, TranslateReportRequest
 from models.response_models import ClaimResponse
 from pipeline.claim_pipeline import ClaimPipeline
 from pipeline.document_pipeline import DocumentPipeline
+from ingestion.ocr import choose_best_ocr_result
 
 router = APIRouter()
 
@@ -28,6 +31,73 @@ def get_document_pipeline():
     if _document_pipeline is None:
         _document_pipeline = DocumentPipeline()
     return _document_pipeline
+
+
+def _warmup_ocr():
+    sample = np.full((48, 240, 3), 255, dtype=np.uint8)
+    lang = os.getenv("OCR_IMAGE_LANGS", "eng+tel+hin+tam+kan+mal").strip() or "eng"
+    config = os.getenv("OCR_IMAGE_CONFIG", "--oem 3 --psm 6").strip() or "--oem 3 --psm 6"
+    choose_best_ocr_result(image_bgr=sample, lang=lang, config=config)
+
+
+def _warmup_pipelines_sync():
+    claim_pipeline = get_claim_pipeline()
+    document_pipeline = get_document_pipeline()
+    document_claim_pipeline = document_pipeline.claim_pipeline
+
+    _ = claim_pipeline.relevance_scorer
+    _ = claim_pipeline.stance
+    if claim_pipeline.enable_verifier_v2:
+        _ = claim_pipeline.verifier_v2
+    if claim_pipeline.enable_llm_verifier:
+        _ = claim_pipeline.llm_verifier
+    if claim_pipeline.enable_retrieval_v2:
+        _ = claim_pipeline.retrieval_v2
+
+    _ = document_claim_pipeline.relevance_scorer
+    _ = document_claim_pipeline.stance
+    if document_claim_pipeline.enable_verifier_v2:
+        _ = document_claim_pipeline.verifier_v2
+    if document_claim_pipeline.enable_llm_verifier:
+        _ = document_claim_pipeline.llm_verifier
+    if document_claim_pipeline.enable_retrieval_v2:
+        _ = document_claim_pipeline.retrieval_v2
+
+    # Warm OCR once so the first image/PDF request doesn't pay init cost.
+    _warmup_ocr()
+
+    return {
+        "claim_pipeline_ready": True,
+        "document_pipeline_ready": document_pipeline is not None,
+        "ocr_ready": True,
+    }
+
+
+async def warmup_pipelines():
+    return await asyncio.to_thread(_warmup_pipelines_sync)
+
+
+async def run_with_disconnect_cancel(request: Request, coro_factory):
+    cancel_event = asyncio.Event()
+    work_task = asyncio.create_task(coro_factory(cancel_event))
+
+    async def watch_disconnect():
+        while not work_task.done():
+            if await request.is_disconnected():
+                cancel_event.set()
+                work_task.cancel()
+                return
+            await asyncio.sleep(0.2)
+
+    disconnect_task = asyncio.create_task(watch_disconnect())
+    try:
+        return await work_task
+    finally:
+        disconnect_task.cancel()
+        try:
+            await disconnect_task
+        except asyncio.CancelledError:
+            pass
 
 
 def _translate_value(value, translator):
@@ -59,24 +129,18 @@ def _translate_value(value, translator):
 
 
 @router.post("/check")
-async def check_claim(data: ClaimRequest):
+async def check_claim(data: ClaimRequest, request: Request):
     try:
-        return await get_claim_pipeline().run(data.claim)
+        return await run_with_disconnect_cancel(
+            request,
+            lambda cancel_event: get_claim_pipeline().run(data.claim, cancel_event=cancel_event),
+        )
     except asyncio.CancelledError:
-        return {"error": "Request cancelled during server reload/shutdown. Please retry."}
-
-
-
-@router.post("/analyze_url")
-async def analyze_url(data: URLRequest):
-    try:
-        return await get_document_pipeline().run(data.url)
-    except asyncio.CancelledError:
-        return {"error": "Request cancelled during server reload/shutdown. Please retry."}
-
+        return {"error": "Request cancelled by client."}
 
 @router.post("/analyze_pdf")
-async def analyze_pdf(file: UploadFile = File(...)):
+async def analyze_pdf(request: Request, file: UploadFile = File(...)):
+    route_start = time.time()
 
     if not file.filename.endswith(".pdf"):
         return {"error": "Only PDF files allowed"}
@@ -84,21 +148,29 @@ async def analyze_pdf(file: UploadFile = File(...)):
     temp_filename = None
 
     try:
+        save_start = time.time()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f:
             temp_filename = f.name
             f.write(await file.read())
+        print("Route /analyze_pdf save upload:", round(time.time() - save_start, 3), "sec")
 
         try:
-            return await get_document_pipeline().process_pdf(temp_filename)
+            result = await run_with_disconnect_cancel(
+                request,
+                lambda cancel_event: get_document_pipeline().process_pdf(temp_filename, cancel_event=cancel_event),
+            )
+            print("Route /analyze_pdf total:", round(time.time() - route_start, 3), "sec")
+            return result
         except asyncio.CancelledError:
-            return {"error": "Request cancelled during server reload/shutdown. Please retry."}
+            return {"error": "Request cancelled by client."}
     finally:
         if temp_filename and os.path.exists(temp_filename):
             os.remove(temp_filename)
 
 
 @router.post("/analyze_image")
-async def analyze_image(file: UploadFile = File(...)):
+async def analyze_image(request: Request, file: UploadFile = File(...)):
+    route_start = time.time()
 
     if not file.filename.lower().endswith((".png", ".jpg", ".jpeg")):
         return {"error": "Only image files allowed"}
@@ -107,14 +179,21 @@ async def analyze_image(file: UploadFile = File(...)):
 
     try:
         suffix = os.path.splitext(file.filename or "")[1].lower() or ".png"
+        save_start = time.time()
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
             temp_filename = f.name
             f.write(await file.read())
+        print("Route /analyze_image save upload:", round(time.time() - save_start, 3), "sec")
 
         try:
-            return await get_document_pipeline().process_image(temp_filename)
+            result = await run_with_disconnect_cancel(
+                request,
+                lambda cancel_event: get_document_pipeline().process_image(temp_filename, cancel_event=cancel_event),
+            )
+            print("Route /analyze_image total:", round(time.time() - route_start, 3), "sec")
+            return result
         except asyncio.CancelledError:
-            return {"error": "Request cancelled during server reload/shutdown. Please retry."}
+            return {"error": "Request cancelled by client."}
     finally:
         if temp_filename and os.path.exists(temp_filename):
             os.remove(temp_filename)

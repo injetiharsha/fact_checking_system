@@ -26,7 +26,7 @@ for env_key, path in cache_paths.items():
     os.environ.setdefault(env_key, str(path))
     path.mkdir(parents=True, exist_ok=True)
 
-from routes import router
+from routes import router, warmup_pipelines
 
 app = FastAPI()
 app.include_router(router)
@@ -42,3 +42,12 @@ def root():
 @app.get("/health")
 def health():
     return {"message": "Fact Checking System Running"}
+
+
+@app.on_event("startup")
+async def startup_warmup():
+    try:
+        await warmup_pipelines()
+        print("Startup warmup complete: text/image/pdf pipelines primed")
+    except Exception as exc:
+        print(f"Startup warmup skipped: {exc}")
