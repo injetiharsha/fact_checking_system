@@ -92,6 +92,8 @@ playwright-report/
 *.yml
 *.pdf
 *.jsonl
+test_images
+test_pdf
 
 # Local experimental docs / notes
 DIVERSE_MULTILINGUAL_PUBLIC_CLAIMS_v2.md
