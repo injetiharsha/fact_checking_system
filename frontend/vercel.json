@@ -1,0 +1,28 @@
+{
+  "rewrites": [
+    {
+      "source": "/health",
+      "destination": "http://13.217.24.76:8000/health"
+    },
+    {
+      "source": "/check",
+      "destination": "http://13.217.24.76:8000/check"
+    },
+    {
+      "source": "/analyze_pdf",
+      "destination": "http://13.217.24.76:8000/analyze_pdf"
+    },
+    {
+      "source": "/analyze_image",
+      "destination": "http://13.217.24.76:8000/analyze_image"
+    },
+    {
+      "source": "/translate_report",
+      "destination": "http://13.217.24.76:8000/translate_report"
+    },
+    {
+      "source": "/progress/:path*",
+      "destination": "http://13.217.24.76:8000/progress/:path*"
+    }
+  ]
+}
