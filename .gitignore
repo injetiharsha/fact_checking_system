@@ -8,6 +8,9 @@ Desktop.ini
 .idea/
 *.iml
 
+# Node.js
+node_modules/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -88,6 +91,8 @@ playwright-report/
 # - checked-in PDFs/images when intentionally added
 # JSON / YAML artifacts
 *.json
+!package.json
+!package-lock.json
 *.yaml
 *.yml
 *.pdf
