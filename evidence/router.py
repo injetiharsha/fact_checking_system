@@ -190,7 +190,20 @@ class EvidenceRouter:
         os.makedirs("logs/scraped_pages", exist_ok=True)
         os.makedirs("logs/retrieval_debug", exist_ok=True)
 
-    async def get_evidence(self, claim, exclude_domain=None, trace=None, context_result=None, claim_type_result=None, original_claim=None, language=None, source_text=None):
+    @staticmethod
+    def _emit_progress(progress_callback=None, **event):
+        if progress_callback is None:
+            return
+        try:
+            progress_callback(event)
+        except Exception:
+            return
+
+    @staticmethod
+    async def _flush_progress():
+        await asyncio.sleep(0)
+
+    async def get_evidence(self, claim, exclude_domain=None, trace=None, context_result=None, claim_type_result=None, original_claim=None, language=None, source_text=None, progress_callback=None):
         cache_key = (
             " ".join((claim or "").strip().lower().split()),
             (exclude_domain or "").strip().lower(),
@@ -220,16 +233,28 @@ class EvidenceRouter:
         disable_structured_apis = (os.getenv("BENCHMARK_DISABLE_STRUCTURED_APIS") or "0").strip() == "1"
         api_tasks = []
         if not disable_structured_apis:
+            self._emit_progress(progress_callback, stage="structured_api", status="active", detail="Querying structured data providers")
+            await self._flush_progress()
+
+            async def _run_api(api_id, fetcher):
+                try:
+                    result = await asyncio.to_thread(fetcher, claim)
+                except Exception:
+                    raise
+                if result:
+                    self._emit_progress(progress_callback, stage="structured_api", status="active", detail=f"{api_id.upper()} returned data", substep=api_id, substatus="done")
+                return result
+
             api_tasks = [
-                asyncio.to_thread(self.worldbank.fetch, claim),
-                asyncio.to_thread(self.un_api.fetch, claim),
-                asyncio.to_thread(self.rbi.fetch, claim),
-                asyncio.to_thread(self.mospi.fetch, claim),
-                asyncio.to_thread(self.who.fetch, claim),
-                asyncio.to_thread(self.oecd.fetch, claim),
-                asyncio.to_thread(self.nasa.fetch, claim),
-                asyncio.to_thread(self.openfda.fetch, claim),
-                asyncio.to_thread(self.news_api.fetch, claim)
+                _run_api("worldbank", self.worldbank.fetch),
+                _run_api("un_data", self.un_api.fetch),
+                _run_api("rbi", self.rbi.fetch),
+                _run_api("mospi", self.mospi.fetch),
+                _run_api("who", self.who.fetch),
+                _run_api("oecd", self.oecd.fetch),
+                _run_api("nasa", self.nasa.fetch),
+                _run_api("openfda", self.openfda.fetch),
+                _run_api("news_api", self.news_api.fetch),
             ]
 
         if api_tasks:
@@ -255,6 +280,8 @@ class EvidenceRouter:
                 evidence_list.append(result)
 
         print("Dynamic data:", round(time.time() - api_start, 3), "sec")
+        self._emit_progress(progress_callback, stage="structured_api", status="done", detail=f"Structured APIs checked in {round(time.time() - api_start, 3)} sec")
+        await self._flush_progress()
 
         if trace is not None:
             trace["search_provider_chain"] = list(self.search_engine._backend_order())
@@ -264,6 +291,8 @@ class EvidenceRouter:
         # ----------------------------
 
         search_start = time.time()
+        self._emit_progress(progress_callback, stage="web_search", status="active", detail="Searching web sources")
+        await self._flush_progress()
 
         query_plan = self._build_search_queries(
             claim,
@@ -286,6 +315,16 @@ class EvidenceRouter:
             for result in self.search_engine.search(query, max_results=per_query_limit):
                 if trace is not None:
                     trace["search_cache_hit"] = bool(self.search_engine.last_trace.get("cache_hit", False))
+                selected_backend = str(self.search_engine.last_trace.get("selected_backend") or result.get("provider") or "search").strip().lower()
+                if selected_backend and selected_backend not in {"memory_cache", "disk_cache"}:
+                    self._emit_progress(
+                        progress_callback,
+                        stage="web_search",
+                        status="active",
+                        detail=f"{selected_backend} returned candidates",
+                        substep=selected_backend,
+                        substatus="done",
+                    )
                 url = (result.get("url") or "").strip()
                 if not url or url in seen_urls:
                     continue
@@ -312,6 +351,8 @@ class EvidenceRouter:
 
         search_results.sort(key=lambda item: item.get("rank_score", 0.0), reverse=True)
         search_results = search_results[:6]
+        self._emit_progress(progress_callback, stage="web_search", status="done", detail=f"Selected {len(search_results)} web result(s)")
+        await self._flush_progress()
 
         print("\n--- SEARCH RESULTS ---")
         for r in search_results:
@@ -368,6 +409,9 @@ class EvidenceRouter:
         ]
 
         try:
+            if scrape_jobs:
+                self._emit_progress(progress_callback, stage="extraction", status="active", detail=f"Extracting text from {len(scrape_jobs)} source(s)")
+                await self._flush_progress()
             scraped_pages = await asyncio.gather(
                 *scrape_tasks,
                 return_exceptions=True
@@ -446,8 +490,18 @@ class EvidenceRouter:
                 "text": text,
                 "weight": get_weight(url)
             })
+            self._emit_progress(
+                progress_callback,
+                stage="extraction",
+                status="active",
+                detail=f"Extracted {word_count} words from {result.get('provider') or 'source'}",
+                substep=f"extract_{len(evidence_list)}",
+                substatus="done",
+            )
 
         print("Search results:", round(time.time() - search_start, 3), "sec")
+        self._emit_progress(progress_callback, stage="extraction", status="done", detail=f"Built {len(evidence_list)} evidence source(s)")
+        await self._flush_progress()
 
         if len(evidence_list) < 2:
             reference_hit = self.reference_fallback.fetch_wikipedia(claim)

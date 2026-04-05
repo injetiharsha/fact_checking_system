@@ -730,6 +730,19 @@ class ClaimPipeline:
         if cancel_event is not None and cancel_event.is_set():
             raise asyncio.CancelledError()
 
+    @staticmethod
+    def _emit_progress(progress_callback=None, **event):
+        if progress_callback is None:
+            return
+        try:
+            progress_callback(event)
+        except Exception:
+            return
+
+    @staticmethod
+    async def _flush_progress():
+        await asyncio.sleep(0)
+
     def _finalize_api_payload(self, payload):
         result = dict(payload or {})
         result["evidence"] = self._trim_evidence_payload(result.get("evidence", []))
@@ -1128,9 +1141,11 @@ class ClaimPipeline:
             })
         return preview
 
-    async def run(self, claim, source_url=None, source_text=None, source_language=None, allow_llm_verifier=None, cancel_event=None):
+    async def run(self, claim, source_url=None, source_text=None, source_language=None, allow_llm_verifier=None, cancel_event=None, progress_callback=None):
         self._raise_if_cancelled(cancel_event)
         original_claim = claim
+        self._emit_progress(progress_callback, stage="input", status="done", detail="Claim accepted for analysis")
+        await self._flush_progress()
         ux_warnings = _build_ux_warnings(claim)
         llm_verifier_enabled = self.enable_llm_verifier if allow_llm_verifier is None else bool(allow_llm_verifier)
 
@@ -1177,11 +1192,18 @@ class ClaimPipeline:
 
         # detect language and normalize claim
         start = time.time()
+        self._emit_progress(progress_callback, stage="language", status="active", detail="Detecting language and normalizing claim")
+        await self._flush_progress()
         language = source_language or detect_language(claim)
         claim = translate_to_english(claim, language)
         claim = normalize_claim(claim)
         stage_timings["language_normalization"] = round(time.time() - start, 3)
         print("Language + normalization:", stage_timings["language_normalization"], "sec")
+        language_detail = f"Language resolved as {language}"
+        if str(language).lower() != "en":
+            language_detail += "; adapting retrieval to multilingual evidence"
+        self._emit_progress(progress_callback, stage="language", status="done", detail=language_detail)
+        await self._flush_progress()
 
         # classify claim type (FACTUAL, OPINION, NUMERICAL, MIXED)
         start = time.time()
@@ -1301,6 +1323,7 @@ class ClaimPipeline:
                     original_claim=original_claim,
                     language=language,
                     source_text=normalized_source_text,
+                    progress_callback=progress_callback,
                 )
             except asyncio.CancelledError:
                 return {
@@ -1324,12 +1347,6 @@ class ClaimPipeline:
 
         evidence_retrieved_count = len(evidence_raw)
         self._raise_if_cancelled(cancel_event)
-
-        if self._is_indian_multilingual_claim(language, context_result):
-            filtered_india_scope = self._filter_national_source_evidence(evidence_raw, context_result=context_result)
-            if len(filtered_india_scope) != len(evidence_raw):
-                print("Applied India local-to-national source filter:", len(filtered_india_scope), "of", len(evidence_raw))
-            evidence_raw = filtered_india_scope
 
         # store search results in trace
         for ev in evidence_raw:
@@ -1376,6 +1393,8 @@ class ClaimPipeline:
         self._raise_if_cancelled(cancel_event)
         # compute relevance and quality scores
         start = time.time()
+        self._emit_progress(progress_callback, stage="relevance", status="active", detail="Ranking evidence by relevance and quality")
+        await self._flush_progress()
 
         scored_evidence = []
         strong_evidence_count = 0
@@ -1605,10 +1624,14 @@ class ClaimPipeline:
         stage_timings["relevance_model_inference"] = round(stage_timings["relevance_model_inference"], 3)
         stage_timings["quality_scoring"] = round(stage_timings["quality_scoring"], 3)
         print("Relevance + quality:", stage_timings["relevance_quality_total"], "sec")
+        self._emit_progress(progress_callback, stage="relevance", status="done", detail=f"Ranked {len(scored_evidence)} evidence item(s)")
+        await self._flush_progress()
 
         self._raise_if_cancelled(cancel_event)
         # run stance detection
         start = time.time()
+        self._emit_progress(progress_callback, stage="stance", status="active", detail="Running stance analysis on shortlisted evidence")
+        await self._flush_progress()
 
         results = []
         stance_results = None
@@ -1710,6 +1733,8 @@ class ClaimPipeline:
         stage_timings["stance_model_inference"] = round(max(0.0, stage_timings["stance_total"] - stage_timings["llm_verifier"]), 3)
         stage_timings["llm_verifier"] = round(stage_timings["llm_verifier"], 3)
         print("Semantic + NLI:", stage_timings["stance_total"], "sec")
+        self._emit_progress(progress_callback, stage="stance", status="done", detail=f"Evaluated stance across {len(results)} evidence item(s)")
+        await self._flush_progress()
 
         # logic engine reasoning pass
         logic_verdict = self.logic_engine.analyze(claim, results)
@@ -1735,6 +1760,8 @@ class ClaimPipeline:
 
         # aggregate final verdict
         start = time.time()
+        self._emit_progress(progress_callback, stage="verdict", status="active", detail="Aggregating final verdict")
+        await self._flush_progress()
 
         verdict, confidence = aggregate_results(results)
         conflict_summary = self.conflict_analyzer.analyze(results)
@@ -1828,6 +1855,7 @@ class ClaimPipeline:
             "verdict": verdict,
             "confidence": confidence
         }
+        self._emit_progress(progress_callback, stage="verdict", status="done", detail=f"{verdict} at {round(float(confidence or 0.0), 3)} confidence")
 
         print("\n========== FINAL RESULT ==========")
         print("Verdict:", verdict)

@@ -12,6 +12,7 @@ from models.response_models import ClaimResponse
 from pipeline.claim_pipeline import ClaimPipeline
 from pipeline.document_pipeline import DocumentPipeline
 from ingestion.ocr import choose_best_ocr_result
+from progress_tracker import progress_tracker
 
 router = APIRouter()
 
@@ -100,6 +101,22 @@ async def run_with_disconnect_cancel(request: Request, coro_factory):
             pass
 
 
+def _progress_id_from_request(request: Request):
+    return (request.headers.get("x-progress-id") or str(uuid.uuid4())).strip()
+
+
+def _emit_progress(progress_id, **event):
+    progress_tracker.emit(progress_id, **event)
+
+
+@router.get("/progress/{progress_id}")
+async def get_progress(progress_id: str):
+    payload = progress_tracker.get(progress_id)
+    if not payload:
+        return {"error": "Progress not found"}
+    return payload
+
+
 def _translate_value(value, translator):
     language_keys = {"language", "target_lang", "source_lang"}
     if isinstance(value, str):
@@ -130,22 +147,40 @@ def _translate_value(value, translator):
 
 @router.post("/check")
 async def check_claim(data: ClaimRequest, request: Request):
+    progress_id = _progress_id_from_request(request)
+    preview = (data.claim or "").strip()[:240]
+    progress_tracker.start(progress_id, "claim", preview=preview)
     try:
-        return await run_with_disconnect_cancel(
+        result = await run_with_disconnect_cancel(
             request,
-            lambda cancel_event: get_claim_pipeline().run(data.claim, cancel_event=cancel_event),
+            lambda cancel_event: get_claim_pipeline().run(
+                data.claim,
+                cancel_event=cancel_event,
+                progress_callback=lambda event: _emit_progress(progress_id, **event),
+            ),
         )
+        if isinstance(result, dict):
+            result["progress_id"] = progress_id
+        progress_tracker.complete(progress_id, detail="Claim analysis complete")
+        return result
     except asyncio.CancelledError:
+        progress_tracker.cancel(progress_id, detail="Claim analysis cancelled")
         return {"error": "Request cancelled by client."}
+    except Exception as exc:
+        progress_tracker.error(progress_id, detail=str(exc))
+        raise
 
 @router.post("/analyze_pdf")
 async def analyze_pdf(request: Request, file: UploadFile = File(...)):
     route_start = time.time()
+    progress_id = _progress_id_from_request(request)
 
     if not file.filename.endswith(".pdf"):
         return {"error": "Only PDF files allowed"}
 
     temp_filename = None
+    progress_tracker.start(progress_id, "pdf", preview=file.filename or "PDF upload")
+    progress_tracker.emit(progress_id, stage="input", status="done", detail="PDF uploaded")
 
     try:
         save_start = time.time()
@@ -157,12 +192,23 @@ async def analyze_pdf(request: Request, file: UploadFile = File(...)):
         try:
             result = await run_with_disconnect_cancel(
                 request,
-                lambda cancel_event: get_document_pipeline().process_pdf(temp_filename, cancel_event=cancel_event),
+                lambda cancel_event: get_document_pipeline().process_pdf(
+                    temp_filename,
+                    cancel_event=cancel_event,
+                    progress_callback=lambda event: _emit_progress(progress_id, **event),
+                ),
             )
             print("Route /analyze_pdf total:", round(time.time() - route_start, 3), "sec")
+            if isinstance(result, dict):
+                result["progress_id"] = progress_id
+            progress_tracker.complete(progress_id, detail="PDF analysis complete")
             return result
         except asyncio.CancelledError:
+            progress_tracker.cancel(progress_id, detail="PDF analysis cancelled")
             return {"error": "Request cancelled by client."}
+        except Exception as exc:
+            progress_tracker.error(progress_id, detail=str(exc))
+            raise
     finally:
         if temp_filename and os.path.exists(temp_filename):
             os.remove(temp_filename)
@@ -171,11 +217,14 @@ async def analyze_pdf(request: Request, file: UploadFile = File(...)):
 @router.post("/analyze_image")
 async def analyze_image(request: Request, file: UploadFile = File(...)):
     route_start = time.time()
+    progress_id = _progress_id_from_request(request)
 
     if not file.filename.lower().endswith((".png", ".jpg", ".jpeg")):
         return {"error": "Only image files allowed"}
 
     temp_filename = None
+    progress_tracker.start(progress_id, "image", preview=file.filename or "Image upload")
+    progress_tracker.emit(progress_id, stage="input", status="done", detail="Image uploaded")
 
     try:
         suffix = os.path.splitext(file.filename or "")[1].lower() or ".png"
@@ -188,12 +237,23 @@ async def analyze_image(request: Request, file: UploadFile = File(...)):
         try:
             result = await run_with_disconnect_cancel(
                 request,
-                lambda cancel_event: get_document_pipeline().process_image(temp_filename, cancel_event=cancel_event),
+                lambda cancel_event: get_document_pipeline().process_image(
+                    temp_filename,
+                    cancel_event=cancel_event,
+                    progress_callback=lambda event: _emit_progress(progress_id, **event),
+                ),
             )
             print("Route /analyze_image total:", round(time.time() - route_start, 3), "sec")
+            if isinstance(result, dict):
+                result["progress_id"] = progress_id
+            progress_tracker.complete(progress_id, detail="Image analysis complete")
             return result
         except asyncio.CancelledError:
+            progress_tracker.cancel(progress_id, detail="Image analysis cancelled")
             return {"error": "Request cancelled by client."}
+        except Exception as exc:
+            progress_tracker.error(progress_id, detail=str(exc))
+            raise
     finally:
         if temp_filename and os.path.exists(temp_filename):
             os.remove(temp_filename)
@@ -202,8 +262,6 @@ async def analyze_image(request: Request, file: UploadFile = File(...)):
 @router.post("/translate_report")
 async def translate_report(data: TranslateReportRequest):
     target = (data.target_lang or "en").strip().lower()
-    if target in {"en", "english"}:
-        return {"report": data.report, "target_lang": "en"}
 
     try:
         translator = GoogleTranslator(source="auto", target=target)
