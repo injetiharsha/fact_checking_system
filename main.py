@@ -4,15 +4,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-# Load env first and force model caches to a custom local path.
+# Load env first and force model caches to a writable local path.
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
-model_cache_root = Path(
-    os.getenv("MODEL_CACHE_DIR", str(BASE_DIR / ".venv" / "model_cache"))
-).expanduser()
+is_vercel = os.getenv("VERCEL") == "1"
+default_cache_dir = "/tmp/model_cache" if is_vercel else str(BASE_DIR / ".venv" / "model_cache")
+model_cache_root = Path(os.getenv("MODEL_CACHE_DIR", default_cache_dir)).expanduser()
 
 cache_paths = {
     "HF_HOME": model_cache_root / "hf_home",
@@ -29,6 +30,19 @@ for env_key, path in cache_paths.items():
 from routes import router, warmup_pipelines
 
 app = FastAPI()
+
+cors_origins_raw = os.getenv("CORS_ALLOW_ORIGINS", "").strip()
+cors_allow_all = cors_origins_raw == "*"
+cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()] if cors_origins_raw else []
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"] if cors_allow_all else cors_origins,
+    allow_credentials=not cors_allow_all,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(router)
 
 frontend_dir = BASE_DIR / "frontend"
@@ -39,6 +53,21 @@ def root():
     return FileResponse(frontend_dir / "index.html")
 
 
+@app.get("/styles.css")
+def frontend_styles():
+    return FileResponse(frontend_dir / "styles.css")
+
+
+@app.get("/app.js")
+def frontend_script():
+    return FileResponse(frontend_dir / "app.js")
+
+
+@app.get("/config.js")
+def frontend_config():
+    return FileResponse(frontend_dir / "config.js")
+
+
 @app.get("/health")
 def health():
     return {"message": "Fact Checking System Running"}
@@ -46,6 +75,10 @@ def health():
 
 @app.on_event("startup")
 async def startup_warmup():
+    disable_startup_warmup = os.getenv("DISABLE_STARTUP_WARMUP", "0") == "1"
+    if is_vercel or disable_startup_warmup:
+        print("Startup warmup skipped: serverless mode")
+        return
     try:
         await warmup_pipelines()
         print("Startup warmup complete: text/image/pdf pipelines primed")

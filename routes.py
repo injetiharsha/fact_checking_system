@@ -9,8 +9,6 @@ import numpy as np
 
 from models.request_models import ClaimRequest, TranslateReportRequest
 from models.response_models import ClaimResponse
-from pipeline.claim_pipeline import ClaimPipeline
-from pipeline.document_pipeline import DocumentPipeline
 from ingestion.ocr import choose_best_ocr_result
 from progress_tracker import progress_tracker
 
@@ -23,6 +21,8 @@ _document_pipeline = None
 def get_claim_pipeline():
     global _claim_pipeline
     if _claim_pipeline is None:
+        # Lazy import keeps cold starts lighter and avoids loading heavy deps until needed.
+        from pipeline.claim_pipeline import ClaimPipeline
         _claim_pipeline = ClaimPipeline()
     return _claim_pipeline
 
@@ -30,6 +30,8 @@ def get_claim_pipeline():
 def get_document_pipeline():
     global _document_pipeline
     if _document_pipeline is None:
+        # Lazy import keeps cold starts lighter and avoids loading heavy deps until needed.
+        from pipeline.document_pipeline import DocumentPipeline
         _document_pipeline = DocumentPipeline()
     return _document_pipeline
 

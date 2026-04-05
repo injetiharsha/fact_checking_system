@@ -34,6 +34,9 @@ const enterAppBtn = document.getElementById("enter-app-btn");
 const pdfPageRangeInput = document.getElementById("pdf-page-range");
 const pdfPageWarningNode = document.getElementById("pdf-page-warning");
 
+const runtimeConfig = window.FACTLENS_CONFIG || {};
+const apiBaseUrl = normalizeApiBaseUrl(runtimeConfig.apiBaseUrl || "");
+
 let mode = "claim";
 let currentController = null;
 let progressTimer = null;
@@ -163,6 +166,18 @@ const defaultWorkflowStages = {
   pdf: ["Input", "Document Parsing", "Claim Selection", "Language", "Structured APIs", "Web Search", "Extraction", "Relevance", "Stance", "Verdict"],
   image: ["Input", "OCR", "Claim Selection", "Language", "Structured APIs", "Web Search", "Extraction", "Relevance", "Stance", "Verdict"],
 };
+
+function normalizeApiBaseUrl(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+  return normalized.replace(/\/+$/, "");
+}
+
+function buildApiUrl(path) {
+  if (!apiBaseUrl) return path;
+  if (!path.startsWith("/")) return `${apiBaseUrl}/${path}`;
+  return `${apiBaseUrl}${path}`;
+}
 
 for (const tab of tabs) {
   tab.addEventListener("click", () => {
@@ -541,7 +556,7 @@ function startProgressPolling(progressId) {
   const fetchProgress = async () => {
     if (!progressId || progressId !== currentProgressId) return;
     try {
-      const response = await fetch(`/progress/${encodeURIComponent(progressId)}`);
+      const response = await fetch(buildApiUrl(`/progress/${encodeURIComponent(progressId)}`));
       const payload = await response.json();
       if (!response.ok || payload.error) return;
       applyProgressPayload(payload);
@@ -652,7 +667,7 @@ async function callApiForMode(signal, progressId = null) {
 }
 
 async function postJson(url, body, signal = null, headers = {}) {
-  const response = await fetch(url, {
+  const response = await fetch(buildApiUrl(url), {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
@@ -667,7 +682,7 @@ async function postFile(url, file, signal = null, headers = {}, fields = {}) {
   Object.entries(fields || {}).forEach(([key, value]) => {
     if (value != null && String(value).trim()) formData.append(key, String(value).trim());
   });
-  const response = await fetch(url, {
+  const response = await fetch(buildApiUrl(url), {
     method: "POST",
     body: formData,
     headers,

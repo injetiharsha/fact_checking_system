@@ -189,6 +189,71 @@ Open:
 - docs: `http://127.0.0.1:8000/docs`
 - frontend: `http://127.0.0.1:8000/frontend`
 
+## Split Deployment: Vercel Frontend + AWS Backend
+
+This is the recommended deployment model for the current stack.
+
+- Vercel hosts the static frontend from `frontend/`
+- AWS hosts the FastAPI backend and model/runtime dependencies
+- the frontend calls the backend through `frontend/config.js`
+
+### Why this split
+
+The backend uses OCR, Transformers, live retrieval, and optional LLM verification. That is a much better fit for AWS than Vercel serverless functions.
+
+### Frontend on Vercel
+
+Deploy the `frontend` directory as its own Vercel project.
+
+In Vercel:
+
+- New Project -> Import Git Repository
+- Root Directory: `frontend`
+- Framework Preset: `Other`
+- Build Command: leave empty
+- Output Directory: leave empty
+
+Set the backend URL in `frontend/config.js` before deployment:
+
+```js
+window.FACTLENS_CONFIG = {
+  apiBaseUrl: "https://your-aws-api.example.com",
+};
+```
+
+The frontend can also run locally with an empty `apiBaseUrl`, which keeps same-origin requests for the local FastAPI app.
+
+### Backend on AWS
+
+Run the FastAPI app on AWS behind HTTPS. A VM, ECS service, or similar long-running compute target is the safest fit.
+
+Minimum backend env additions for split-origin deploys:
+
+```env
+CORS_ALLOW_ORIGINS=https://your-vercel-app.vercel.app,https://your-custom-frontend-domain.com
+MODEL_CACHE_DIR=/srv/factlens/model_cache
+
+SEARCH_BACKEND=tavily
+TAVILY_API_KEY=your_tavily_key
+NEWS_API_KEY=your_news_api_key
+
+ENABLE_LLM_VERIFIER=1
+LLM_VERIFIER_PROVIDER=groq
+LLM_VERIFIER_API_BASE=https://api.groq.com/openai/v1
+LLM_VERIFIER_API_KEY=your_groq_key
+LLM_VERIFIER_MODEL=openai/gpt-oss-20b
+```
+
+Run the backend with:
+
+```powershell
+.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### Security Note
+
+Do not commit real secrets in `.env` or frontend config files. Use Vercel project settings for frontend config management and AWS secret storage for backend keys.
+
 ## Model And Search Notes
 
 ### Search
