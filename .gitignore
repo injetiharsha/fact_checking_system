@@ -29,6 +29,8 @@ ENV/
 # Build artifacts
 build/
 dist/
+.next/
+node_modules/
 *.egg-info/
 .eggs/
 
@@ -99,6 +101,11 @@ playwright-report/
 *.jsonl
 test_images
 test_pdf
+
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/tsconfig.json
+!frontend/.env.example
 
 # Local experimental docs / notes
 DIVERSE_MULTILINGUAL_PUBLIC_CLAIMS_v2.md
