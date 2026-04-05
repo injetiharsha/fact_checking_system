@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from config import TAVILY_API_KEYS
 
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -30,7 +31,9 @@ class SearchEngine:
         self.cache_enabled = os.getenv("FACTLENS_CACHE_RETRIEVAL", "0") == "1"
         self.search_backend = (os.getenv("SEARCH_BACKEND") or "").strip().lower()
         self.search_policy = (os.getenv("SEARCH_POLICY") or "hybrid").strip().lower()
-        self.tavily_api_key = (os.getenv("TAVILY_API_KEY") or "").strip()
+        self.tavily_api_keys = list(TAVILY_API_KEYS)
+        self.tavily_api_key = self.tavily_api_keys[0] if self.tavily_api_keys else (os.getenv("TAVILY_API_KEY") or "").strip()
+        self._tavily_key_index = 0
         self.serpapi_api_key = (os.getenv("SERPAPI_KEY") or "").strip()
         self.cache_dir = Path("logs/search_cache")
         self.usage_log_path = Path("logs/search_provider_usage.jsonl")
@@ -168,8 +171,11 @@ class SearchEngine:
         return self._search_duckduckgo(query, max_results=max_results)
 
     def _search_tavily(self, query, max_results=15):
+        api_key = self._next_tavily_api_key()
+        if not api_key:
+            return []
         payload = {
-            "api_key": self.tavily_api_key,
+            "api_key": api_key,
             "query": query,
             "max_results": max(1, min(int(max_results), 20)),
             "search_depth": "basic",
@@ -197,6 +203,13 @@ class SearchEngine:
                 "provider": "tavily",
             })
         return items
+
+    def _next_tavily_api_key(self):
+        if not self.tavily_api_keys:
+            return self.tavily_api_key
+        key = self.tavily_api_keys[self._tavily_key_index % len(self.tavily_api_keys)]
+        self._tavily_key_index = (self._tavily_key_index + 1) % len(self.tavily_api_keys)
+        return key
 
     def _search_serpapi(self, query, max_results=15):
         per_page = max(1, min(int(max_results), 10))

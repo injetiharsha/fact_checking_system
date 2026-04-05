@@ -1,4 +1,5 @@
 import os
+import re
 from dotenv import load_dotenv
 
 # Load .env from project root
@@ -21,9 +22,31 @@ def _read_env_value(env_path: str, key: str):
     return None
 
 
+def _parse_env_list(raw):
+    if not raw:
+        return []
+    parts = [part.strip() for part in re.split(r"[\r\n,]+", str(raw)) if part.strip()]
+    seen = []
+    for part in parts:
+        if part not in seen:
+            seen.append(part)
+    return seen
+
+
 load_dotenv(ENV_PATH, override=True)
 
 NEWS_API_KEY = os.getenv("NEWS_API_KEY") or _read_env_value(ENV_PATH, "NEWS_API_KEY")
-
 if NEWS_API_KEY:
     NEWS_API_KEY = NEWS_API_KEY.strip()
+
+NEWS_API_KEYS = _parse_env_list(
+    os.getenv("NEWS_API_KEYS") or _read_env_value(ENV_PATH, "NEWS_API_KEYS") or NEWS_API_KEY
+)
+
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY") or _read_env_value(ENV_PATH, "TAVILY_API_KEY")
+if TAVILY_API_KEY:
+    TAVILY_API_KEY = TAVILY_API_KEY.strip()
+
+TAVILY_API_KEYS = _parse_env_list(
+    os.getenv("TAVILY_API_KEYS") or _read_env_value(ENV_PATH, "TAVILY_API_KEYS") or TAVILY_API_KEY
+)

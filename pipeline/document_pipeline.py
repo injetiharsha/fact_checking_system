@@ -53,9 +53,42 @@ class DocumentPipeline:
             return default
 
     @staticmethod
+    def _parse_page_range(page_range, total_pages):
+        raw = str(page_range or "").strip()
+        if not raw:
+            return None
+        match = re.fullmatch(r"(\d+)(?:\s*-\s*(\d+))?", raw)
+        if not match:
+            raise ValueError("Page selection must look like 1 or 1-2.")
+        start = int(match.group(1))
+        end = int(match.group(2) or start)
+        if start < 1 or end < 1 or end < start:
+            raise ValueError("Invalid page selection.")
+        if total_pages and start > total_pages:
+            raise ValueError(f"Selected page {start} is outside this PDF.")
+        if total_pages:
+            end = min(end, total_pages)
+        if (end - start + 1) > 5:
+            raise ValueError("Select up to 5 pages at a time.")
+        return start, end
+
+    @staticmethod
     def _raise_if_cancelled(cancel_event=None):
         if cancel_event is not None and cancel_event.is_set():
             raise asyncio.CancelledError()
+
+    @staticmethod
+    def _emit_progress(progress_callback=None, **event):
+        if progress_callback is None:
+            return
+        try:
+            progress_callback(event)
+        except Exception:
+            return
+
+    @staticmethod
+    async def _flush_progress():
+        await asyncio.sleep(0)
 
     @staticmethod
     def _infer_source_language(text, ocr_details=None):
@@ -83,16 +116,20 @@ class DocumentPipeline:
         text = self.web_ingestor.extract_text(url)
         return await self._process_text(text, source_url=url)
 
-    async def process_pdf(self, file_path, cancel_event=None):
+    async def process_pdf(self, file_path, page_range=None, cancel_event=None, progress_callback=None):
         total_start = time.time()
+        self._emit_progress(progress_callback, stage="document_parse", status="active", detail="Extracting PDF text and page structure")
+        await self._flush_progress()
         self._raise_if_cancelled(cancel_event)
         extract_start = time.time()
-        pdf_result = extract_pdf_with_details(file_path)
+        pdf_result = await asyncio.to_thread(extract_pdf_with_details, file_path)
         print("PDF extract:", round(time.time() - extract_start, 3), "sec")
         self._raise_if_cancelled(cancel_event)
         text = (pdf_result or {}).get("text", "")
         pages = list((pdf_result or {}).get("pages") or [])
         total_pages_detected = len(pages)
+        self._emit_progress(progress_callback, stage="document_parse", status="done", detail=f"Extracted {total_pages_detected or 1} page(s)")
+        await self._flush_progress()
         ocr_details = (pdf_result or {}).get("ocr_details")
         source_language = self._infer_source_language(text, ocr_details)
 
@@ -121,6 +158,16 @@ class DocumentPipeline:
                 "source": (pdf_result or {}).get("extraction_source", "pdf"),
             }]
 
+        selected_page_range = self._parse_page_range(page_range, total_pages_detected)
+        if selected_page_range:
+            start_page, end_page = selected_page_range
+            pages = [
+                page for page in pages
+                if start_page <= int((page or {}).get("page_number") or 0) <= end_page
+            ]
+            if not pages:
+                raise ValueError("No pages matched the selected page range.")
+
         if self.pdf_analysis_max_pages > 0:
             pages = pages[:self.pdf_analysis_max_pages]
 
@@ -128,9 +175,11 @@ class DocumentPipeline:
         if total_pages_detected > 5:
             analysis_warning = (
                 f"Time-intensive PDF detected ({total_pages_detected} pages). "
-                f"Analyzing first {len(pages)} pages only. "
-                "Increase PDF_ANALYSIS_MAX_PAGES for a broader run."
+                f"Analyzing first {len(pages)} pages only."
             )
+        if selected_page_range:
+            selected_note = f"Selected pages {selected_page_range[0]}-{selected_page_range[1]}."
+            analysis_warning = f"{selected_note} {analysis_warning}".strip() if analysis_warning else selected_note
 
         sectionized_pages = self._assign_sections_to_pages(pages)
         section_text_by_key = {}
@@ -163,15 +212,43 @@ class DocumentPipeline:
             section_key = (page or {}).get("section_key", "document_overview")
             section_topic = (page or {}).get("section_topic", "Document Overview")
             summary_start = time.time()
-            page_context_summary = self._generate_context_summary(page_text, topic=section_topic)
+            page_context_summary = await asyncio.to_thread(self._generate_context_summary, page_text, section_topic)
             print(f"PDF page {page_number} context summary:", round(time.time() - summary_start, 3), "sec")
             selection_start = time.time()
-            selection = self._select_text_main_claim(
+            self._emit_progress(
+                progress_callback,
+                stage="claim_selection",
+                status="active",
+                detail=f"Selecting claim from page {page_number}",
+                substep=f"page_{page_number}",
+                substatus="active",
+            )
+            await self._flush_progress()
+            selection = await asyncio.to_thread(
+                self._select_text_main_claim,
                 page_text,
-                prefer_fast_path=self._should_use_pdf_fast_path(page),
+                self._should_use_pdf_fast_path(page),
             )
             print(f"PDF page {page_number} claim selection:", round(time.time() - selection_start, 3), "sec")
+            self._emit_progress(
+                progress_callback,
+                stage="claim_selection",
+                status="active",
+                detail=f"Selected claim on page {page_number}",
+                substep=f"page_{page_number}",
+                substatus="done",
+            )
+            await self._flush_progress()
             selected_claim = selection.get("claim")
+
+            for stage_id in ("structured_api", "web_search", "extraction", "relevance", "stance", "verdict"):
+                self._emit_progress(
+                    progress_callback,
+                    stage=stage_id,
+                    status="pending",
+                    detail=f"Waiting for page {page_number}",
+                )
+            await self._flush_progress()
 
             page_pipeline_start = time.time()
             page_result = await self._process_text(
@@ -182,6 +259,7 @@ class DocumentPipeline:
                 source_language=source_language,
                 allow_llm_verifier=True,
                 cancel_event=cancel_event,
+                progress_callback=progress_callback,
             )
             print(f"PDF page {page_number} claim pipeline:", round(time.time() - page_pipeline_start, 3), "sec")
             if isinstance(page_result, dict):
@@ -270,7 +348,7 @@ class DocumentPipeline:
             else:
                 section_verdict = "Mixed / Needs Review"
 
-            section_overview.append({
+                section_overview.append({
                 "section_topic": bucket["section_topic"],
                 "pages": sorted(bucket["pages"]),
                 "claims_analyzed": len(bucket["pages"]),
@@ -278,14 +356,29 @@ class DocumentPipeline:
                 "false_claims": bucket["false_claims"],
                 "neutral_claims": bucket["neutral_claims"],
                 "section_verdict": section_verdict,
-                "section_context_summary": self._generate_context_summary(
+                "section_context_summary": await asyncio.to_thread(
+                    self._generate_context_summary,
                     section_context_by_key.get(section_key, ""),
-                    topic=bucket["section_topic"],
+                    bucket["section_topic"],
                 ),
             })
 
+        self._emit_progress(
+            progress_callback,
+            stage="verdict",
+            status="active",
+            detail=f"Aggregating document verdict across {len(page_results)} page(s)",
+        )
+        await self._flush_progress()
         total_elapsed = round(time.time() - total_start, 3)
         print("TOTAL PDF DOCUMENT PIPELINE TIME:", total_elapsed, "sec")
+        self._emit_progress(
+            progress_callback,
+            stage="verdict",
+            status="done",
+            detail=f"{document_score['verdict']} across {len(page_results)} page(s)",
+        )
+        await self._flush_progress()
         return {
             "source_url": None,
             "ocr_details": ocr_details,
@@ -309,13 +402,17 @@ class DocumentPipeline:
             "results": page_results,
         }
 
-    async def process_image(self, file_path, cancel_event=None):
+    async def process_image(self, file_path, cancel_event=None, progress_callback=None):
         total_start = time.time()
+        self._emit_progress(progress_callback, stage="ocr", status="active", detail="Running OCR on uploaded image")
+        await self._flush_progress()
         self._raise_if_cancelled(cancel_event)
         ocr_start = time.time()
-        ocr_result = extract_image_text(file_path)
+        ocr_result = await asyncio.to_thread(extract_image_text, file_path)
         ocr_elapsed = round(time.time() - ocr_start, 3)
         print("Image OCR:", ocr_elapsed, "sec")
+        self._emit_progress(progress_callback, stage="ocr", status="done", detail=f"OCR complete in {ocr_elapsed} sec")
+        await self._flush_progress()
         self._raise_if_cancelled(cancel_event)
         text = (ocr_result or {}).get("text", "")
         source_language = self._infer_source_language(text, ocr_result)
@@ -335,10 +432,15 @@ class DocumentPipeline:
             }
 
         selection_start = time.time()
-        selection = self._select_image_main_claim(text)
+        self._emit_progress(progress_callback, stage="claim_selection", status="active", detail="Selecting central claim from OCR text")
+        await self._flush_progress()
+        selection = await asyncio.to_thread(self._select_image_main_claim, text)
         selection_elapsed = round(time.time() - selection_start, 3)
         print("Image claim selection:", selection_elapsed, "sec")
+        self._emit_progress(progress_callback, stage="claim_selection", status="done", detail=f"Claim selected in {selection_elapsed} sec")
+        await self._flush_progress()
         main_claim = selection.get("claim")
+        source_language = detect_language(main_claim or text)
         if not main_claim:
             return {
                 "error": "Could not isolate a central factual claim from image text",
@@ -364,6 +466,7 @@ class DocumentPipeline:
             source_language=source_language,
             allow_llm_verifier=True,
             cancel_event=cancel_event,
+            progress_callback=progress_callback,
         )
         claim_pipeline_elapsed = round(time.time() - claim_pipeline_start, 3)
         total_elapsed = round(time.time() - total_start, 3)
@@ -961,7 +1064,7 @@ class DocumentPipeline:
             "source_block": best["text"],
         }
 
-    async def _process_text(self, text, source_url=None, ocr_details=None, selected_claim=None, source_text=None, source_language=None, allow_llm_verifier=True, cancel_event=None):
+    async def _process_text(self, text, source_url=None, ocr_details=None, selected_claim=None, source_text=None, source_language=None, allow_llm_verifier=True, cancel_event=None, progress_callback=None):
         self._raise_if_cancelled(cancel_event)
 
         if not text:
@@ -992,6 +1095,7 @@ class DocumentPipeline:
             source_language=source_language,
             allow_llm_verifier=allow_llm_verifier,
             cancel_event=cancel_event,
+            progress_callback=progress_callback,
         )
         results.append(claim_result)
 

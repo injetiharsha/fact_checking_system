@@ -31,6 +31,8 @@ const claimTextNode = document.getElementById("claim-text");
 const appMainNode = document.getElementById("app-main");
 const welcomeNode = document.getElementById("welcome-screen");
 const enterAppBtn = document.getElementById("enter-app-btn");
+const pdfPageRangeInput = document.getElementById("pdf-page-range");
+const pdfPageWarningNode = document.getElementById("pdf-page-warning");
 
 let mode = "claim";
 let currentController = null;
@@ -140,8 +142,10 @@ function setActiveInputLocked(locked) {
     return;
   }
   if (mode === "pdf") {
-    const node = document.getElementById("pdf-file");
-    if (node) node.disabled = locked;
+    const fileNode = document.getElementById("pdf-file");
+    const rangeNode = document.getElementById("pdf-page-range");
+    if (fileNode) fileNode.disabled = locked;
+    if (rangeNode) rangeNode.disabled = locked;
     return;
   }
   const node = document.getElementById("image-file");
@@ -156,7 +160,7 @@ function getProgressPreviewLabel() {
 
 const defaultWorkflowStages = {
   claim: ["Input", "Language", "Structured APIs", "Web Search", "Extraction", "Relevance", "Stance", "Verdict"],
-  pdf: ["Input", "Document Parsing", "Language", "Claim Selection", "Structured APIs", "Web Search", "Extraction", "Relevance", "Stance", "Verdict"],
+  pdf: ["Input", "Document Parsing", "Claim Selection", "Language", "Structured APIs", "Web Search", "Extraction", "Relevance", "Stance", "Verdict"],
   image: ["Input", "OCR", "Claim Selection", "Language", "Structured APIs", "Web Search", "Extraction", "Relevance", "Stance", "Verdict"],
 };
 
@@ -188,6 +192,35 @@ if (imageFileInput) {
       currentImagePreviewUrl = URL.createObjectURL(file);
     }
   });
+}
+
+if (pdfPageRangeInput) {
+  pdfPageRangeInput.addEventListener("input", () => {
+    renderPdfPageRangeWarning();
+  });
+}
+
+function getPdfPageRangeWarning() {
+  const raw = String(pdfPageRangeInput?.value || "").trim();
+  if (!raw) return "";
+  const match = raw.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+  if (!match) return "Use page format like 1 or 1-2.";
+  const start = Number(match[1]);
+  const end = Number(match[2] || match[1]);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < start) {
+    return "Enter a valid page selection.";
+  }
+  if ((end - start + 1) > 5) {
+    return "Select up to 5 pages at a time.";
+  }
+  return "";
+}
+
+function renderPdfPageRangeWarning() {
+  if (!pdfPageWarningNode) return;
+  const warning = getPdfPageRangeWarning();
+  pdfPageWarningNode.textContent = warning;
+  pdfPageWarningNode.hidden = !warning;
 }
 
 cancelBtn.addEventListener("click", () => {
@@ -288,13 +321,15 @@ form.addEventListener("submit", async (event) => {
 
   const localWarnings = getLocalClaimWarnings();
   const blockingWarning = localWarnings.find((warning) => warning?.block);
+  const pdfPageRangeWarning = mode === "pdf" ? getPdfPageRangeWarning() : "";
   statusNode.textContent = "Analyzing...";
   resultsNode.innerHTML = "";
   renderTopAdvisory({ ux_warnings: localWarnings });
   hideReportTools();
 
-  if (blockingWarning) {
-    statusNode.textContent = "Add a little more context before analysis.";
+  if (blockingWarning || pdfPageRangeWarning) {
+    statusNode.textContent = pdfPageRangeWarning || "Add a little more context before analysis.";
+    renderPdfPageRangeWarning();
     resetProgressPanel();
     runBtn.disabled = false;
     cancelBtn.hidden = true;
@@ -360,7 +395,8 @@ function getCurrentInputPreview() {
   }
   if (mode === "pdf") {
     const file = document.getElementById("pdf-file").files[0];
-    return file ? `PDF: ${file.name} (${formatKb(file.size)})` : "PDF: No file selected";
+    const pageRange = String(document.getElementById("pdf-page-range")?.value || "").trim();
+    return file ? `PDF: ${file.name} (${formatKb(file.size)})${pageRange ? ` | Pages: ${pageRange}` : ""}` : "PDF: No file selected";
   }
   const file = document.getElementById("image-file").files[0];
   return file ? `Image: ${file.name} (${formatKb(file.size)})` : "Image: No file selected";
@@ -434,7 +470,11 @@ function finalizeWorkflowSnapshot(verdictLabel = "Completed") {
 }
 
 function renderWorkflow(payload) {
-  const stages = Array.isArray(payload?.stages) ? payload.stages : [];
+  const allStages = Array.isArray(payload?.stages) ? payload.stages : [];
+  const stages = allStages.filter((stage) => {
+    const status = String(stage?.status || "pending");
+    return status !== "pending";
+  });
   if (!stages.length) {
     stepsNode.innerHTML = "";
     return;
@@ -483,6 +523,11 @@ function renderWorkflow(payload) {
 
 function applyProgressPayload(payload) {
   currentProgressSnapshot = payload;
+  if (payload?.status === "done") {
+    const finalDetail = payload.final_detail || extractVerdict(renderedReport || originalReport || {}) || "Completed";
+    finalizeWorkflowSnapshot(finalDetail);
+    return;
+  }
   const activeStage = (payload.stages || []).find((stage) => stage.status === "active");
   if (activeStage) {
     previewNode.textContent = `${basePreview} | Stage: ${activeStage.label}${activeStage.detail ? ` - ${activeStage.detail}` : ""}`;
@@ -598,7 +643,8 @@ async function callApiForMode(signal, progressId = null) {
   if (mode === "pdf") {
     const file = document.getElementById("pdf-file").files[0];
     if (!file) throw new Error("Please choose a PDF.");
-    return postFile("/analyze_pdf", file, signal, { "X-Progress-Id": currentProgressId });
+    const pageRange = String(document.getElementById("pdf-page-range")?.value || "").trim();
+    return postFile("/analyze_pdf", file, signal, { "X-Progress-Id": currentProgressId }, { page_range: pageRange });
   }
   const file = document.getElementById("image-file").files[0];
   if (!file) throw new Error("Please choose an image.");
@@ -615,9 +661,12 @@ async function postJson(url, body, signal = null, headers = {}) {
   return handleResponse(response);
 }
 
-async function postFile(url, file, signal = null, headers = {}) {
+async function postFile(url, file, signal = null, headers = {}, fields = {}) {
   const formData = new FormData();
   formData.append("file", file);
+  Object.entries(fields || {}).forEach(([key, value]) => {
+    if (value != null && String(value).trim()) formData.append(key, String(value).trim());
+  });
   const response = await fetch(url, {
     method: "POST",
     body: formData,
@@ -661,6 +710,9 @@ function renderDocumentResult(data) {
   const credibilityLabel = formatPct(data.document_credibility_score);
   const claimsLabel = num(data.claims_analyzed);
   const verdictBreakdown = `${num(data.true_claims)} / ${num(data.false_claims)} / ${num(data.neutral_claims)}`;
+  const warningBlock = data.analysis_warning
+    ? `<p class="meta document-warning"><strong>Note:</strong> ${escapeHtml(data.analysis_warning)}</p>`
+    : "";
   const summary = `
     <div class="document-topline">
       <div class="document-title-stack">
@@ -679,6 +731,7 @@ function renderDocumentResult(data) {
       <p><strong>Signal:</strong> ${credibilityLabel} credibility across ${claimsLabel} extracted claims.</p>
       <p><strong>Mix:</strong> ${verdictBreakdown} (true / false / neutral).</p>
     </div>
+    ${warningBlock}
   `;
 
   const sourceUrl = data.source_url ? `<p class="meta">Source: <a href="${escapeAttr(data.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(data.source_url)}</a></p>` : "";
@@ -893,7 +946,6 @@ function renderImageAnalyzedContext(data) {
   const ocr = data && data.ocr_details && typeof data.ocr_details === "object" ? data.ocr_details : null;
   if (!ocr) return "";
 
-  const ocrLanguage = formatOcrLanguageLabel(ocr.ocr_langs || "");
   const claimLanguage = normalizeLanguageLabel(
     extractLanguage(data)
       || ocr.language
@@ -927,7 +979,7 @@ function renderImageAnalyzedContext(data) {
         <summary>OCR context analyzed</summary>
         <div class="analysis-collapse-body">
           <ul class="summary-list">
-            <li><strong>OCR language setup:</strong> ${escapeHtml(ocrLanguage)}</li>
+            <li><strong>OCR language detected:</strong> ${escapeHtml(claimLanguage)}</li>
           </ul>
           ${imagePreview}
         </div>
@@ -1186,13 +1238,6 @@ function renderImageClaimSelectionBody(payload, options = {}) {
     <p class="meta"><strong>Selected claim:</strong> ${selectedClaim}</p>
     ${candidateItems}
   `;
-}
-
-function formatOcrLanguageLabel(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "Not specified";
-  const parts = raw.split("+").map((part) => normalizeLanguageLabel(part)).filter(Boolean);
-  return parts.length ? parts.join(", ") : raw;
 }
 
 function normalizeClaimComparison(text) {

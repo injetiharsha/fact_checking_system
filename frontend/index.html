@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/frontend/styles.css?v=20260405n">
+  <link rel="stylesheet" href="/frontend/styles.css?v=20260405s">
 </head>
 <body>
   <section id="welcome-screen" class="welcome-screen" aria-label="Welcome">
@@ -60,6 +60,10 @@
             <div class="field mode-block file mode-block-inline" data-mode="pdf">
               <label for="pdf-file">Upload PDF</label>
               <input id="pdf-file" type="file" accept=".pdf">
+              <label for="pdf-page-range">Pages to check</label>
+              <input id="pdf-page-range" class="page-range-input" type="text" inputmode="numeric" placeholder="1 or 1-2" aria-label="PDF pages to check">
+              <p class="field-note">Check up to the configured PDF max pages. Large PDFs may be capped and warned automatically.</p>
+              <p id="pdf-page-warning" class="field-warning" hidden></p>
             </div>
 
             <div class="field mode-block file mode-block-inline" data-mode="image">
@@ -112,6 +116,6 @@
     <section id="results" class="results"></section>
   </main>
 
-  <script src="/frontend/app.js?v=20260405n"></script>
+  <script src="/frontend/app.js?v=20260405s"></script>
 </body>
 </html>

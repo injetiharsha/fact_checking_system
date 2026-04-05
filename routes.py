@@ -3,7 +3,7 @@ import uuid
 import asyncio
 import tempfile
 import time
-from fastapi import APIRouter, UploadFile, File, Request
+from fastapi import APIRouter, UploadFile, File, Form, Request
 from deep_translator import GoogleTranslator
 import numpy as np
 
@@ -171,7 +171,7 @@ async def check_claim(data: ClaimRequest, request: Request):
         raise
 
 @router.post("/analyze_pdf")
-async def analyze_pdf(request: Request, file: UploadFile = File(...)):
+async def analyze_pdf(request: Request, file: UploadFile = File(...), page_range: str = Form("")):
     route_start = time.time()
     progress_id = _progress_id_from_request(request)
 
@@ -194,6 +194,7 @@ async def analyze_pdf(request: Request, file: UploadFile = File(...)):
                 request,
                 lambda cancel_event: get_document_pipeline().process_pdf(
                     temp_filename,
+                    page_range=page_range,
                     cancel_event=cancel_event,
                     progress_callback=lambda event: _emit_progress(progress_id, **event),
                 ),

@@ -313,8 +313,22 @@ label {
   font-size: 0.95rem;
 }
 
+.field-note {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.field-warning {
+  margin: 8px 0 0;
+  color: #9b1c1c;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 textarea,
-input[type="url"] {
+input[type="url"],
+input[type="text"] {
   width: 100%;
   padding: 13px;
   border: 1px solid var(--line);
@@ -326,6 +340,7 @@ input[type="url"] {
 
 textarea:focus,
 input[type="url"]:focus,
+input[type="text"]:focus,
 select:focus,
 input[type="file"]:focus {
   outline: 2px solid rgba(0, 109, 119, 0.28);
@@ -338,6 +353,17 @@ input[type="file"] {
   border-radius: 14px;
   border: 1px dashed #6b9395;
   background: #eef7f7;
+}
+
+.page-range-input {
+  max-width: 180px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.page-range-input:disabled {
+  opacity: 0.72;
+  background: #f3f7f6;
 }
 
 .actions {
@@ -724,6 +750,14 @@ input[type="file"] {
   border: 1px dashed #95ada9;
   border-radius: 12px;
   background: #f7fbfa;
+}
+
+.document-warning {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(143, 98, 0, 0.24);
+  background: #fff7e2;
 }
 
 .document-stat-strip p {

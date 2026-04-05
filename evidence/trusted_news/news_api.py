@@ -1,7 +1,7 @@
 import os
 import time
 import requests
-from config import NEWS_API_KEY
+from config import NEWS_API_KEYS
 
 
 class TrustedNewsAPI:
@@ -23,6 +23,8 @@ class TrustedNewsAPI:
 
     def __init__(self):
         self._backoff_until = 0.0
+        self.api_keys = list(NEWS_API_KEYS)
+        self._api_key_index = 0
 
     def fetch(self, claim):
         if time.time() < self._backoff_until:
@@ -30,13 +32,14 @@ class TrustedNewsAPI:
         return self._dedupe_evidence(self._fetch_newsdata(claim))
 
     def _fetch_newsdata(self, claim):
-        if not NEWS_API_KEY:
+        api_key = self._next_api_key()
+        if not api_key:
             return []
 
         params = {
             "q": claim,
             "language": "en",
-            "apikey": NEWS_API_KEY,
+            "apikey": api_key,
         }
 
         try:
@@ -86,6 +89,13 @@ class TrustedNewsAPI:
             elif isinstance(e, requests.exceptions.Timeout):
                 self._backoff_until = time.time() + 180
             return []
+
+    def _next_api_key(self):
+        if not self.api_keys:
+            return ""
+        key = self.api_keys[self._api_key_index % len(self.api_keys)]
+        self._api_key_index = (self._api_key_index + 1) % len(self.api_keys)
+        return key
 
     def _dedupe_evidence(self, rows):
         deduped = []
