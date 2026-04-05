@@ -1,5 +1,9 @@
 ﻿const tabs = document.querySelectorAll(".tab");
+const tabsContainer = document.querySelector(".tabs");
+const tabIndicator = document.querySelector(".tab-indicator");
 const blocks = document.querySelectorAll(".mode-block");
+const modeTipNode = document.getElementById("mode-tip");
+const controlsPanel = document.querySelector(".controls");
 const form = document.getElementById("analyzer-form");
 const runBtn = document.getElementById("run-btn");
 const cancelBtn = document.getElementById("cancel-btn");
@@ -24,22 +28,115 @@ const inlineSourcePreview = document.getElementById("inline-source-preview");
 const inlineSourcePreviewBody = document.getElementById("inline-source-preview-body");
 const claimAdvisoryNode = document.getElementById("claim-advisory");
 const claimTextNode = document.getElementById("claim-text");
+const appMainNode = document.getElementById("app-main");
+const welcomeNode = document.getElementById("welcome-screen");
+const enterAppBtn = document.getElementById("enter-app-btn");
+const pdfPageRangeInput = document.getElementById("pdf-page-range");
+const pdfPageWarningNode = document.getElementById("pdf-page-warning");
+
+const runtimeConfig = window.FACTLENS_CONFIG || {};
+const apiBaseUrl = normalizeApiBaseUrl(runtimeConfig.apiBaseUrl || "");
 
 let mode = "claim";
 let currentController = null;
 let progressTimer = null;
-let detailPulseTimer = null;
 let elapsedTimer = null;
-let progressIndex = 0;
 let progressStartedAt = null;
-let activeSteps = [];
-let stepDetails = [];
-let stepFlowQueues = [];
-let stepFlowPos = [];
 let basePreview = "";
+let progressPollTimer = null;
+let currentProgressId = null;
+let currentProgressSnapshot = null;
 let originalReport = null;
 let renderedReport = null;
 let reportLanguageOverride = null;
+let modeSwitchTimeout = null;
+let currentImagePreviewUrl = null;
+let currentImageClaimSelectionState = null;
+
+const modeTips = {
+  claim: "Tip: include a concrete subject, timeframe, and measurable fact for better evidence retrieval.",
+  pdf: "Tip: scanned and text-layer PDFs are supported. Long technical pages may use hybrid selection.",
+  image: "Tip: clearer text and tighter crops improve OCR precision and evidence ranking quality.",
+};
+
+function moveTabIndicatorToActive() {
+  if (!tabsContainer || !tabIndicator) return;
+  const activeTab = tabsContainer.querySelector(".tab.active");
+  if (!activeTab) return;
+
+  const containerRect = tabsContainer.getBoundingClientRect();
+  const activeRect = activeTab.getBoundingClientRect();
+  const left = activeRect.left - containerRect.left;
+  const width = activeRect.width;
+
+  tabIndicator.style.width = `${width}px`;
+  tabIndicator.style.transform = `translateX(${left}px)`;
+}
+
+function setMode(nextMode) {
+  mode = nextMode;
+  tabs.forEach((t) => t.classList.toggle("active", t.dataset.mode === mode));
+  blocks.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  if (modeTipNode) modeTipNode.textContent = modeTips[mode] || modeTips.claim;
+  moveTabIndicatorToActive();
+
+  if (controlsPanel) {
+    controlsPanel.classList.add("is-switching");
+    if (modeSwitchTimeout) clearTimeout(modeSwitchTimeout);
+    modeSwitchTimeout = setTimeout(() => {
+      controlsPanel.classList.remove("is-switching");
+    }, 220);
+  }
+}
+
+function enterMainApp() {
+  document.body.classList.remove("home-mode");
+  document.body.classList.add("app-mode");
+
+  if (welcomeNode) {
+    welcomeNode.style.pointerEvents = "none";
+    welcomeNode.classList.add("is-leaving");
+  }
+
+  if (appMainNode) {
+    appMainNode.hidden = false;
+    appMainNode.classList.add("app-preenter");
+    requestAnimationFrame(() => {
+      appMainNode.classList.remove("app-preenter");
+      appMainNode.classList.add("app-enter");
+    });
+    appMainNode.scrollTop = 0;
+  }
+
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
+  const finalizeHideWelcome = () => {
+    if (!welcomeNode) return;
+    welcomeNode.hidden = true;
+    welcomeNode.classList.remove("is-leaving");
+    welcomeNode.style.pointerEvents = "";
+  };
+
+  if (welcomeNode) {
+    welcomeNode.addEventListener("transitionend", finalizeHideWelcome, { once: true });
+  }
+  setTimeout(finalizeHideWelcome, 320);
+
+  moveTabIndicatorToActive();
+}
+
+function initWelcomeFlow() {
+  if (!appMainNode) return;
+  document.body.classList.add("home-mode");
+  appMainNode.hidden = true;
+  if (welcomeNode) welcomeNode.hidden = false;
+
+  if (enterAppBtn) {
+    enterAppBtn.addEventListener("click", () => {
+      enterMainApp();
+    });
+  }
+}
 
 function setActiveInputLocked(locked) {
   if (mode === "claim") {
@@ -47,14 +144,11 @@ function setActiveInputLocked(locked) {
     if (node) node.readOnly = locked;
     return;
   }
-  if (mode === "url") {
-    const node = document.getElementById("url-text");
-    if (node) node.readOnly = locked;
-    return;
-  }
   if (mode === "pdf") {
-    const node = document.getElementById("pdf-file");
-    if (node) node.disabled = locked;
+    const fileNode = document.getElementById("pdf-file");
+    const rangeNode = document.getElementById("pdf-page-range");
+    if (fileNode) fileNode.disabled = locked;
+    if (rangeNode) rangeNode.disabled = locked;
     return;
   }
   const node = document.getElementById("image-file");
@@ -63,47 +157,31 @@ function setActiveInputLocked(locked) {
 
 function getProgressPreviewLabel() {
   if (mode === "claim") return "Claim analysis in progress";
-  if (mode === "url") return "URL analysis in progress";
   if (mode === "pdf") return "PDF analysis in progress";
   return "Image analysis in progress";
 }
 
-const stepTitles = {
-  claim: [
-    "Validating claim text",
-    "Detecting language and normalizing",
-    "Retrieving evidence sources",
-    "Scoring relevance and quality",
-    "Stance analysis and verdict aggregation",
-  ],
-  url: [
-    "Fetching article content",
-    "Extracting main claim",
-    "Retrieving evidence sources",
-    "Scoring relevance and quality",
-    "Stance analysis and verdict aggregation",
-  ],
-  pdf: [
-    "Extracting text from PDF",
-    "Selecting main content claim",
-    "Retrieving evidence sources",
-    "Scoring relevance and quality",
-    "Stance analysis and verdict aggregation",
-  ],
-  image: [
-    "Running OCR on image",
-    "Selecting main content claim",
-    "Retrieving evidence sources",
-    "Scoring relevance and quality",
-    "Stance analysis and verdict aggregation",
-  ],
+const defaultWorkflowStages = {
+  claim: ["Input", "Language", "Structured APIs", "Web Search", "Extraction", "Relevance", "Stance", "Verdict"],
+  pdf: ["Input", "Document Parsing", "Claim Selection", "Language", "Structured APIs", "Web Search", "Extraction", "Relevance", "Stance", "Verdict"],
+  image: ["Input", "OCR", "Claim Selection", "Language", "Structured APIs", "Web Search", "Extraction", "Relevance", "Stance", "Verdict"],
 };
+
+function normalizeApiBaseUrl(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+  return normalized.replace(/\/+$/, "");
+}
+
+function buildApiUrl(path) {
+  if (!apiBaseUrl) return path;
+  if (!path.startsWith("/")) return `${apiBaseUrl}/${path}`;
+  return `${apiBaseUrl}${path}`;
+}
 
 for (const tab of tabs) {
   tab.addEventListener("click", () => {
-    mode = tab.dataset.mode;
-    tabs.forEach((t) => t.classList.toggle("active", t === tab));
-    blocks.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+    setMode(tab.dataset.mode);
     resultsNode.innerHTML = "";
     statusNode.textContent = "";
     renderTopAdvisory(null);
@@ -112,10 +190,100 @@ for (const tab of tabs) {
   });
 }
 
+window.addEventListener("resize", moveTabIndicatorToActive);
+
+initWelcomeFlow();
+setMode(mode);
+
+const imageFileInput = document.getElementById("image-file");
+if (imageFileInput) {
+  imageFileInput.addEventListener("change", () => {
+    if (currentImagePreviewUrl) {
+      URL.revokeObjectURL(currentImagePreviewUrl);
+      currentImagePreviewUrl = null;
+    }
+    const file = imageFileInput.files && imageFileInput.files[0];
+    if (file) {
+      currentImagePreviewUrl = URL.createObjectURL(file);
+    }
+  });
+}
+
+if (pdfPageRangeInput) {
+  pdfPageRangeInput.addEventListener("input", () => {
+    renderPdfPageRangeWarning();
+  });
+}
+
+function getPdfPageRangeWarning() {
+  const raw = String(pdfPageRangeInput?.value || "").trim();
+  if (!raw) return "";
+  const match = raw.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+  if (!match) return "Use page format like 1 or 1-2.";
+  const start = Number(match[1]);
+  const end = Number(match[2] || match[1]);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < start) {
+    return "Enter a valid page selection.";
+  }
+  if ((end - start + 1) > 5) {
+    return "Select up to 5 pages at a time.";
+  }
+  return "";
+}
+
+function renderPdfPageRangeWarning() {
+  if (!pdfPageWarningNode) return;
+  const warning = getPdfPageRangeWarning();
+  pdfPageWarningNode.textContent = warning;
+  pdfPageWarningNode.hidden = !warning;
+}
+
 cancelBtn.addEventListener("click", () => {
   if (currentController) {
     currentController.abort();
     statusNode.textContent = "Cancelled.";
+  }
+});
+
+resultsNode.addEventListener("click", async (event) => {
+  const trigger = event.target.closest("[data-image-claim-translate]");
+  if (!trigger) return;
+  if (!currentImageClaimSelectionState) return;
+
+  const bodyNode = resultsNode.querySelector("[data-image-claim-selection-body]");
+  if (!bodyNode) return;
+
+  const wantsOriginal = trigger.dataset.state === "translated";
+  if (wantsOriginal) {
+    bodyNode.innerHTML = renderImageClaimSelectionBody(currentImageClaimSelectionState.original);
+    trigger.textContent = "Translate";
+    trigger.dataset.state = "original";
+    return;
+  }
+
+  trigger.disabled = true;
+  const priorText = trigger.textContent;
+  trigger.textContent = "Translating...";
+  try {
+    if (!currentImageClaimSelectionState.translated) {
+      const payload = await postJson("/translate_report", {
+        report: currentImageClaimSelectionState.original,
+        target_lang: "en",
+      });
+      currentImageClaimSelectionState.translated = payload.report || null;
+    }
+    const translated = currentImageClaimSelectionState.translated;
+    if (translated) {
+      bodyNode.innerHTML = renderImageClaimSelectionBody(translated, { label: "English translation" });
+      trigger.textContent = "Original";
+      trigger.dataset.state = "translated";
+    } else {
+      trigger.textContent = priorText;
+    }
+  } catch (_) {
+    trigger.textContent = priorText;
+  } finally {
+    trigger.disabled = false;
   }
 });
 
@@ -155,15 +323,28 @@ form.addEventListener("submit", async (event) => {
   runBtn.disabled = true;
   cancelBtn.hidden = false;
   setActiveInputLocked(true);
+  const claimInput = claimTextNode ? String(claimTextNode.value || "").trim() : "";
+  if (mode === "claim" && !claimInput) {
+    statusNode.textContent = "Please enter a claim.";
+    resultsNode.innerHTML = "";
+    renderTopAdvisory(null);
+    runBtn.disabled = false;
+    cancelBtn.hidden = true;
+    setActiveInputLocked(false);
+    return;
+  }
+
   const localWarnings = getLocalClaimWarnings();
   const blockingWarning = localWarnings.find((warning) => warning?.block);
+  const pdfPageRangeWarning = mode === "pdf" ? getPdfPageRangeWarning() : "";
   statusNode.textContent = "Analyzing...";
   resultsNode.innerHTML = "";
   renderTopAdvisory({ ux_warnings: localWarnings });
   hideReportTools();
 
-  if (blockingWarning) {
-    statusNode.textContent = "Add a little more context before analysis.";
+  if (blockingWarning || pdfPageRangeWarning) {
+    statusNode.textContent = pdfPageRangeWarning || "Add a little more context before analysis.";
+    renderPdfPageRangeWarning();
     resetProgressPanel();
     runBtn.disabled = false;
     cancelBtn.hidden = true;
@@ -171,11 +352,12 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
-  startProgressForCurrentInput();
+  const progressId = createProgressId();
+  startProgressForCurrentInput(progressId);
   currentController = new AbortController();
 
   try {
-    const data = await callApiForMode(currentController.signal);
+    const data = await callApiForMode(currentController.signal, progressId);
     originalReport = data;
     renderedReport = data;
     enrichProgressWithResponse(data);
@@ -187,10 +369,28 @@ form.addEventListener("submit", async (event) => {
   } catch (error) {
     if (error.name === "AbortError") {
       statusNode.textContent = "Cancelled.";
-      stepsNode.insertAdjacentHTML("beforeend", '<li><div class="step-title">Process cancelled by user</div></li>');
+      renderWorkflow({
+        status: "cancelled",
+        stages: [{
+          id: "cancelled",
+          label: "Cancelled",
+          status: "cancelled",
+          detail: "Process cancelled by user.",
+          substeps: [],
+        }],
+      });
     } else {
       statusNode.textContent = "Failed.";
-      stepsNode.insertAdjacentHTML("beforeend", `<li><div class="step-title">Error</div><div class="step-detail">${escapeHtml(error.message)}</div></li>`);
+      renderWorkflow({
+        status: "error",
+        stages: [{
+          id: "error",
+          label: "Error",
+          status: "error",
+          detail: error.message,
+          substeps: [],
+        }],
+      });
       renderTopAdvisory(null);
       resultsNode.innerHTML = cardHtml("Error", `<p>${escapeHtml(error.message)}</p>`);
     }
@@ -208,135 +408,201 @@ function getCurrentInputPreview() {
     const claim = document.getElementById("claim-text").value.trim();
     return claim ? `Claim: ${truncate(claim, 240)}` : "Claim: No claim entered";
   }
-  if (mode === "url") {
-    const url = document.getElementById("url-text").value.trim();
-    return url ? `URL: ${truncate(url, 240)}` : "URL: No URL entered";
-  }
   if (mode === "pdf") {
     const file = document.getElementById("pdf-file").files[0];
-    return file ? `PDF: ${file.name} (${formatKb(file.size)})` : "PDF: No file selected";
+    const pageRange = String(document.getElementById("pdf-page-range")?.value || "").trim();
+    return file ? `PDF: ${file.name} (${formatKb(file.size)})${pageRange ? ` | Pages: ${pageRange}` : ""}` : "PDF: No file selected";
   }
   const file = document.getElementById("image-file").files[0];
   return file ? `Image: ${file.name} (${formatKb(file.size)})` : "Image: No file selected";
 }
 
-function initialFlowQueues(preview) {
-  const langGuess = guessLanguageFromPreview(preview);
-  const sourceGuess = guessTopSources(preview).join(", ");
-
-  return [
-    [
-      "Input accepted",
-      "Parsing sentence boundaries",
-      "Preparing claim payload",
-    ],
-    [
-      `Detected language (estimated): ${langGuess}`,
-      "Normalizing claim tokens",
-      "Applying translation if needed",
-    ],
-    [
-      `Top sources (estimated): ${sourceGuess}`,
-      "Querying trusted evidence providers",
-      "Collecting high-credibility candidates",
-    ],
-    [
-      "Computing relevance score",
-      "Computing evidence quality score",
-      "Selecting strongest support/refute snippets",
-    ],
-    [
-      "Running stance detection",
-      "Aggregating weighted verdict",
-      "Preparing explanation and citations",
-    ],
-  ];
+function createProgressId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `progress-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function startProgressForCurrentInput() {
+function buildPlaceholderWorkflow() {
+  return {
+    status: "running",
+    stages: (defaultWorkflowStages[mode] || defaultWorkflowStages.claim).map((label, index) => ({
+      id: `${mode}-${index}`,
+      label,
+      status: index === 0 ? "active" : "pending",
+      detail: index === 0 ? "Queued for analysis" : "",
+      substeps: [],
+    })),
+  };
+}
+
+function startProgressForCurrentInput(progressId) {
   processPanel.hidden = false;
   progressStartedAt = Date.now();
-  activeSteps = [...(stepTitles[mode] || stepTitles.claim)];
   basePreview = getProgressPreviewLabel();
+  currentProgressId = progressId;
+  currentProgressSnapshot = buildPlaceholderWorkflow();
   const advisoryMessage = getPrimaryAdvisoryMessage();
   previewNode.textContent = advisoryMessage ? `${basePreview} | Advisory: ${advisoryMessage}` : basePreview;
-
-  stepFlowQueues = initialFlowQueues(getCurrentInputPreview());
-  stepFlowPos = stepFlowQueues.map(() => 0);
-  stepDetails = stepFlowQueues.map((q) => q[0]);
-
-  progressIndex = 0;
-  renderSteps();
-  setStepState(progressIndex, "active");
+  renderWorkflow(currentProgressSnapshot);
 
   stopProgressTimers();
   updateElapsedTimer();
   elapsedTimer = setInterval(updateElapsedTimer, 1000);
-  progressTimer = setInterval(() => {
-    if (progressIndex >= activeSteps.length - 1) {
-      return;
-    }
-    setStepState(progressIndex, "done");
-    progressIndex += 1;
-    setStepState(progressIndex, "active");
-    previewNode.textContent = `${basePreview} | Stage: ${activeSteps[progressIndex]}`;
-    renderSteps();
-  }, 2300);
-
-  detailPulseTimer = setInterval(() => {
-    const idx = progressIndex;
-    const queue = stepFlowQueues[idx] || [];
-    if (queue.length < 2) return;
-    stepFlowPos[idx] = (stepFlowPos[idx] + 1) % queue.length;
-    stepDetails[idx] = queue[stepFlowPos[idx]];
-    renderSteps();
-    setStepState(idx, "active");
-  }, 900);
+  startProgressPolling(progressId);
 }
 
 function enrichProgressWithResponse(data) {
-  const lang = normalizeLanguageLabel(extractLanguage(data));
-  const sources = extractTopSources(data);
   const verdict = extractVerdict(data);
-
-  if (activeSteps[1]) stepDetails[1] = `Detected language: ${lang}`;
-  if (activeSteps[2]) stepDetails[2] = `Top sources: ${sources.length ? sources.join(", ") : "No strong sources returned"}`;
-  if (activeSteps[4]) stepDetails[4] = `Final verdict: ${verdict}`;
-
   previewNode.textContent = `${basePreview} | Final verdict: ${verdict}`;
-  renderSteps();
+  if (currentProgressSnapshot) {
+    finalizeWorkflowSnapshot(verdict);
+  }
 }
 
-function renderSteps() {
-  if (!activeSteps.length) {
+function finalizeWorkflowSnapshot(verdictLabel = "Completed") {
+  if (!currentProgressSnapshot || !Array.isArray(currentProgressSnapshot.stages)) return;
+  currentProgressSnapshot.status = "done";
+  currentProgressSnapshot.final_detail = verdictLabel;
+  currentProgressSnapshot.stages = currentProgressSnapshot.stages.map((stage) => {
+    const nextStage = {
+      ...stage,
+      status: stage.status === "error" || stage.status === "cancelled" ? stage.status : "done",
+      substeps: Array.isArray(stage.substeps)
+        ? stage.substeps.map((substep) => ({
+          ...substep,
+          status: substep.status === "error" ? "error" : "done",
+        }))
+        : [],
+    };
+    if (nextStage.id === "verdict") {
+      nextStage.detail = verdictLabel;
+    } else if (!nextStage.detail) {
+      nextStage.detail = "Completed";
+    }
+    return nextStage;
+  });
+  renderWorkflow(currentProgressSnapshot);
+}
+
+function renderWorkflow(payload) {
+  const allStages = Array.isArray(payload?.stages) ? payload.stages : [];
+  const stages = allStages.filter((stage) => {
+    const status = String(stage?.status || "pending");
+    return status !== "pending";
+  });
+  if (!stages.length) {
     stepsNode.innerHTML = "";
     return;
   }
-  const idx = Math.min(progressIndex, activeSteps.length - 1);
-  const title = activeSteps[idx];
-  const detail = stepDetails[idx] ? `<div class="step-detail">${escapeHtml(stepDetails[idx])}</div>` : "";
-  stepsNode.innerHTML = `<li class="active current-step" data-step-idx="${idx}"><div class="step-title">${escapeHtml(title)}</div>${detail}</li>`;
+  stepsNode.innerHTML = stages.map((stage, index) => {
+    const stageStatus = escapeAttr(stage.status || "pending");
+    const detail = stage.detail ? `<div class="step-detail">${escapeHtml(stage.detail)}</div>` : "";
+    const visibleSubsteps = Array.isArray(stage.substeps)
+      ? stage.substeps.filter((substep) => ["active", "done", "error"].includes(substep.status || ""))
+      : [];
+    const substeps = visibleSubsteps.length
+      ? `<div class="step-substeps">${visibleSubsteps.map((substep) => `
+          <div class="step-substep ${escapeAttr(substep.status || "pending")}">
+            <span class="substep-dot"></span>
+            <span class="substep-label">${escapeHtml(substep.label || substep.id || "Step")}</span>
+            ${substep.detail ? `<span class="substep-detail">${escapeHtml(substep.detail)}</span>` : ""}
+          </div>
+        `).join("")}</div>`
+      : "";
+    const connector = index < stages.length - 1 ? '<span class="step-connector" aria-hidden="true"></span>' : "";
+    const isParallel = ["structured_api", "web_search", "extraction"].includes(stage.id) && visibleSubsteps.length > 1;
+    const isIterative = ["claim_selection", "document_parse"].includes(stage.id) && visibleSubsteps.length > 1;
+    const summaryMeta = [
+      isParallel ? '<span class="workflow-chip">Parallel</span>' : "",
+      isIterative ? '<span class="workflow-chip workflow-chip-soft">Loop</span>' : "",
+    ].filter(Boolean).join("");
+    const disclosureOpen = stage.status === "active" ? " open" : "";
+    return `
+      <li class="workflow-step ${stageStatus}${isParallel ? " parallel-stage" : ""}${isIterative ? " iterative-stage" : ""}">
+        <div class="step-node-wrap">
+          <span class="step-node" aria-hidden="true"></span>
+          ${connector}
+        </div>
+        <details class="step-body"${disclosureOpen}>
+          <summary class="step-summary">
+            <span class="step-title">${escapeHtml(stage.label || stage.id || "Stage")}</span>
+            ${summaryMeta}
+          </summary>
+          ${detail}
+          ${substeps}
+        </details>
+      </li>
+    `;
+  }).join("");
+}
+
+function applyProgressPayload(payload) {
+  currentProgressSnapshot = payload;
+  if (payload?.status === "done") {
+    const finalDetail = payload.final_detail || extractVerdict(renderedReport || originalReport || {}) || "Completed";
+    finalizeWorkflowSnapshot(finalDetail);
+    return;
+  }
+  const activeStage = (payload.stages || []).find((stage) => stage.status === "active");
+  if (activeStage) {
+    previewNode.textContent = `${basePreview} | Stage: ${activeStage.label}${activeStage.detail ? ` - ${activeStage.detail}` : ""}`;
+  } else if (payload.final_detail) {
+    previewNode.textContent = `${basePreview} | ${payload.final_detail}`;
+  }
+  renderWorkflow(payload);
+}
+
+function startProgressPolling(progressId) {
+  const fetchProgress = async () => {
+    if (!progressId || progressId !== currentProgressId) return;
+    try {
+      const response = await fetch(buildApiUrl(`/progress/${encodeURIComponent(progressId)}`));
+      const payload = await response.json();
+      if (!response.ok || payload.error) return;
+      applyProgressPayload(payload);
+      if (["done", "error", "cancelled"].includes(payload.status)) {
+        stopProgressTimers();
+        updateElapsedTimer();
+      }
+    } catch (_error) {
+      return;
+    }
+  };
+
+  fetchProgress();
+  progressPollTimer = setInterval(fetchProgress, 700);
 }
 
 function completeProgress() {
   stopProgressTimers();
   const elapsedLabel = formatElapsedDuration();
-  stepsNode.innerHTML = `<li class="done"><div class="step-title">Completed</div><div class="step-detail">Report generated successfully. Total time: ${escapeHtml(elapsedLabel)}.</div></li>`;
   progressTimerNode.textContent = `Time: ${elapsedLabel}`;
+  if (currentProgressSnapshot) {
+    finalizeWorkflowSnapshot(extractVerdict(renderedReport || originalReport || {}));
+  } else {
+    renderWorkflow({
+      status: "done",
+      stages: [{
+        id: "complete",
+        label: "Completed",
+        status: "done",
+        detail: `Report generated successfully in ${elapsedLabel}.`,
+        substeps: [],
+      }],
+    });
+  }
 }
 
 function resetProgressPanel() {
   stopProgressTimers();
   processPanel.hidden = true;
   renderTopAdvisory(null);
-  previewNode.textContent = "Submit a claim, URL, PDF, or image to start.";
+  previewNode.textContent = "Submit a claim, PDF, or image to start.";
   progressTimerNode.textContent = "Time: 00:00";
   stepsNode.innerHTML = "";
-  activeSteps = [];
-  stepDetails = [];
-  stepFlowQueues = [];
-  stepFlowPos = [];
   basePreview = "";
+  currentProgressId = null;
+  currentProgressSnapshot = null;
 }
 
 function stopProgressTimers() {
@@ -344,13 +610,13 @@ function stopProgressTimers() {
     clearInterval(progressTimer);
     progressTimer = null;
   }
-  if (detailPulseTimer) {
-    clearInterval(detailPulseTimer);
-    detailPulseTimer = null;
-  }
   if (elapsedTimer) {
     clearInterval(elapsedTimer);
     elapsedTimer = null;
+  }
+  if (progressPollTimer) {
+    clearInterval(progressPollTimer);
+    progressPollTimer = null;
   }
 }
 
@@ -364,13 +630,6 @@ function formatElapsedDuration() {
   const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
   const seconds = String(totalSeconds % 60).padStart(2, "0");
   return `${minutes}:${seconds}`;
-}
-
-function setStepState(index, state) {
-  const item = stepsNode.querySelector(`li[data-step-idx="${index}"]`);
-  if (!item) return;
-  item.classList.remove("active", "done");
-  if (state) item.classList.add(state);
 }
 
 function showReportTools() {
@@ -390,43 +649,43 @@ function hideReportTools() {
   inlineSourcePreviewBody.innerHTML = "";
 }
 
-async function callApiForMode(signal) {
+async function callApiForMode(signal, progressId = null) {
   if (mode === "claim") {
     const claim = document.getElementById("claim-text").value.trim();
     if (!claim) throw new Error("Please enter a claim.");
-    return postJson("/check", { claim }, signal);
-  }
-  if (mode === "url") {
-    const url = document.getElementById("url-text").value.trim();
-    if (!url) throw new Error("Please enter a URL.");
-    return postJson("/analyze_url", { url }, signal);
+    return postJson("/check", { claim }, signal, { "X-Progress-Id": currentProgressId });
   }
   if (mode === "pdf") {
     const file = document.getElementById("pdf-file").files[0];
     if (!file) throw new Error("Please choose a PDF.");
-    return postFile("/analyze_pdf", file, signal);
+    const pageRange = String(document.getElementById("pdf-page-range")?.value || "").trim();
+    return postFile("/analyze_pdf", file, signal, { "X-Progress-Id": currentProgressId }, { page_range: pageRange });
   }
   const file = document.getElementById("image-file").files[0];
   if (!file) throw new Error("Please choose an image.");
-  return postFile("/analyze_image", file, signal);
+  return postFile("/analyze_image", file, signal, { "X-Progress-Id": currentProgressId });
 }
 
-async function postJson(url, body, signal = null) {
-  const response = await fetch(url, {
+async function postJson(url, body, signal = null, headers = {}) {
+  const response = await fetch(buildApiUrl(url), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
     signal,
   });
   return handleResponse(response);
 }
 
-async function postFile(url, file, signal = null) {
+async function postFile(url, file, signal = null, headers = {}, fields = {}) {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await fetch(url, {
+  Object.entries(fields || {}).forEach(([key, value]) => {
+    if (value != null && String(value).trim()) formData.append(key, String(value).trim());
+  });
+  const response = await fetch(buildApiUrl(url), {
     method: "POST",
     body: formData,
+    headers,
     signal,
   });
   return handleResponse(response);
@@ -454,38 +713,145 @@ function renderResult(data) {
 }
 
 function renderDocumentResult(data) {
+  resultsNode.classList.add("document-mode");
+  resultsNode.classList.remove("claim-mode");
+
+  if (data.ocr_details && !data.page_results && !data.section_overview && !data.pages_analyzed) {
+    renderImageDocumentResult(data);
+    return;
+  }
+
+  const verdictLabel = escapeHtml(data.document_verdict || "Unknown");
+  const credibilityLabel = formatPct(data.document_credibility_score);
+  const claimsLabel = num(data.claims_analyzed);
+  const verdictBreakdown = `${num(data.true_claims)} / ${num(data.false_claims)} / ${num(data.neutral_claims)}`;
+  const warningBlock = data.analysis_warning
+    ? `<p class="meta document-warning"><strong>Note:</strong> ${escapeHtml(data.analysis_warning)}</p>`
+    : "";
   const summary = `
-    <div class="kpi">
-      <div class="tile"><span>Document verdict</span><strong>${escapeHtml(data.document_verdict || "Unknown")}</strong></div>
-      <div class="tile"><span>Credibility score</span><strong>${formatPct(data.document_credibility_score)}</strong></div>
-      <div class="tile"><span>Claims analyzed</span><strong>${num(data.claims_analyzed)}</strong></div>
-      <div class="tile"><span>True / False / Neutral</span><strong>${num(data.true_claims)} / ${num(data.false_claims)} / ${num(data.neutral_claims)}</strong></div>
+    <div class="document-topline">
+      <div class="document-title-stack">
+        <p class="document-kicker">Document Overview</p>
+        <h4>Overall Assessment</h4>
+      </div>
+      <span class="pill neutral">${verdictLabel}</span>
     </div>
+    <div class="kpi">
+      <div class="tile"><span>Document verdict</span><strong>${verdictLabel}</strong></div>
+      <div class="tile"><span>Credibility score</span><strong>${credibilityLabel}</strong></div>
+      <div class="tile"><span>Claims analyzed</span><strong>${claimsLabel}</strong></div>
+      <div class="tile"><span>True / False / Neutral</span><strong>${verdictBreakdown}</strong></div>
+    </div>
+    <div class="document-stat-strip">
+      <p><strong>Signal:</strong> ${credibilityLabel} credibility across ${claimsLabel} extracted claims.</p>
+      <p><strong>Mix:</strong> ${verdictBreakdown} (true / false / neutral).</p>
+    </div>
+    ${warningBlock}
   `;
 
   const sourceUrl = data.source_url ? `<p class="meta">Source: <a href="${escapeAttr(data.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(data.source_url)}</a></p>` : "";
   const primaryClaim = Array.isArray(data.results) && data.results[0] ? data.results[0] : null;
-  const primary = primaryClaim ? claimResultHtml(primaryClaim, null, false) : "<p>No claim result returned.</p>";
+  const pdfAnalysisSentence = buildPdfAnalysisSentence(data);
+  const primaryView = primaryClaim
+    ? {
+      ...primaryClaim,
+      claim: pdfAnalysisSentence,
+    }
+    : null;
+  const primary = primaryClaim
+    ? claimResultHtml(primaryView, null, false, {
+      header: "Representative Claim Snapshot",
+      extraClass: "document-primary-claim-card",
+      introNote: "This card shows the first extracted claim only. Use the document overview above as the actual PDF verdict.",
+    })
+    : "<p>No claim result returned.</p>";
   const sourceEvidence = primaryClaim ? getDisplayEvidence(primaryClaim) : [];
+  const analyzedContext = renderPdfAnalyzedContext(data);
   renderInlineSourcePreview(sourceEvidence);
   resultsNode.innerHTML = [
-    cardHtml("Document Summary", `${sourceUrl}${summary}`),
+    cardHtml("Document Summary", `${sourceUrl}${summary}`, "document-summary-card"),
+    analyzedContext,
     primary,
   ].join("");
+}
+
+function renderImageDocumentResult(data) {
+  const primaryClaim = Array.isArray(data.results) && data.results[0] ? data.results[0] : null;
+  const primary = primaryClaim
+    ? claimResultHtml(primaryClaim, null, false, {
+      header: "Image Analysis Result",
+      extraClass: "document-primary-claim-card",
+    })
+    : "<p>No claim result returned.</p>";
+  const sourceEvidence = primaryClaim ? getDisplayEvidence(primaryClaim) : [];
+  const analyzedContext = renderImageAnalyzedContext(data);
+  renderInlineSourcePreview(sourceEvidence);
+  resultsNode.innerHTML = [
+    analyzedContext,
+    primary,
+  ].filter(Boolean).join("");
+}
+
+function buildPdfAnalysisSentence(data) {
+  const pages = Number(data.pages_analyzed || data.claims_analyzed || 0);
+  const sections = Array.isArray(data.section_overview) ? data.section_overview.length : 0;
+  if (pages > 0 && sections > 0) {
+    return `PDF analyzed page-by-page across ${pages} pages and ${sections} sections.`;
+  }
+  if (pages > 0) {
+    return `PDF analyzed page-by-page across ${pages} pages.`;
+  }
+  return "PDF analyzed section-by-section for evidence-backed verification.";
+}
+
+function renderPdfAnalyzedContext(data) {
+  const sections = Array.isArray(data.section_overview) ? data.section_overview : [];
+  const pages = Array.isArray(data.page_results) ? data.page_results : [];
+
+  const sectionItems = sections.length
+    ? `<ul class="summary-list">${sections.slice(0, 8).map((section) => {
+      const topic = escapeHtml(section.section_topic || "Document section");
+      const verdict = escapeHtml(section.section_verdict || "Mixed / Needs Review");
+      const sectionPages = Array.isArray(section.pages) && section.pages.length ? section.pages.join(", ") : "N/A";
+      const context = escapeHtml(String(section.section_context_summary || "").trim() || "No section context summary available.");
+      return `<li><strong>${topic}</strong> (pages: ${escapeHtml(String(sectionPages))}) - ${verdict}<br>${context}</li>`;
+    }).join("")}</ul>`
+    : "<p>No section-level context returned.</p>";
+
+  const pageItems = pages.length
+    ? `<ul class="summary-list">${pages.slice(0, 8).map((page) => {
+      const pageNumber = escapeHtml(String(page.page_number ?? "?"));
+      const topic = escapeHtml(page.section_topic || "Document Overview");
+      const context = escapeHtml(String(page.page_context_summary || page.text_preview || "").trim() || "No page context summary available.");
+      return `<li><strong>Page ${pageNumber}</strong> - ${topic}<br>${context}</li>`;
+    }).join("")}</ul>`
+    : "<p>No page-level context returned.</p>";
+
+  return cardHtml(
+    "Analyzed Context",
+    `
+      <details class="analysis-collapse">
+        <summary>Sections analyzed</summary>
+        <div class="analysis-collapse-body">
+          ${sectionItems}
+        </div>
+      </details>
+      <details class="analysis-collapse">
+        <summary>Page context analyzed</summary>
+        <div class="analysis-collapse-body">
+          ${pageItems}
+        </div>
+      </details>
+    `,
+    "document-context-card",
+  );
 }
 
 
 function getLocalCheckabilityBlock() {
   if (mode !== "claim" || !claimTextNode) return null;
   const claim = String(claimTextNode.value || "").trim();
-  if (!claim) {
-    return {
-      code: "empty_claim",
-      severity: "error",
-      block: true,
-      message: "Enter a fact-checkable claim before analysis.",
-    };
-  }
+  if (!claim) return null;
 
   const lowered = claim.toLowerCase();
   const personalPatterns = [
@@ -582,11 +948,71 @@ function renderTopAdvisory(data) {
 }
 
 function renderClaimResult(data) {
+  resultsNode.classList.add("claim-mode");
+  resultsNode.classList.remove("document-mode");
   const filteredEvidence = getDisplayEvidence(data);
   renderInlineSourcePreview(filteredEvidence);
   resultsNode.innerHTML = [
     claimResultHtml(data, null, false),
   ].join("");
+}
+
+function renderImageAnalyzedContext(data) {
+  const ocr = data && data.ocr_details && typeof data.ocr_details === "object" ? data.ocr_details : null;
+  if (!ocr) return "";
+
+  const claimLanguage = normalizeLanguageLabel(
+    extractLanguage(data)
+      || ocr.language
+      || guessLanguageFromPreview(ocr.selected_claim || data.claim || ocr.text_preview || "")
+      || "unknown"
+  );
+  const candidates = Array.isArray(ocr.selected_claim_candidates) ? ocr.selected_claim_candidates : [];
+  currentImageClaimSelectionState = {
+    original: {
+      claim_language: claimLanguage,
+      selected_claim: String(ocr.selected_claim || data.claim || "").trim() || "No selected claim returned.",
+      candidates: candidates.slice(0, 3).map((row) => ({
+        text: String(row.text || row.claim || "").trim() || "Candidate",
+        score: row.score,
+      })),
+    },
+    translated: null,
+  };
+  const imagePreview = currentImagePreviewUrl
+    ? `
+      <figure class="image-context-preview">
+        <img src="${escapeAttr(currentImagePreviewUrl)}" alt="Uploaded image preview">
+        <figcaption>Source image preview</figcaption>
+      </figure>
+    `
+    : `<p class="meta"><strong>Image preview:</strong> No image preview available.</p>`;
+  return cardHtml(
+    "Analyzed Context",
+    `
+      <details class="analysis-collapse" open>
+        <summary>OCR context analyzed</summary>
+        <div class="analysis-collapse-body">
+          <ul class="summary-list">
+            <li><strong>OCR language detected:</strong> ${escapeHtml(claimLanguage)}</li>
+          </ul>
+          ${imagePreview}
+        </div>
+      </details>
+      <details class="analysis-collapse">
+        <summary>Claim selection analyzed</summary>
+        <div class="analysis-collapse-body">
+          <div class="analysis-action-row">
+            <button type="button" class="analysis-mini-btn" data-image-claim-translate data-state="original">Translate</button>
+          </div>
+          <div data-image-claim-selection-body>
+            ${renderImageClaimSelectionBody(currentImageClaimSelectionState.original)}
+          </div>
+        </div>
+      </details>
+    `,
+    "document-context-card image-context-card",
+  );
 }
 
 
@@ -609,12 +1035,14 @@ function renderUxWarnings(data) {
   `;
 }
 
-function claimResultHtml(data, index = null, includeSourcePreview = false) {
+function claimResultHtml(data, index = null, includeSourcePreview = false, options = {}) {
   const filteredEvidence = getDisplayEvidence(data);
   const transparency = (data && data.transparency) || {};
   const verdict = (data.final_verdict || "NEUTRAL").toUpperCase();
   const verdictClass = verdict === "SUPPORT" ? "support" : verdict === "REFUTE" ? "refute" : "neutral";
-  const header = index ? `Claim ${index}` : "Claim Result";
+  const header = options.header || (index ? `Claim ${index}` : "Claim Result");
+  const extraClass = options.extraClass || "";
+  const introNote = options.introNote ? `<p class="meta subtle-note">${escapeHtml(options.introNote)}</p>` : "";
   const cleanExplanationText = sanitizeNarrative(data.explanation || "");
   const cleanConflictText = sanitizeNarrative(data.conflict_analysis || "N/A");
   const explanationDetails = buildExplanationDetails(data, filteredEvidence, cleanExplanationText);
@@ -624,11 +1052,12 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
   const warningBlock = renderUxWarnings(data);
   const citations = (data.citations || [])
     .filter((c) => !String(c).includes("internal://logic_engine") && !String(c).includes("logic_engine"))
-    .map((c) => `<li>${escapeHtml(String(c))}</li>`)
+    .map((c) => `<li>${escapeHtml(cleanCitationText(c))}</li>`)
     .join("");
 
   const evidenceItems = filteredEvidence
     .map((ev) => {
+      const sourceLabel = sourceLabelForEvidence(ev);
       const stanceClass = (ev.stance || "NEUTRAL").toUpperCase() === "SUPPORT"
         ? "support"
         : (ev.stance || "NEUTRAL").toUpperCase() === "REFUTE"
@@ -639,9 +1068,9 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
           <div>
             <span class="pill ${stanceClass}">${escapeHtml(ev.stance || "NEUTRAL")}</span>
           </div>
-          <p>${escapeHtml(ev.text || "")}</p>
+          <p>${escapeHtml(getDisplaySnippetText(ev))}</p>
           <p class="meta">
-            Source: ${escapeHtml(ev.source || "Unknown")} |
+            Source: ${escapeHtml(sourceLabel)} |
             Confidence: ${formatPct(ev.confidence)} |
             Weight: ${num(ev.weight)}
           </p>
@@ -659,6 +1088,7 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
     header,
     `
       <div class="quick-lines">
+        ${introNote}
         <p><strong>Claim:</strong> ${claimTextLine}</p>
         <p><strong>Verdict:</strong> ${escapeHtml(verdict)}</p>
         <p><strong>Confidence:</strong> ${formatPct(data.confidence)}</p>
@@ -682,7 +1112,8 @@ function claimResultHtml(data, index = null, includeSourcePreview = false) {
       <p>${escapeHtml(cleanConflictText)}</p>
       <h4>Citations</h4>
       ${citations ? `<ol>${citations}</ol>` : "<p>No citations returned.</p>"}
-    `
+    `,
+    extraClass,
   );
 }
 
@@ -774,11 +1205,12 @@ function renderSourceMedia(evidence) {
     const domain = extractDomain(ev.url || "");
     if (!domain) return "";
     const logo = `https://logo.clearbit.com/${domain}`;
+    const sourceLabel = sourceLabelForEvidence(ev);
     return `
       <a class="source-media-item" href="${escapeAttr(ev.url)}" target="_blank" rel="noopener noreferrer">
         <img src="${escapeAttr(logo)}" alt="${escapeHtml(domain)} logo" loading="lazy" onerror="this.src='https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64'">
         <div>
-          <div>${escapeHtml(ev.source || domain)}</div>
+          <div>${escapeHtml(sourceLabel || domain)}</div>
           <p class="meta">${escapeHtml(domain)}</p>
         </div>
       </a>
@@ -803,20 +1235,62 @@ function extractLanguage(data) {
   return null;
 }
 
+function renderImageClaimSelectionBody(payload, options = {}) {
+  const selectedClaim = escapeHtml(String(payload?.selected_claim || "").trim() || "No selected claim returned.");
+  const claimLanguage = escapeHtml(String(payload?.claim_language || "Unknown"));
+  const label = options.label ? `<p class="meta"><strong>${escapeHtml(options.label)}:</strong></p>` : "";
+  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+  const candidateItems = candidates.length
+    ? `<ul class="summary-list">${candidates.map((row) => {
+      const text = escapeHtml(String(row.text || row.claim || "").trim() || "Candidate");
+      const score = row.score != null ? ` (${num(row.score)})` : "";
+      return `<li><strong>${text}</strong>${escapeHtml(score)}</li>`;
+    }).join("")}</ul>`
+    : "<p>No alternate claim candidates returned.</p>";
+  return `
+    ${label}
+    <p class="meta"><strong>Claim language:</strong> ${claimLanguage}</p>
+    <p class="meta"><strong>Selected claim:</strong> ${selectedClaim}</p>
+    ${candidateItems}
+  `;
+}
+
+function normalizeClaimComparison(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function normalizeLanguageLabel(code) {
   const v = String(code || "unknown").trim().toLowerCase();
   const map = {
     en: "English",
+    eng: "English",
     hi: "Hindi",
+    hin: "Hindi",
     ta: "Tamil",
+    tam: "Tamil",
     te: "Telugu",
+    tel: "Telugu",
     bn: "Bengali",
+    ben: "Bengali",
     mr: "Marathi",
+    mar: "Marathi",
     gu: "Gujarati",
+    guj: "Gujarati",
     kn: "Kannada",
+    kan: "Kannada",
     ml: "Malayalam",
+    mal: "Malayalam",
     pa: "Punjabi",
+    pan: "Punjabi",
     ur: "Urdu",
+    urd: "Urdu",
+    ori: "Odia",
+    or: "Odia",
+    osd: "Orientation Script Detection",
     unknown: "Unknown",
   };
   if (map[v]) return map[v];
@@ -826,11 +1300,47 @@ function normalizeLanguageLabel(code) {
 
 function sanitizeNarrative(text) {
   if (!text) return "";
-  return String(text)
+  return maybeFixMojibake(String(text))
     .replace(/logic_engine/gi, "reasoning engine")
     .replace(/\binternal:\/\/logic_engine\b/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
+}
+
+function cleanCitationText(value) {
+  return maybeFixMojibake(String(value || ""))
+    .replace(/^\s*\[\d+\]\s*/u, "")
+    .trim();
+}
+
+function maybeFixMojibake(text) {
+  const raw = String(text || "");
+  if (!looksLikeMojibake(raw)) return raw;
+  try {
+    const bytes = Uint8Array.from(Array.from(raw, (ch) => ch.charCodeAt(0) & 0xff));
+    const decoded = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    if (isBetterDecodedText(raw, decoded)) return decoded;
+  } catch (_) {
+    return raw;
+  }
+  return raw;
+}
+
+function looksLikeMojibake(text) {
+  return /(?:Ã.|Â.|â.|à.|Ð.|Ñ.)/.test(text);
+}
+
+function isBetterDecodedText(original, decoded) {
+  if (!decoded || decoded.includes("\uFFFD")) return false;
+  const mojibakePenalty = countRegex(original, /(?:Ã.|Â.|â.|à.|Ð.|Ñ.)/g) - countRegex(decoded, /(?:Ã.|Â.|â.|à.|Ð.|Ñ.)/g);
+  const scriptGain = countRegex(decoded, /[\u0900-\u0D7F]/g) - countRegex(original, /[\u0900-\u0D7F]/g);
+  const latinDrop = countRegex(original, /[A-Za-z]{2,}/g) - countRegex(decoded, /[A-Za-z]{2,}/g);
+  return mojibakePenalty > 0 && (scriptGain > 0 || latinDrop <= 0);
+}
+
+function countRegex(text, regex) {
+  const matches = String(text || "").match(regex);
+  return matches ? matches.length : 0;
 }
 
 function formatSourceList(items) {
@@ -918,9 +1428,11 @@ function buildExplanationDetails(data, filteredEvidence, fallbackText) {
     notes.push(`<p>${escapeHtml(fallbackText)}</p>`);
   }
 
+  const introList = `<ul class="explanation-intro-list">${intro.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`;
+
   return `
     <div class="explanation-block">
-      <p>${escapeHtml(intro.join(" "))}</p>
+      ${introList}
       ${supportHtml}
       ${refuteHtml}
       ${neutralHtml}
@@ -943,9 +1455,11 @@ function renderExplanationSection(title, items, claimText = "") {
 }
 
 function renderExplanationItem(item) {
-  const context = pickEvidenceContext(item, 520) || "No detailed evidence text available.";
-  const source = item && item.source ? String(item.source).trim() : "Unknown source";
-  return `<li><p>${escapeHtml(context)}</p><p class="meta">Source: ${escapeHtml(source)}</p></li>`;
+  const context = getDisplaySnippetText({
+    text: pickEvidenceContext(item, 520) || item?.text || "",
+  }) || "No detailed evidence text available.";
+  const source = sourceLabelForEvidence(item);
+  return `<li><p class="explanation-context">${escapeHtml(context)}</p><p class="meta explanation-source">Source: ${escapeHtml(source)}</p></li>`;
 }
 
 function getEvidenceGroups(filteredEvidence) {
@@ -1056,8 +1570,7 @@ function extractTopSources(data) {
   const names = [];
   const pushSource = (ev) => {
     if (!ev) return;
-    if (String(ev.source || "") === "logic_engine") return;
-    const val = String(ev.source || "").trim();
+    const val = normalizeSourceName(ev.source || "", "");
     if (!val) return;
     if (!names.includes(val)) names.push(val);
   };
@@ -1069,6 +1582,59 @@ function extractTopSources(data) {
     });
   }
   return names.slice(0, 3);
+}
+
+function normalizeSourceName(value, fallback = "Unknown source") {
+  const raw = maybeFixMojibake(String(value || "")).trim();
+  if (!raw) return fallback;
+  const compact = raw.toLowerCase().replace(/[_\-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (compact === "logic engine" || compact === "logic_engine") return fallback;
+  if (/^ocr( context| text| extraction)?$/.test(compact)) return fallback;
+  if (compact.includes("ocr context")) return fallback;
+  if (compact.includes("internal://")) return fallback;
+  return raw;
+}
+
+function sourceLabelForEvidence(ev) {
+  const cleaned = normalizeSourceName(ev && ev.source, "");
+  if (cleaned) return cleaned;
+  const domain = extractDomain((ev && ev.url) || "");
+  return domain || "Unknown source";
+}
+
+function cleanEvidenceContext(text) {
+  if (!text) return "";
+  let out = sanitizeNarrative(String(text));
+  out = out.replace(/[\r\n]+/g, " ");
+  out = out.replace(/^\s*[-*•–—]+\s*/u, "");
+  out = out.replace(/\s+[\-–—]\s+/gu, "; ");
+  out = out.replace(/\s{2,}/g, " ").trim();
+  return out;
+}
+
+function getDisplaySnippetText(item) {
+  const raw = cleanEvidenceContext(String(item?.text || ""));
+  if (!raw) return "Source snippet unavailable.";
+
+  let out = raw;
+  const suspicious = looksLikeMojibake(out) || /\bIN US English\b/i.test(out);
+
+  if (suspicious) {
+    out = out.replace(/^\s*IN US English\s*/i, "").trim();
+
+    const headlineMatch = out.match(/(['"“][^'"”]{20,}['"”])/u);
+    if (headlineMatch && typeof headlineMatch.index === "number" && headlineMatch.index > 12) {
+      out = out.slice(headlineMatch.index).trim();
+    }
+
+    out = out.replace(/^(?:News\s+|City\s+|amaravati\s+){2,}/i, "").trim();
+
+    if (looksLikeMojibake(out) && countRegex(out, /(?:Ã.|Â.|â.|à.|Ð.|Ñ.)/g) >= 3 && !/[\u0900-\u0D7F]/.test(out)) {
+      return "Source snippet omitted because it contained unreadable encoded text.";
+    }
+  }
+
+  return truncateAtSentence(out, 420);
 }
 
 function guessTopSources(preview) {
@@ -1087,8 +1653,9 @@ function guessLanguageFromPreview(preview) {
   return "en";
 }
 
-function cardHtml(title, body) {
-  return `<section class="card"><h3>${escapeHtml(title)}</h3>${body}</section>`;
+function cardHtml(title, body, extraClass = "") {
+  const className = ["card", extraClass].filter(Boolean).join(" ");
+  return `<section class="${className}"><h3>${escapeHtml(title)}</h3>${body}</section>`;
 }
 
 function formatPct(value) {
