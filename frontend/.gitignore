@@ -1,0 +1,5 @@
+# Dependencies
+node_modules/
+
+# Lock files are tracked for proper dependency management
+# package-lock.json should be committed
