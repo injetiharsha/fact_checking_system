@@ -1,0 +1,21 @@
+{
+  "name": "factlens-frontend",
+  "version": "1.0.0",
+  "description": "FactLens frontend application",
+  "type": "module",
+  "scripts": {
+    "build": "echo 'Static HTML project - no build needed'",
+    "dev": "npx serve .",
+    "install:speed-insights": "npm install @vercel/speed-insights"
+  },
+  "dependencies": {
+    "@vercel/speed-insights": "^1.0.14"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "fact-checking",
+    "verification"
+  ],
+  "author": "",
+  "license": "ISC"
+}
