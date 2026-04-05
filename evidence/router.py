@@ -86,6 +86,7 @@ CLAIM_TYPE_QUERY_HINTS = {
 MISINFORMATION_QUERY_HINTS = ["debunked", "fact check", "myth"]
 TEMPORAL_QUERY_HINTS = ["timeline", "history", "official history"]
 SPACE_SURVIVAL_HINTS = ["vacuum", "spacesuit", "life support"]
+ECONOMY_RANK_HINTS = ["gdp ranking", "largest economies", "nominal gdp", "imf", "world bank"]
 MISINFORMATION_TITLE_PENALTIES = (
     "conspiracy",
     "changed my mind",
@@ -627,6 +628,10 @@ class EvidenceRouter:
         use_india_scope_sources = query_language in INDIAN_MULTILINGUAL_LANGUAGES
 
         candidates = [base_claim]
+        for rewrite in self._claim_query_rewrites(base_claim, domain):
+            candidates.append(rewrite)
+            if original_query and original_query != base_claim:
+                candidates.append(rewrite.replace(base_claim, original_query, 1) if rewrite.startswith(base_claim) else f"{original_query} {rewrite}")
         if original_query and original_query != base_claim and query_language and query_language != "en":
             candidates.append(original_query)
 
@@ -708,7 +713,46 @@ class EvidenceRouter:
         if domain == "space_astronomy" and any(token in claim_text for token in ("breathe", "survive", "without", "equipment")):
             hints.extend(SPACE_SURVIVAL_HINTS)
 
+        if "largest economy" in claim_text or re.search(r"\b\d+(?:st|nd|rd|th)\s+largest economy\b", claim_text):
+            hints.extend(ECONOMY_RANK_HINTS)
+
         return hints
+
+    @staticmethod
+    def _claim_query_rewrites(claim, domain):
+        claim_text = (claim or "").strip()
+        lowered = claim_text.lower()
+        rewrites = []
+
+        if re.search(r"\b\d+(?:st|nd|rd|th)\s+largest economy\b", lowered) or "largest economy" in lowered:
+            compact = re.sub(r"\bis\s+the\b", "", claim_text, flags=re.I)
+            compact = re.sub(r"\bin\s+(19|20)\d{2}\b", "", compact, flags=re.I)
+            compact = re.sub(r"\s+", " ", compact).strip(" .")
+            rewrites.extend([
+                f"{compact} nominal GDP ranking",
+                f"{compact} IMF world economic outlook",
+                f"{compact} world bank GDP ranking",
+            ])
+
+        if any(token in lowered for token in ("covid", "virus")) and any(token in lowered for token in ("spread", "spreads", "cause", "causes", "5g")):
+            rewrites.extend([
+                f"{claim_text} myth",
+                f"{claim_text} fact check",
+                f"{claim_text} WHO",
+            ])
+
+        if domain == "economics_business" and "gdp" in lowered and "india" in lowered:
+            rewrites.append(f"{claim_text} official GDP data India")
+
+        seen = set()
+        ordered = []
+        for item in rewrites:
+            compact = re.sub(r"\s+", " ", item).strip()
+            key = compact.lower()
+            if compact and key not in seen:
+                seen.add(key)
+                ordered.append(compact)
+        return ordered[:4]
 
     @staticmethod
     def _clean_hint(value):

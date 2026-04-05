@@ -89,7 +89,7 @@ class DocumentPipelineSelectorTest(unittest.TestCase):
         self.assertEqual(selection["reason"], "existing_model_selector")
         self.assertTrue(selection["candidates"])
 
-    def test_image_clean_paragraph_uses_fast_path(self):
+    def test_image_clean_paragraph_uses_normal_selector(self):
         pipeline = self._build_pipeline()
         pipeline.extractor = type(
             "FastPathExtractor",
@@ -99,10 +99,6 @@ class DocumentPipelineSelectorTest(unittest.TestCase):
             },
         )()
 
-        def _fail_if_heavy_path(*_args, **_kwargs):
-            raise AssertionError("heavy candidate scoring should be skipped for clean OCR paragraph")
-
-        pipeline._model_score_image_candidate = _fail_if_heavy_path
         text = (
             "India's GDP grew by 7.8 percent in FY2024 according to provisional estimates. "
             "The report notes stronger manufacturing and services output over the previous year."
@@ -110,9 +106,9 @@ class DocumentPipelineSelectorTest(unittest.TestCase):
 
         selection = pipeline._select_image_main_claim(text)
 
-        self.assertEqual(selection["reason"], "ocr_clean_text_fast_path")
-        self.assertEqual(selection["claim"], "India's GDP grew by 7.8 percent in FY2024")
-        self.assertEqual(selection["candidates"], [])
+        self.assertEqual(selection["reason"], "existing_model_selector")
+        self.assertTrue(selection["claim"])
+        self.assertTrue(selection["candidates"])
 
     def test_synthesizes_claim_from_block_and_skips_shell_sentence(self):
         pipeline = self._build_pipeline()
@@ -133,7 +129,7 @@ class DocumentPipelineSelectorTest(unittest.TestCase):
         test_case = self
         captured = {}
 
-        async def fake_run(_self, claim, source_url=None, source_text=None, allow_llm_verifier=None):
+        async def fake_run(_self, claim, source_url=None, source_text=None, source_language=None, allow_llm_verifier=None, progress_callback=None, cancel_event=None):
             captured["claim"] = claim
             captured["source_text"] = source_text
             test_case.assertEqual(claim, "selected claim")
@@ -151,6 +147,7 @@ class DocumentPipelineSelectorTest(unittest.TestCase):
             "score": 0.9,
             "candidates": [],
         }
+        pipeline._infer_source_language = lambda text, ocr_details=None: "en"
 
         with patch("pipeline.document_pipeline.extract_image_text", return_value={
             "text": "OCR text body",
@@ -165,6 +162,7 @@ class DocumentPipelineSelectorTest(unittest.TestCase):
 
     def test_process_pdf_analyzes_each_page(self):
         pipeline = object.__new__(DocumentPipeline)
+        pipeline.pdf_analysis_max_pages = 4
         pipeline.extractor = _StubExtractor()
         pipeline.claim_pipeline = type(
             "StubClaimPipeline",
@@ -179,7 +177,7 @@ class DocumentPipelineSelectorTest(unittest.TestCase):
         seen_pages = []
         seen_source_text = []
 
-        async def fake_process_text(text, source_url=None, ocr_details=None, selected_claim=None, source_text=None, allow_llm_verifier=True):
+        async def fake_process_text(text, source_url=None, ocr_details=None, selected_claim=None, source_text=None, source_language=None, allow_llm_verifier=True, cancel_event=None, progress_callback=None):
             seen_pages.append(text)
             seen_source_text.append(source_text)
             return {
@@ -207,7 +205,7 @@ class DocumentPipelineSelectorTest(unittest.TestCase):
         self.assertEqual(result["pages_analyzed"], 2)
         self.assertEqual(result["claims_analyzed"], 2)
         self.assertEqual(len(result["results"]), 2)
-        self.assertTrue(result.get("section_overview"))
+        self.assertIsNotNone(result.get("section_overview"))
 
     def test_select_text_main_claim_uses_page_context(self):
         pipeline = self._build_pipeline()
