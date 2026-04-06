@@ -148,3 +148,4 @@ training/common/build_stance_stage2_hardcases_v5_multilingual_internet.py
 data/claim_checkability/seeds/local_curated_v2.jsonl
 data/claim_checkability/v2/metadata.json
 
+.vercel
