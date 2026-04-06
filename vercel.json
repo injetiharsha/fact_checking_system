@@ -1,17 +1,4 @@
 {
   "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend",
-  "functions": {
-    "api/index.py": {
-      "runtime": "python3.11",
-      "memory": 2048,
-      "maxDuration": 60
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/index.py"
-    }
-  ]
+  "outputDirectory": "frontend"
 }
