@@ -1,6 +1,0 @@
-﻿[
-  {"claim": "The moon landing was faked", "expected_verdict": "FALSE"},
-  {"claim": "Climate change is a hoax", "expected_verdict": "FALSE"},
-  {"claim": "Mars has two moons", "expected_verdict": "TRUE"},
-  {"claim": "The Great Barrier Reef is off the coast of Australia", "expected_verdict": "TRUE"}
-]
