@@ -1,10 +1,13 @@
-// ...existing code...
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const rawOrigin = process.env.BACKEND_ORIGIN || "http://13.217.24.76:8000";
 const ec2Origin = rawOrigin.replace(/\/+$/, ""); // remove trailing slash
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   async rewrites() {
     return {
       beforeFiles: [
@@ -26,4 +29,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-// ...existing code...
