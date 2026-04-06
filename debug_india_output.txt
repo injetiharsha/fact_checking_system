@@ -1,0 +1,172 @@
+
+================================================================================
+DEBUGGING: India became independent in 1950.
+================================================================================
+
+Result keys: dict_keys(['claim', 'language', 'evidence', 'final_verdict', 'confidence', 'conflict_analysis', 'citations', 'logical_analysis', 'explanation'])
+
+Full result:
+{
+  "claim": "india became independent in 1950.",
+  "language": "en",
+  "evidence": [
+    {
+      "source": "BBC ON THIS DAY | 26 | 1950: India becomes a republic",
+      "url": "http://news.bbc.co.uk/onthisday/low/dates/stories/january/26/newsid_3475000/3475569.stm",
+      "text": "Front Page | Years | Themes | Witness 1950: India becomes a republic AUDIO : Independence proclaimed in India The independent republic of India is officially born today, after nearly 100 years of British rule.",
+      "weight": 0.5,
+      "raw_weight": 0.5,
+      "stance": "SUPPORT",
+      "confidence": 0.9,
+      "stance_source": "numeric_year_match",
+      "relevance_score": 1.0,
+      "base_relevance_score": 0.998,
+      "selector_score": 1.09,
+      "quality_score": 1.0,
+      "combined_score": 1.0,
+      "evidence_tier": "strong",
+      "passage_count": 2,
+      "support_passages": 1,
+      "refute_passages": 1,
+      "neutral_passages": 0,
+      "document_score": 1.0,
+      "document_has_conflict": true,
+      "retained_passages": [
+        {
+          "text": "Front Page | Years | Themes | Witness 1950: India becomes a republic AUDIO : Independence proclaimed in India The independent republic of India is officially born today, after nearly 100 years of British rule.",
+          "stance": "SUPPORT",
+          "confidence": 0.9,
+          "weight": 0.5,
+          "relevance_score": 1.0,
+          "quality_score": 1.0,
+          "combined_score": 1.0,
+          "evidence_tier": "strong"
+        },
+        {
+          "text": "Jawaharlal Nehru became India's first elected prime minister in the first general election in 1952.",
+          "stance": "REFUTE",
+          "confidence": 0.95,
+          "weight": 0.5,
+          "relevance_score": 0.322,
+          "quality_score": 0.6,
+          "combined_score": 0.1932,
+          "evidence_tier": "soft"
+        }
+      ]
+    },
+    {
+      "source": "BBC ON THIS DAY | 26 | 1950: India becomes a republic - BBC News",
+      "url": "http://news.bbc.co.uk/onthisday/hi/dates/stories/january/26/newsid_3475000/3475569.stm",
+      "text": "1950: India becomes a republic The independent republic of India is officially born today, after nearly 100 years of British rule.",
+      "weight": 0.5,
+      "raw_weight": 0.5,
+      "stance": "SUPPORT",
+      "confidence": 0.9,
+      "stance_source": "numeric_year_match",
+      "relevance_score": 1.0,
+      "base_relevance_score": 0.998,
+      "selector_score": 1.081,
+      "quality_score": 0.8,
+      "combined_score": 0.8,
+      "evidence_tier": "strong",
+      "passage_count": 2,
+      "support_passages": 1,
+      "refute_passages": 1,
+      "neutral_passages": 0,
+      "document_score": 0.8,
+      "document_has_conflict": true,
+      "retained_passages": [
+        {
+          "text": "1950: India becomes a republic The independent republic of India is officially born today, after nearly 100 years of British rule.",
+          "stance": "SUPPORT",
+          "confidence": 0.9,
+          "weight": 0.5,
+          "relevance_score": 1.0,
+          "quality_score": 0.8,
+          "combined_score": 0.8,
+          "evidence_tier": "strong"
+        },
+        {
+          "text": "Independence proclaimed in India In Context Dr Rajendra Prasad served for 12 years as India's president, retiring in 1962.",
+          "stance": "REFUTE",
+          "confidence": 0.95,
+          "weight": 0.5,
+          "relevance_score": 0.391,
+          "quality_score": 0.6,
+          "combined_score": 0.2346,
+          "evidence_tier": "soft"
+        }
+      ]
+    },
+    {
+      "source": "Declaration as Republic of India in 1950 versus gaining of ...",
+      "url": "https://theleaflet.in/analysis/declaration-as-republic-of-india-in-1950-versus-gaining-of-independence-in-1947-whats-the-difference",
+      "text": "The conclusion is that, on August 15, 1947 when Great Britain eschewed its sovereign power, India became a wholly independent nation in the eye of International Law.",
+      "weight": 0.5,
+      "raw_weight": 0.5,
+      "stance": "SUPPORT",
+      "confidence": 0.9,
+      "stance_source": "numeric_year_match",
+      "relevance_score": 0.776,
+      "base_relevance_score": 0.762,
+      "selector_score": 0.82,
+      "quality_score": 0.8,
+      "combined_score": 0.6208,
+      "evidence_tier": "strong",
+      "passage_count": 2,
+      "support_passages": 1,
+      "refute_passages": 1,
+      "neutral_passages": 0,
+      "document_score": 0.766,
+      "document_has_conflict": true,
+      "retained_passages": [
+        {
+          "text": "The Constituent Assembly of India finally exercised its option and enacted the Constitution of India on November 26, 1949 declaring the Dominion of India as Republic of India from January 26, 1950.",
+          "stance": "REFUTE",
+          "confidence": 0.95,
+          "weight": 0.5,
+          "relevance_score": 0.766,
+          "quality_score": 1.0,
+          "combined_score": 0.766,
+          "evidence_tier": "strong"
+        },
+        {
+          "text": "The conclusion is that, on August 15, 1947 when Great Britain eschewed its sovereign power, India became a wholly independent nation in the eye of International Law.",
+          "stance": "SUPPORT",
+          "confidence": 0.9,
+          "weight": 0.5,
+          "relevance_score": 0.776,
+          "quality_score": 0.8,
+          "combined_score": 0.6208,
+          "evidence_tier": "strong"
+        }
+      ]
+    },
+    {
+      "source": "logic_engine",
+      "url": "internal://logic_engine",
+      "text": "Structured reasoning signal",
+      "weight": 0.8,
+      "stance": "SUPPORT",
+      "confidence": 0.8,
+      "relevance_score": 1.0,
+      "quality_score": 1.0
+    }
+  ],
+  "final_verdict": "TRUE",
+  "confidence": 1.0,
+  "conflict_analysis": "Strong Supporting Consensus",
+  "citations": [
+    "[1] BBC ON THIS DAY | 26 | 1950: India becomes a republic - http://news.bbc.co.uk/onthisday/low/dates/stories/january/26/newsid_3475000/3475569.stm",
+    "[2] BBC ON THIS DAY | 26 | 1950: India becomes a republic - BBC News - http://news.bbc.co.uk/onthisday/hi/dates/stories/january/26/newsid_3475000/3475569.stm",
+    "[3] Declaration as Republic of India in 1950 versus gaining of ... - https://theleaflet.in/analysis/declaration-as-republic-of-india-in-1950-versus-gaining-of-independence-in-1947-whats-the-difference"
+  ],
+  "logical_analysis": {
+    "is_future_claim": false,
+    "is_projection": false,
+    "is_comparative": false,
+    "has_numeric_value": true,
+    "is_opinion": false
+  },
+  "explanation": "The claim \"india became independent in 1950.\" is rated TRUE because the strongest evidence supports it. The clearest supporting evidence says: \"Front Page | Years | Themes | Witness 1950: India becomes a republic AUDIO : Independence proclaimed in India The independent republic of India is officially born today, after nearly 100 years of British rule.\" This conclusion is supported by sources such as BBC ON THIS DAY | 26 | 1950: India becomes a republic, BBC ON THIS DAY | 26 | 1950: India becomes a republic - BBC News, and Declaration as Republic of India in 1950 versus gaining of .... The evidence mix was 4 supporting, 0 contradicting, and 0 neutral items, with an overall confidence of 100.0%. Conflict assessment: Strong Supporting Consensus."
+}
