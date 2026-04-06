@@ -1,4 +1,10 @@
 {
   "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend"
+  "outputDirectory": "frontend",
+  "rewrites": [
+    {
+      "source": "/backend/:path*",
+      "destination": "http://13.217.24.76:8000/:path*"
+    }
+  ]
 }

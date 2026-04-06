@@ -1,7 +1,8 @@
 window.FACTLENS_CONFIG = {
   // Static frontend configuration.
-  // Use localhost for local dev, and replace with your HTTPS backend origin for deployment.
+  // Local dev hits local backend directly.
+  // Production uses same-origin /backend and Vercel rewrites to avoid mixed-content blocks.
   apiBaseUrl: (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
     ? "http://127.0.0.1:8000"
-    : "http://13.217.24.76:8000/",
+    : "/backend",
 };

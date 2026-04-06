@@ -4,6 +4,7 @@
   "outputDirectory": ".",
   "cleanUrls": false,
   "routes": [
+    { "src": "/backend/(.*)", "dest": "http://13.217.24.76:8000/$1" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
