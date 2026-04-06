@@ -5,6 +5,15 @@ import re
 class OECDAPI:
 
     BASE_URL = "https://stats.oecd.org/SDMX-JSON/data"
+    ECONOMIC_MARKERS = {
+        "employment",
+        "unemployment",
+        "productivity",
+        "education",
+        "gdp",
+        "economy",
+        "largest economy",
+    }
 
     def extract_year(self, claim):
         match = re.search(r"\b(19|20)\d{2}\b", claim)
@@ -15,13 +24,7 @@ class OECDAPI:
         claim_lower = claim.lower()
         year = self.extract_year(claim)
 
-        if any(word in claim_lower for word in [
-            "employment",
-            "unemployment",
-            "productivity",
-            "education",
-            "gdp"
-        ]):
+        if any(word in claim_lower for word in self.ECONOMIC_MARKERS):
 
             try:
                 # Example dataset call (simplified)
@@ -35,7 +38,7 @@ class OECDAPI:
                 return {
                     "source": "OECD",
                     "url": "https://www.oecd.org/",
-                    "text": f"OECD structured economic data available for {year}.",
+                    "text": f"OECD maintains structured economic data relevant to this claim for {year or 'recent reporting periods'}.",
                     "weight": 0.95
                 }
 

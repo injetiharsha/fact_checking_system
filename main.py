@@ -3,9 +3,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 # Load env first and force model caches to a writable local path.
 BASE_DIR = Path(__file__).resolve().parent
@@ -45,33 +43,13 @@ app.add_middleware(
 
 app.include_router(router)
 
-frontend_dir = BASE_DIR / "frontend"
-app.mount("/frontend", StaticFiles(directory=frontend_dir), name="frontend")
-
-@app.get("/")
-def root():
-    return FileResponse(frontend_dir / "index.html")
-
-
-@app.get("/styles.css")
-def frontend_styles():
-    return FileResponse(frontend_dir / "styles.css")
-
-
-@app.get("/app.js")
-def frontend_script():
-    return FileResponse(frontend_dir / "app.js")
-
-
-@app.get("/config.js")
-def frontend_config():
-    return FileResponse(frontend_dir / "config.js")
-
-
 @app.get("/health")
 def health():
     return {"message": "Fact Checking System Running"}
 
+@app.get("/")
+def root():
+    return {"message": "Backend is running", "health": "/health", "docs": "/docs"}
 
 @app.on_event("startup")
 async def startup_warmup():

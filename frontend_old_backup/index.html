@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FactLens</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="./config.js?v=20260405s"></script>
+  <link rel="stylesheet" href="./styles.css?v=20260405s">
+  <!-- Vercel Web Analytics -->
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+  <!-- Vercel Speed Insights -->
+  <script>
+    window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/speed-insights/script.js"></script>
+</head>
+<body>
+  <section id="welcome-screen" class="welcome-screen" aria-label="Welcome">
+    <div class="welcome-card">
+      <p class="eyebrow">Welcome</p>
+      <h1>FactLens</h1>
+      <p>Analyze claims, PDFs, and images with evidence-backed verdicts in a focused verification workspace.</p>
+      <button id="enter-app-btn" type="button">Start Analysis</button>
+    </div>
+  </section>
+
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+  <div class="bg-orb orb-c"></div>
+
+  <main id="app-main" class="page" hidden>
+    <section class="hero">
+      <p class="eyebrow">Verification Console</p>
+      <h1>FactLens</h1>
+      <p class="subtitle">Run claim checks, PDF extraction, and image evidence analysis in one high-signal workspace.</p>
+      <div class="hero-chips" aria-label="Key capabilities">
+        <span>Multilingual analysis</span>
+        <span>Document evidence tracing</span>
+        <span>Live verdict confidence</span>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <div class="left-stack">
+        <section class="panel controls">
+          <div class="controls-head">
+            <h3>Start A Verification Run</h3>
+            <p>Choose an input mode, submit content, then review sourced evidence and final verdict details.</p>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="Analysis type">
+            <button class="tab active" data-mode="claim" role="tab">Claim</button>
+            <button class="tab" data-mode="pdf" role="tab">PDF</button>
+            <button class="tab" data-mode="image" role="tab">Image</button>
+            <span class="tab-indicator" aria-hidden="true"></span>
+          </div>
+
+          <form id="analyzer-form">
+            <div class="field mode-block active" data-mode="claim">
+              <label for="claim-text">Claim text</label>
+              <textarea id="claim-text" rows="4" placeholder="Example: India's inflation was below 4% in 2024."></textarea>
+            </div>
+
+            <div class="field mode-block file mode-block-inline" data-mode="pdf">
+              <label for="pdf-file">Upload PDF</label>
+              <input id="pdf-file" type="file" accept=".pdf">
+              <label for="pdf-page-range">Pages to check</label>
+              <input id="pdf-page-range" class="page-range-input" type="text" inputmode="numeric" placeholder="1 or 1-2" aria-label="PDF pages to check">
+              <p class="field-note">Check up to the configured PDF max pages. Large PDFs may be capped and warned automatically.</p>
+              <p id="pdf-page-warning" class="field-warning" hidden></p>
+            </div>
+
+            <div class="field mode-block file mode-block-inline" data-mode="image">
+              <label for="image-file">Upload image</label>
+              <input id="image-file" type="file" accept=".png,.jpg,.jpeg">
+            </div>
+            <p id="mode-tip" class="mode-hint">Tip: include a concrete subject, timeframe, and measurable fact for better evidence retrieval.</p>
+
+            <div class="actions">
+              <button id="run-btn" type="submit">Run Analysis</button>
+              <button id="cancel-btn" type="button" class="danger" hidden>Cancel</button>
+              <span id="status" class="status" aria-live="polite"></span>
+            </div>
+
+            <div id="claim-advisory" class="claim-advisory" hidden aria-live="polite"></div>
+          </form>
+        </section>
+
+        <section id="inline-source-preview" class="panel preview-strip" hidden>
+          <h3>Strong Source Preview</h3>
+          <div id="inline-source-preview-body"></div>
+        </section>
+      </div>
+
+      <aside class="panel process-panel" id="process-panel" hidden>
+        <h3>Fact-Check Progress</h3>
+        <p id="process-preview" class="meta">Submit a claim, PDF, or image to start.</p>
+        <ul id="process-steps" class="steps"></ul>
+      </aside>
+    </section>
+
+    <section id="report-tools" class="report-tools" hidden>
+      <label for="report-lang">Report language</label>
+      <select id="report-lang">
+        <option value="en">English</option>
+        <option value="hi">Hindi</option>
+        <option value="ta">Tamil</option>
+        <option value="te">Telugu</option>
+        <option value="bn">Bengali</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+        <option value="de">German</option>
+        <option value="ar">Arabic</option>
+      </select>
+      <button id="translate-btn" type="button">Translate Report</button>
+      <button id="reset-translate-btn" type="button" hidden>Original</button>
+      <span id="translate-status" class="status" aria-live="polite"></span>
+    </section>
+
+    <section id="results" class="results"></section>
+  </main>
+
+  <script src="./app.js?v=20260405s"></script>
+</body>
+</html>
