@@ -1,0 +1,20 @@
+{
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend",
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.11",
+      "memory": 3008,
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index.py"
+    }
+  ],
+  "env": {
+    "BACKEND_ORIGIN": "@backend_origin"
+  }
+}

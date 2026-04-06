@@ -95,6 +95,8 @@ playwright-report/
 *.json
 !package.json
 !package-lock.json
+!vercel.json
+!frontend/vercel.json
 *.yaml
 *.yml
 *.pdf
