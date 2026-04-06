@@ -3,25 +3,9 @@ import requests
 
 class RBIAPI:
 
-    TOPIC_HINTS = {
-        "inflation": "inflation statistics",
-        "repo": "repo rate and monetary policy data",
-        "interest": "interest rate statistics",
-        "forex": "foreign exchange statistics",
-        "currency": "currency and note issue data",
-        "exchange rate": "exchange rate data",
-    }
-
     def fetch(self, claim):
 
-        claim_lower = (claim or "").lower()
-        topic = None
-        for word, label in self.TOPIC_HINTS.items():
-            if word in claim_lower:
-                topic = label
-                break
-
-        if topic is None:
+        if not any(word in claim.lower() for word in ["inflation", "repo", "interest", "forex"]):
             return None
 
         try:
@@ -34,8 +18,8 @@ class RBIAPI:
             return {
                 "source": "Reserve Bank of India",
                 "url": "https://www.rbi.org.in/",
-                "text": f"RBI provides official {topic} through its DBIE statistics and monetary policy resources.",
-                "weight": 0.92
+                "text": "RBI provides official financial statistics and monetary policy data.",
+                "weight": 1.0
             }
 
         except Exception as e:
