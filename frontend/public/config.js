@@ -1,3 +1,5 @@
 window.FACTLENS_CONFIG = {
-  apiBaseUrl: "",
+  // Route all frontend API calls through Next.js rewrite proxy:
+  // /backend/* -> http://13.217.24.76:8000/*
+  apiBaseUrl: "/backend",
 };
