@@ -86,7 +86,6 @@ CLAIM_TYPE_QUERY_HINTS = {
 MISINFORMATION_QUERY_HINTS = ["debunked", "fact check", "myth"]
 TEMPORAL_QUERY_HINTS = ["timeline", "history", "official history"]
 SPACE_SURVIVAL_HINTS = ["vacuum", "spacesuit", "life support"]
-ECONOMY_RANK_HINTS = ["gdp ranking", "largest economies", "nominal gdp", "imf", "world bank"]
 MISINFORMATION_TITLE_PENALTIES = (
     "conspiracy",
     "changed my mind",
@@ -232,6 +231,15 @@ class EvidenceRouter:
         api_start = time.time()
 
         disable_structured_apis = (os.getenv("BENCHMARK_DISABLE_STRUCTURED_APIS") or "0").strip() == "1"
+        disable_mospi_api = (os.getenv("DISABLE_MOSPI_API") or "0").strip() == "1"
+        structured_api_timeout_sec = max(1, int((os.getenv("STRUCTURED_API_TIMEOUT_SEC") or "25").strip() or "25"))
+        disabled_api_ids = {
+            token.strip().lower()
+            for token in (os.getenv("STRUCTURED_API_DISABLE_LIST") or "").split(",")
+            if token and token.strip()
+        }
+        if disable_mospi_api:
+            disabled_api_ids.add("mospi")
         api_tasks = []
         if not disable_structured_apis:
             self._emit_progress(progress_callback, stage="structured_api", status="active", detail="Querying structured data providers")
@@ -239,23 +247,41 @@ class EvidenceRouter:
 
             async def _run_api(api_id, fetcher):
                 try:
-                    result = await asyncio.to_thread(fetcher, claim)
+                    result = await asyncio.wait_for(
+                        asyncio.to_thread(fetcher, claim),
+                        timeout=structured_api_timeout_sec,
+                    )
+                except asyncio.TimeoutError:
+                    self._emit_progress(
+                        progress_callback,
+                        stage="structured_api",
+                        status="active",
+                        detail=f"{api_id.upper()} timed out",
+                        substep=api_id,
+                        substatus="error",
+                    )
+                    return None
                 except Exception:
                     raise
                 if result:
                     self._emit_progress(progress_callback, stage="structured_api", status="active", detail=f"{api_id.upper()} returned data", substep=api_id, substatus="done")
                 return result
 
+            api_sources = [
+                ("worldbank", self.worldbank.fetch),
+                ("un_data", self.un_api.fetch),
+                ("rbi", self.rbi.fetch),
+                ("mospi", self.mospi.fetch),
+                ("who", self.who.fetch),
+                ("oecd", self.oecd.fetch),
+                ("nasa", self.nasa.fetch),
+                ("openfda", self.openfda.fetch),
+                ("news_api", self.news_api.fetch),
+            ]
             api_tasks = [
-                _run_api("worldbank", self.worldbank.fetch),
-                _run_api("un_data", self.un_api.fetch),
-                _run_api("rbi", self.rbi.fetch),
-                _run_api("mospi", self.mospi.fetch),
-                _run_api("who", self.who.fetch),
-                _run_api("oecd", self.oecd.fetch),
-                _run_api("nasa", self.nasa.fetch),
-                _run_api("openfda", self.openfda.fetch),
-                _run_api("news_api", self.news_api.fetch),
+                _run_api(api_id, fetcher)
+                for api_id, fetcher in api_sources
+                if api_id not in disabled_api_ids
             ]
 
         if api_tasks:
@@ -628,10 +654,6 @@ class EvidenceRouter:
         use_india_scope_sources = query_language in INDIAN_MULTILINGUAL_LANGUAGES
 
         candidates = [base_claim]
-        for rewrite in self._claim_query_rewrites(base_claim, domain):
-            candidates.append(rewrite)
-            if original_query and original_query != base_claim:
-                candidates.append(rewrite.replace(base_claim, original_query, 1) if rewrite.startswith(base_claim) else f"{original_query} {rewrite}")
         if original_query and original_query != base_claim and query_language and query_language != "en":
             candidates.append(original_query)
 
@@ -713,46 +735,7 @@ class EvidenceRouter:
         if domain == "space_astronomy" and any(token in claim_text for token in ("breathe", "survive", "without", "equipment")):
             hints.extend(SPACE_SURVIVAL_HINTS)
 
-        if "largest economy" in claim_text or re.search(r"\b\d+(?:st|nd|rd|th)\s+largest economy\b", claim_text):
-            hints.extend(ECONOMY_RANK_HINTS)
-
         return hints
-
-    @staticmethod
-    def _claim_query_rewrites(claim, domain):
-        claim_text = (claim or "").strip()
-        lowered = claim_text.lower()
-        rewrites = []
-
-        if re.search(r"\b\d+(?:st|nd|rd|th)\s+largest economy\b", lowered) or "largest economy" in lowered:
-            compact = re.sub(r"\bis\s+the\b", "", claim_text, flags=re.I)
-            compact = re.sub(r"\bin\s+(19|20)\d{2}\b", "", compact, flags=re.I)
-            compact = re.sub(r"\s+", " ", compact).strip(" .")
-            rewrites.extend([
-                f"{compact} nominal GDP ranking",
-                f"{compact} IMF world economic outlook",
-                f"{compact} world bank GDP ranking",
-            ])
-
-        if any(token in lowered for token in ("covid", "virus")) and any(token in lowered for token in ("spread", "spreads", "cause", "causes", "5g")):
-            rewrites.extend([
-                f"{claim_text} myth",
-                f"{claim_text} fact check",
-                f"{claim_text} WHO",
-            ])
-
-        if domain == "economics_business" and "gdp" in lowered and "india" in lowered:
-            rewrites.append(f"{claim_text} official GDP data India")
-
-        seen = set()
-        ordered = []
-        for item in rewrites:
-            compact = re.sub(r"\s+", " ", item).strip()
-            key = compact.lower()
-            if compact and key not in seen:
-                seen.add(key)
-                ordered.append(compact)
-        return ordered[:4]
 
     @staticmethod
     def _clean_hint(value):
