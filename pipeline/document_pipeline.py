@@ -114,7 +114,7 @@ class DocumentPipeline:
 
     async def run(self, url):
         text = self.web_ingestor.extract_text(url)
-        return await self._process_text(text, source_url=url)
+        return await self._process_text(text, source_url=url, source_modality="web")
 
     async def process_pdf(self, file_path, page_range=None, cancel_event=None, progress_callback=None):
         total_start = time.time()
@@ -257,6 +257,7 @@ class DocumentPipeline:
                 selected_claim=selected_claim,
                 source_text=section_context_by_key.get(section_key) or page_text,
                 source_language=source_language,
+                source_modality="pdf",
                 allow_llm_verifier=True,
                 cancel_event=cancel_event,
                 progress_callback=progress_callback,
@@ -439,9 +440,28 @@ class DocumentPipeline:
         print("Image claim selection:", selection_elapsed, "sec")
         self._emit_progress(progress_callback, stage="claim_selection", status="done", detail=f"Claim selected in {selection_elapsed} sec")
         await self._flush_progress()
+        candidate_claims = []
+        seen_candidates = set()
+        for candidate in (selection.get("top_claims") or []):
+            cleaned = self._clean_image_candidate(candidate)
+            if not cleaned:
+                continue
+            key = re.sub(r"\W+", " ", cleaned.lower(), flags=re.UNICODE).strip()
+            if not key or key in seen_candidates:
+                continue
+            seen_candidates.add(key)
+            candidate_claims.append(cleaned)
         main_claim = selection.get("claim")
-        source_language = detect_language(main_claim or text)
-        if not main_claim:
+        if main_claim:
+            cleaned_main = self._clean_image_candidate(main_claim)
+            if cleaned_main:
+                key = re.sub(r"\W+", " ", cleaned_main.lower(), flags=re.UNICODE).strip()
+                if key not in seen_candidates:
+                    candidate_claims.insert(0, cleaned_main)
+                    seen_candidates.add(key)
+        if not candidate_claims and main_claim:
+            candidate_claims = [main_claim]
+        if not candidate_claims:
             return {
                 "error": "Could not isolate a central factual claim from image text",
                 "ocr_details": {
@@ -451,23 +471,84 @@ class DocumentPipeline:
                 },
             }
 
+        source_language = detect_language(candidate_claims[0] or text)
+
         enriched_ocr = dict(ocr_result)
-        enriched_ocr["selected_claim"] = main_claim
+        enriched_ocr["selected_claim"] = candidate_claims[0]
         enriched_ocr["selection_reason"] = selection.get("reason")
         enriched_ocr["selected_claim_score"] = selection.get("score")
         enriched_ocr["selected_claim_candidates"] = selection.get("candidates", [])[:3]
+        enriched_ocr["selected_claims"] = candidate_claims[:3]
 
         claim_pipeline_start = time.time()
-        result = await self._process_text(
-            text,
-            ocr_details=enriched_ocr,
-            selected_claim=main_claim,
-            source_text=text,
-            source_language=source_language,
-            allow_llm_verifier=True,
-            cancel_event=cancel_event,
-            progress_callback=progress_callback,
-        )
+        candidate_results = []
+        for candidate_claim in candidate_claims[:3]:
+            self._raise_if_cancelled(cancel_event)
+            candidate_result = await self._process_text(
+                text,
+                ocr_details=enriched_ocr,
+                selected_claim=candidate_claim,
+                source_text=text,
+                source_language=source_language,
+                source_modality="image",
+                allow_llm_verifier=True,
+                cancel_event=cancel_event,
+                progress_callback=progress_callback,
+            )
+            if isinstance(candidate_result, dict):
+                normalized_candidate = dict(candidate_result)
+                nested_rows = normalized_candidate.get("results")
+                if isinstance(nested_rows, list) and nested_rows and isinstance(nested_rows[0], dict):
+                    # Flatten the top claim result so scoring reads real verdict/confidence values.
+                    normalized_candidate.update(dict(nested_rows[0]))
+                normalized_candidate["selected_claim"] = candidate_claim
+                candidate_result = normalized_candidate
+            candidate_results.append(candidate_result)
+
+        def image_result_score(item):
+            if not isinstance(item, dict):
+                return (-1.0, -1.0, -1.0)
+            verdict = str(item.get("final_verdict") or "NEUTRAL").upper()
+            confidence = float(item.get("confidence", 0.0) or 0.0)
+            verdict_bonus = 1.0 if verdict in {"TRUE", "FALSE"} else 0.4
+            support_count = len([ev for ev in item.get("evidence", []) if str((ev or {}).get("stance", "")).upper() in {"SUPPORT", "REFUTE"}])
+            return (verdict_bonus, confidence, float(support_count))
+
+        if candidate_results:
+            best_index = max(range(len(candidate_results)), key=lambda idx: image_result_score(candidate_results[idx]))
+            result = candidate_results[best_index]
+        else:
+            best_index = None
+            result = {"error": "Could not analyze image claim candidates"}
+
+        if isinstance(result, dict):
+            winning_claim = None
+            if best_index is not None and 0 <= best_index < len(candidate_claims):
+                winning_claim = result.get("selected_claim") or candidate_claims[best_index]
+                result["claim"] = winning_claim
+                result["selected_claim"] = winning_claim
+            candidate_summaries = []
+            for idx, item in enumerate(candidate_results):
+                if not isinstance(item, dict):
+                    continue
+                candidate_summaries.append({
+                    "candidate_index": idx,
+                    "selected_claim": item.get("selected_claim"),
+                    "final_verdict": item.get("final_verdict"),
+                    "confidence": item.get("confidence"),
+                    "conflict_analysis": item.get("conflict_analysis"),
+                    "evidence_count": len(item.get("evidence", []) or []),
+                })
+
+            result["image_candidate_results"] = candidate_summaries
+            result["image_selected_candidate_index"] = best_index
+            result["image_selected_candidates"] = candidate_claims[:3]
+            ocr_details_result = result.get("ocr_details")
+            if isinstance(ocr_details_result, dict):
+                if winning_claim:
+                    ocr_details_result["selected_claim"] = winning_claim
+                ocr_details_result["selected_claim_preanalysis"] = candidate_claims[0] if candidate_claims else None
+                ocr_details_result["selected_claims"] = candidate_claims[:3]
         claim_pipeline_elapsed = round(time.time() - claim_pipeline_start, 3)
         total_elapsed = round(time.time() - total_start, 3)
         print("Image document->claim pipeline:", claim_pipeline_elapsed, "sec")
@@ -759,6 +840,45 @@ class DocumentPipeline:
 
         return blocks
 
+    @staticmethod
+    def _image_candidate_key(text):
+        normalized = re.sub(r"\s+", " ", (text or "")).strip().lower()
+        normalized = re.sub(r"[^\w\u0900-\u0D7F]+", " ", normalized, flags=re.UNICODE)
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return normalized
+
+    def _distinct_top_image_candidates(self, scored_candidates, limit=3):
+        selected = []
+        seen = []
+        for item in scored_candidates:
+            text = self._clean_image_candidate(item.get("text"))
+            if not text:
+                continue
+            key = self._image_candidate_key(text)
+            if not key:
+                continue
+
+            tokens = set(re.findall(r"[\w\u0900-\u0D7F]{3,}", key, flags=re.UNICODE))
+            duplicate = False
+            for existing_key, existing_tokens in seen:
+                if key == existing_key:
+                    duplicate = True
+                    break
+                if tokens and existing_tokens and len(tokens & existing_tokens) / max(len(tokens | existing_tokens), 1) >= 0.72:
+                    duplicate = True
+                    break
+                if key in existing_key or existing_key in key:
+                    duplicate = True
+                    break
+            if duplicate:
+                continue
+
+            selected.append(item)
+            seen.append((key, tokens))
+            if len(selected) >= limit:
+                break
+        return selected
+
     def _model_score_image_candidate(self, document_text, candidate_text):
         cleaned = self._clean_image_candidate(candidate_text)
         if not cleaned:
@@ -947,7 +1067,25 @@ class DocumentPipeline:
             for sentence in sentences
         ]
         ranked.sort(key=lambda item: item["score"], reverse=True)
-        return (ranked[0] or {}).get("text", cleaned) if ranked else cleaned
+        if not ranked:
+            return cleaned
+
+        best = ranked[0] or {}
+        best_text = self._clean_image_candidate(best.get("text", cleaned))
+        best_word_count = len(best_text.split()) if best_text else 0
+
+        if best_word_count > 24:
+            compact_candidates = [
+                item for item in ranked
+                if 6 <= len((item.get("text") or "").split()) <= 24
+            ]
+            if compact_candidates:
+                compact_candidates.sort(key=lambda item: item["score"], reverse=True)
+                compact_text = self._clean_image_candidate((compact_candidates[0] or {}).get("text", ""))
+                if compact_text:
+                    return compact_text
+
+        return best_text or cleaned
 
     def _select_text_main_claim(self, text, prefer_fast_path=False):
         if prefer_fast_path and (
@@ -1016,11 +1154,37 @@ class DocumentPipeline:
                 "candidates": scored,
             }
 
+        def selection_rank(item):
+            candidate_text = self._clean_image_candidate(item.get("text", ""))
+            word_count = len(candidate_text.split()) if candidate_text else 0
+            base_score = float(item.get("score", -1.0) or -1.0)
+            punctuation_count = candidate_text.count(",") + candidate_text.count(";") + candidate_text.count(":")
+            lead_context_penalty = 0.0
+            if word_count > 0 and word_count < 6:
+                lead_context_penalty = 0.08
+
+            length_bonus = 0.0
+            if 8 <= word_count <= 24:
+                length_bonus = 0.08
+            elif 25 <= word_count <= 34:
+                length_bonus = 0.03
+            elif word_count > 40:
+                length_bonus = -0.06
+            elif word_count > 28:
+                length_bonus = -0.03
+
+            punctuation_penalty = min(0.10, punctuation_count * 0.02)
+            return base_score + length_bonus - punctuation_penalty - lead_context_penalty
+
+        ranked_selection = sorted(scored, key=selection_rank, reverse=True)
+        selected_best = ranked_selection[0] if ranked_selection else best
+        selected_text = self._clean_image_candidate((selected_best or {}).get("text", ""))
+
         return {
-            "claim": best["text"],
+            "claim": selected_text or best["text"],
             "reason": "page_context_selector",
-            "score": best.get("score"),
-            "candidates": scored,
+            "score": (selected_best or best).get("score"),
+            "candidates": ranked_selection,
         }
 
     def _select_image_main_claim(self, text):
@@ -1038,6 +1202,7 @@ class DocumentPipeline:
             for _, candidate_text in candidates
         ]
         scored.sort(key=lambda item: item["score"], reverse=True)
+        scored = self._distinct_top_image_candidates(scored, limit=3)
         best = scored[0] if scored else None
         if not best:
             return {
@@ -1056,15 +1221,69 @@ class DocumentPipeline:
             }
 
         synthesized_claim = self._synthesize_claim_from_block(best["text"], full_text=text)
+        ranked_candidates = sorted(scored, key=lambda item: item["score"], reverse=True)
+        concise_top_claims = []
+        seen_claims = set()
+        seen_tokens = []
+        for item in ranked_candidates[:5]:
+            raw_block = item.get("text", "")
+            concise = self._synthesize_claim_from_block(raw_block, full_text=text)
+            concise = self._clean_image_candidate(concise)[:260]
+            key = self._image_candidate_key(concise)
+            if not concise or not key or key in seen_claims:
+                continue
+
+            tokens = set(re.findall(r"[\w\u0900-\u0D7F]{3,}", key, flags=re.UNICODE))
+            if tokens and any(
+                prev_tokens and len(tokens & prev_tokens) / max(len(tokens | prev_tokens), 1) >= 0.70
+                for prev_tokens in seen_tokens
+            ):
+                continue
+
+            seen_claims.add(key)
+            seen_tokens.append(tokens)
+            concise_top_claims.append(concise)
+            if len(concise_top_claims) >= 3:
+                break
+
+        # Backfill with high-scoring raw blocks when synthesized claims collapse into a single variant.
+        if len(concise_top_claims) < 3:
+            for item in ranked_candidates[:10]:
+                raw_candidate = self._clean_image_candidate(item.get("text", ""))[:260]
+                key = self._image_candidate_key(raw_candidate)
+                if not raw_candidate or not key or key in seen_claims:
+                    continue
+
+                raw_tokens = set(re.findall(r"[\w\u0900-\u0D7F]{3,}", key, flags=re.UNICODE))
+                if raw_tokens and any(
+                    prev_tokens and len(raw_tokens & prev_tokens) / max(len(raw_tokens | prev_tokens), 1) >= 0.90
+                    for prev_tokens in seen_tokens
+                ):
+                    continue
+
+                seen_claims.add(key)
+                seen_tokens.append(raw_tokens)
+                concise_top_claims.append(raw_candidate)
+                if len(concise_top_claims) >= 3:
+                    break
+
+        if not concise_top_claims and best.get("text"):
+            fallback_claim = self._clean_image_candidate(best.get("text"))[:260]
+            if fallback_claim:
+                concise_top_claims = [fallback_claim]
+
+        selected_claim = concise_top_claims[0] if concise_top_claims else (synthesized_claim or best["text"])
+
         return {
-            "claim": synthesized_claim or best["text"],
+            "claim": selected_claim,
             "reason": "existing_model_selector",
             "score": best["score"],
-            "candidates": scored,
+            "candidates": ranked_candidates,
             "source_block": best["text"],
+            "top_claims": concise_top_claims,
         }
 
-    async def _process_text(self, text, source_url=None, ocr_details=None, selected_claim=None, source_text=None, source_language=None, allow_llm_verifier=True, cancel_event=None, progress_callback=None):
+    async def _process_text(self, text, source_url=None, ocr_details=None, selected_claim=None, source_text=None, source_language=None, source_modality="text", allow_llm_verifier=True, cancel_event=None, progress_callback=None):
         self._raise_if_cancelled(cancel_event)
 
         if not text:
@@ -1093,6 +1312,7 @@ class DocumentPipeline:
             source_url=source_url,
             source_text=source_text,
             source_language=source_language,
+            source_modality=source_modality,
             allow_llm_verifier=allow_llm_verifier,
             cancel_event=cancel_event,
             progress_callback=progress_callback,
