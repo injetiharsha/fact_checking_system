@@ -1,5 +1,7 @@
 window.FACTLENS_CONFIG = {
-  // Route all frontend API calls through Next.js rewrite proxy:
-  // /backend/* -> http://13.217.24.76:8000/*
-  apiBaseUrl: "/backend",
+  // Static frontend configuration.
+  // Use localhost for local dev, and replace with your HTTPS backend origin for deployment.
+  apiBaseUrl: (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://127.0.0.1:8000"
+    : "http://13.217.24.76:8000/",
 };
