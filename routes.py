@@ -157,6 +157,7 @@ async def check_claim(data: ClaimRequest, request: Request):
             request,
             lambda cancel_event: get_claim_pipeline().run(
                 data.claim,
+                source_modality="text",
                 cancel_event=cancel_event,
                 progress_callback=lambda event: _emit_progress(progress_id, **event),
             ),

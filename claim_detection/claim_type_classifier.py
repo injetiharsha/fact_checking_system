@@ -65,7 +65,12 @@ class ClaimTypeClassifier:
                 continue
 
         if self.model is None:
-            print("ClaimTypeClassifier fallback: heuristic mode (no cached model)")
+            if self.trained_checkpoint is not None:
+                print(
+                    "ClaimTypeClassifier foundation cache unavailable; using trained subprocess path with heuristic fallback"
+                )
+            else:
+                print("ClaimTypeClassifier fallback: heuristic mode (no cached model)")
 
     def classify(self, claim: str) -> dict:
         if self.trained_checkpoint is not None:

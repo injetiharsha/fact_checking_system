@@ -9,7 +9,6 @@ Recommended sources:
 - World Bank
 - OECD
 - RBI
-- MOSPI
 - PIB
 - official government pages
 

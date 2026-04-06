@@ -158,6 +158,22 @@ class StanceDetector:
 
     def _extract_rank_claim(self, text):
         text = (text or "").lower().replace("-", " ")
+        ordinal_words = {
+            "first": 1,
+            "second": 2,
+            "third": 3,
+            "fourth": 4,
+            "fifth": 5,
+        }
+
+        match = re.search(r"\b(\d+)(?:st|nd|rd|th)\s+(?:largest|biggest|deepest|longest|oldest|smallest|youngest)\b", text)
+        if match:
+            return match.group(1), int(match.group(1))
+
+        for word, number in ordinal_words.items():
+            if re.search(rf"\b{word}\s+(?:largest|biggest|deepest|longest|oldest|smallest|youngest)\b", text):
+                return word, number
+
         patterns = [
             ("largest", 1),
             ("biggest", 1),
@@ -181,12 +197,28 @@ class StanceDetector:
             "fourth": 4,
             "fifth": 5,
         }
-        for word, number in order_words.items():
-            if word in text:
-                return number
-        match = re.search(r"\b(\d+)(st|nd|rd|th)\b", text)
+
+        comparator_patterns = [
+            r"\b(?P<rank>\d+)(?:st|nd|rd|th)?\s+(?:largest|biggest|deepest|longest|oldest|smallest|youngest)\b",
+            r"\b(?P<rank>first|second|third|fourth|fifth)\s+(?:largest|biggest|deepest|longest|oldest|smallest|youngest)\b",
+            r"\b(?:largest|biggest|deepest|longest|oldest|smallest|youngest)\s+(?:economy|economies|country|countries|rank|position)?\s*(?:is|was|at|of|to)?\s*(?P<rank>\d+)(?:st|nd|rd|th)?\b",
+            r"\b(?:largest|biggest|deepest|longest|oldest|smallest|youngest)\s+(?:economy|economies|country|countries|rank|position)?\s*(?:is|was|at|of|to)?\s*(?P<rank>first|second|third|fourth|fifth)\b",
+        ]
+        for pattern in comparator_patterns:
+            match = re.search(pattern, text)
+            if match:
+                rank = match.group("rank")
+                if rank.isdigit():
+                    return int(rank)
+                if rank in order_words:
+                    return order_words[rank]
+
+        match = re.search(r"\b(\d+)(?:st|nd|rd|th)\b", text)
         if match:
             return int(match.group(1))
+        for word, number in order_words.items():
+            if re.search(rf"\b{word}\s+rank\b", text):
+                return number
         return None
 
     def _canonical_place(self, text):
@@ -374,14 +406,24 @@ class StanceDetector:
 
         if stance == "SUPPORT":
             if self._has_reporting_quote_context(text):
-                return None
+                # Keep quoted/reporting snippets conservative, but allow high-overlap direct assertions.
+                if token_overlap < 4 or confidence < 0.58:
+                    return None
             if claim_capital and self._has_qualified_capital_language(text):
                 return None
             if self.v2_mode and self._has_explicit_refute_language(text):
                 return None
             if self._has_temporal_support_anchor(claim_text, text, token_overlap, confidence):
                 return "SUPPORT"
-            if confidence < self.SUPPORT_MIN_CONFIDENCE:
+            support_threshold = self.SUPPORT_MIN_CONFIDENCE
+            model_name = str(getattr(self.model, "model_name", "") or "").strip().lower()
+            fallback_model = model_name in {"", "unknown"}
+            if model_name in {"", "unknown"}:
+                # When running with fallback NLI, keep SUPPORT conservative but not overly strict.
+                support_threshold = 0.58 if token_overlap >= 3 else 0.62
+            if self.v2_mode and not fallback_model:
+                support_threshold = max(support_threshold, 0.60)
+            if confidence < support_threshold:
                 return None
             if shape_claim and any(term in evidence_tokens for term in shape_refute_terms):
                 return None

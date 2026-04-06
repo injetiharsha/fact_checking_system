@@ -180,7 +180,12 @@ class RelevanceScorer:
                 self.bge_reranker = None
 
         if self.model is None:
-            print("RelevanceScorer fallback: lexical overlap mode")
+            if self.trained_checkpoint is not None:
+                print(
+                    "RelevanceScorer semantic cache unavailable; using trained subprocess path with lexical fallback"
+                )
+            else:
+                print("RelevanceScorer fallback: lexical overlap mode")
 
     def _start_worker(self):
         if self._worker_ready and self._worker is not None and self._worker.poll() is None:

@@ -63,6 +63,8 @@ def _sanitize_ipc_text(text, max_chars=1200):
 
 
 class NLIModel:
+    TRAINED_CONFIDENCE_THRESHOLD = 0.58
+
     def __init__(self):
         self._lock = threading.Lock()
         self._worker = None
@@ -129,7 +131,12 @@ class NLIModel:
                 continue
 
         if self.model is None:
-            print("NLIModel fallback: heuristic mode (no cached model)")
+            if self.trained_checkpoint is not None:
+                print(
+                    "NLIModel foundation cache unavailable; using trained subprocess path with heuristic fallback"
+                )
+            else:
+                print("NLIModel fallback: heuristic mode (no cached model)")
 
     def _start_worker(self):
         if self._worker_ready and self._worker is not None and self._worker.poll() is None:
@@ -223,6 +230,10 @@ class NLIModel:
         trained_result = None
         if self.trained_checkpoint is not None:
             trained_result = self._predict_with_subprocess(claim, evidence)
+            if trained_result is not None:
+                _, trained_conf = trained_result
+                if float(trained_conf) < self.TRAINED_CONFIDENCE_THRESHOLD:
+                    trained_result = None
 
         foundation_result = None
         if self.model is not None and self.tokenizer is not None:

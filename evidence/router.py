@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 from evidence.international.worldbank import WorldBankAPI
 from evidence.international.un_data import UNDataAPI
 from evidence.government_india.rbi import RBIAPI
-from evidence.government_india.mospi import MOSPIAPI
 from evidence.international.who import WHOAPI
 from evidence.international.oecd import OECDAPI
 from evidence.international.nasa import NASAAPI
@@ -22,7 +21,6 @@ from evidence.local_rag import LocalRAGRetriever
 from evidence.scraper import WebScraper
 from evidence.credibility_weights import get_weight
 from evidence.reference_fallback import ReferenceFallback
-from evidence.india_source_registry import get_india_state_source_hints, get_india_national_source_domains
 
 
 # domains that should never be scraped
@@ -38,8 +36,6 @@ BLOCKED_DOMAINS = [
     "x.com",
     "news.google.com",
 ]
-
-INDIAN_MULTILINGUAL_LANGUAGES = {"hi", "te", "ta", "bn", "mr", "gu", "kn", "ml", "pa", "ur", "or", "as"}
 
 WEAK_RESULT_URL_MARKERS = (
     "/video/",
@@ -59,33 +55,6 @@ WEAK_RESULT_TITLE_MARKERS = (
     "photo gallery",
 )
 
-DOMAIN_QUERY_HINTS = {
-    "science": ["science"],
-    "health": ["health", "medical"],
-    "technology": ["technology"],
-    "history": ["history"],
-    "politics_government": ["government", "public policy"],
-    "economics_business": ["economics"],
-    "geography": ["geography"],
-    "space_astronomy": ["astronomy", "space"],
-    "environment_climate": ["climate science", "environment"],
-    "society_culture": ["society"],
-    "law_crime": ["law"],
-    "sports": ["sports"],
-    "entertainment": ["entertainment"],
-    "general_factual": [],
-}
-
-CLAIM_TYPE_QUERY_HINTS = {
-    "numerical": ["statistics", "data", "report"],
-    "factual": ["facts"],
-    "mixed": [],
-    "opinion": [],
-}
-
-MISINFORMATION_QUERY_HINTS = ["debunked", "fact check", "myth"]
-TEMPORAL_QUERY_HINTS = ["timeline", "history", "official history"]
-SPACE_SURVIVAL_HINTS = ["vacuum", "spacesuit", "life support"]
 MISINFORMATION_TITLE_PENALTIES = (
     "conspiracy",
     "changed my mind",
@@ -169,7 +138,6 @@ class EvidenceRouter:
         self.worldbank = WorldBankAPI()
         self.un_api = UNDataAPI()
         self.rbi = RBIAPI()
-        self.mospi = MOSPIAPI()
         self.who = WHOAPI()
         self.oecd = OECDAPI()
         self.nasa = NASAAPI()
@@ -203,12 +171,19 @@ class EvidenceRouter:
     async def _flush_progress():
         await asyncio.sleep(0)
 
-    async def get_evidence(self, claim, exclude_domain=None, trace=None, context_result=None, claim_type_result=None, original_claim=None, language=None, source_text=None, progress_callback=None):
+    async def get_evidence(self, claim, exclude_domain=None, trace=None, context_result=None, claim_type_result=None, original_claim=None, language=None, source_text=None, progress_callback=None, max_sources=6, force_refresh=False):
+        try:
+            web_source_cap = int(max_sources)
+        except Exception:
+            web_source_cap = 6
+        web_source_cap = max(2, min(10, web_source_cap))
+
         cache_key = (
             " ".join((claim or "").strip().lower().split()),
             (exclude_domain or "").strip().lower(),
+            web_source_cap,
         )
-        if self.cache_enabled and cache_key in self._evidence_cache:
+        if self.cache_enabled and not force_refresh and cache_key in self._evidence_cache:
             cached = self._evidence_cache[cache_key]
             return [dict(item) for item in cached]
 
@@ -231,15 +206,12 @@ class EvidenceRouter:
         api_start = time.time()
 
         disable_structured_apis = (os.getenv("BENCHMARK_DISABLE_STRUCTURED_APIS") or "0").strip() == "1"
-        disable_mospi_api = (os.getenv("DISABLE_MOSPI_API") or "0").strip() == "1"
         structured_api_timeout_sec = max(1, int((os.getenv("STRUCTURED_API_TIMEOUT_SEC") or "25").strip() or "25"))
         disabled_api_ids = {
             token.strip().lower()
             for token in (os.getenv("STRUCTURED_API_DISABLE_LIST") or "").split(",")
             if token and token.strip()
         }
-        if disable_mospi_api:
-            disabled_api_ids.add("mospi")
         api_tasks = []
         if not disable_structured_apis:
             self._emit_progress(progress_callback, stage="structured_api", status="active", detail="Querying structured data providers")
@@ -271,7 +243,6 @@ class EvidenceRouter:
                 ("worldbank", self.worldbank.fetch),
                 ("un_data", self.un_api.fetch),
                 ("rbi", self.rbi.fetch),
-                ("mospi", self.mospi.fetch),
                 ("who", self.who.fetch),
                 ("oecd", self.oecd.fetch),
                 ("nasa", self.nasa.fetch),
@@ -359,9 +330,9 @@ class EvidenceRouter:
                 enriched = dict(result)
                 enriched["query"] = query
                 search_results.append(enriched)
-                if len(search_results) >= 15:
+                if len(search_results) >= max(15, web_source_cap * 2):
                     break
-            if len(search_results) >= 15:
+            if len(search_results) >= max(15, web_source_cap * 2):
                 break
 
         bm25_scores = self._build_bm25_scores(claim, search_results)
@@ -377,7 +348,7 @@ class EvidenceRouter:
             enriched["rank_components"] = components
 
         search_results.sort(key=lambda item: item.get("rank_score", 0.0), reverse=True)
-        search_results = search_results[:6]
+        search_results = search_results[:web_source_cap]
         self._emit_progress(progress_callback, stage="web_search", status="done", detail=f"Selected {len(search_results)} web result(s)")
         await self._flush_progress()
 
@@ -396,7 +367,7 @@ class EvidenceRouter:
 
         scrape_jobs = []
 
-        for result in search_results[:6]:
+        for result in search_results[:web_source_cap]:
 
             url = result["url"]
 
@@ -643,71 +614,25 @@ class EvidenceRouter:
         if not base_claim:
             return []
         original_query = " ".join((original_claim or "").strip().split())
-
+        query_language = str(language or "").strip().lower()
         context_result = context_result or {}
-        domain = str(context_result.get("domain") or "general_factual").strip()
-        subcategory = str(context_result.get("subcategory") or "").strip()
-        state_focus = context_result.get("state_focus")
-        query_language = str(context_result.get("query_language") or language or "").strip().lower()
-        region_hints = list(context_result.get("region_hints", []) or [])
-        claim_type = self._claim_type_label(claim_type_result)
-        use_india_scope_sources = query_language in INDIAN_MULTILINGUAL_LANGUAGES
+        hinted_query_language = str(context_result.get("query_language") or "").strip().lower()
+        region_hints = [str(item or "").strip().lower() for item in (context_result.get("region_hints") or []) if str(item or "").strip()]
+        state_focus = str(context_result.get("state_focus") or "").strip().lower()
 
         candidates = [base_claim]
         if original_query and original_query != base_claim and query_language and query_language != "en":
             candidates.append(original_query)
 
-        subcategory_hint = self._clean_hint(subcategory)
-        if subcategory_hint and subcategory_hint not in {"encyclopedic", "entity property", "general news"}:
-            candidates.append(f"{base_claim} {subcategory_hint}")
-            if original_query and original_query != base_claim:
-                candidates.append(f"{original_query} {subcategory_hint}")
-
-        for hint in DOMAIN_QUERY_HINTS.get(domain, [])[:2]:
-            cleaned_hint = self._clean_hint(hint)
-            if cleaned_hint:
-                candidates.append(f"{base_claim} {cleaned_hint}")
-                if original_query and original_query != base_claim:
-                    candidates.append(f"{original_query} {cleaned_hint}")
-
-        for hint in CLAIM_TYPE_QUERY_HINTS.get(claim_type, [])[:2]:
-            cleaned_hint = self._clean_hint(hint)
-            if cleaned_hint:
-                candidates.append(f"{base_claim} {cleaned_hint}")
-
-        for hint in self._pattern_query_hints(base_claim, domain)[:3]:
-            cleaned_hint = self._clean_hint(hint)
-            if cleaned_hint:
-                candidates.append(f"{base_claim} {cleaned_hint}")
-
-        if query_language and query_language != "en":
-            candidates.append(f"{base_claim} {query_language}")
-            if original_query and original_query != base_claim:
-                candidates.append(f"{original_query} {query_language}")
-
-        for region in region_hints[:2]:
-            cleaned_region = self._clean_hint(region)
-            if cleaned_region:
-                candidates.append(f"{base_claim} {cleaned_region}")
-                if original_query and original_query != base_claim:
-                    candidates.append(f"{original_query} {cleaned_region}")
-
-        state_domains = get_india_state_source_hints(state_focus).get("source_domains", [])
-        if use_india_scope_sources:
-            source_domain_hints = list(dict.fromkeys(list(state_domains) + get_india_national_source_domains()))
-        else:
-            source_domain_hints = state_domains
-        for domain_hint in source_domain_hints[:4]:
-            candidates.append(f"{base_claim} site:{domain_hint}")
-            if original_query and original_query != base_claim:
-                candidates.append(f"{original_query} site:{domain_hint}")
-
-        if not use_india_scope_sources:
-            trusted_variants = self._trusted_source_variants(domain)
-            for variant in trusted_variants:
-                candidates.append(f"{base_claim} {variant}")
-                if original_query and original_query != base_claim and query_language and query_language != "en":
-                    candidates.append(f"{original_query} {variant}")
+        # Add locality-aware variants in addition to the global query path.
+        if "india" in region_hints or state_focus:
+            candidates.append(f"india {base_claim}")
+        if state_focus:
+            state_tokens = state_focus.replace("_", " ").strip()
+            if state_tokens:
+                candidates.append(f"{state_tokens} {base_claim}")
+        if hinted_query_language and hinted_query_language not in {"en", query_language}:
+            candidates.append(f"{base_claim} {hinted_query_language}")
 
         seen = set()
         ordered = []
@@ -717,45 +642,7 @@ class EvidenceRouter:
             if compact and key not in seen:
                 seen.add(key)
                 ordered.append(compact)
-        return ordered[:8]
-
-    @staticmethod
-    def _pattern_query_hints(claim, domain):
-        claim_text = (claim or "").lower()
-        hints = []
-
-        misinformation_tokens = ("hoax", "fake", "faked", "myth", "cure", "cures", "spread")
-        if any(token in claim_text for token in misinformation_tokens):
-            hints.extend(MISINFORMATION_QUERY_HINTS)
-
-        temporal_tokens = ("founded", "established", "fell", "began", "created", "started")
-        if domain == "history" or any(token in claim_text for token in temporal_tokens) or re.search(r"\b(?:19|20)\d{2}\b", claim_text):
-            hints.extend(TEMPORAL_QUERY_HINTS)
-
-        if domain == "space_astronomy" and any(token in claim_text for token in ("breathe", "survive", "without", "equipment")):
-            hints.extend(SPACE_SURVIVAL_HINTS)
-
-        return hints
-
-    @staticmethod
-    def _clean_hint(value):
-        text = str(value or "").replace("_", " ").strip().lower()
-        return re.sub(r"\s+", " ", text)
-
-    @staticmethod
-    def _trusted_source_variants(domain):
-        mapping = {
-            "health": ["site:who.int"],
-            "economics_business": ["site:worldbank.org", "site:oecd.org"],
-            "politics_government": ["site:.gov", "site:un.org"],
-            "technology": ["technology", "company blog", "site:techcrunch.com", "site:theverge.com"],
-            "science": ["site:.edu", "site:wikipedia.org"],
-            "space_astronomy": ["site:nasa.gov", "site:wikipedia.org"],
-            "environment_climate": ["site:who.int", "site:wikipedia.org"],
-            "history": ["site:wikipedia.org"],
-            "geography": ["site:wikipedia.org"],
-        }
-        return mapping.get(domain, [])
+        return ordered[:4]
 
     @staticmethod
     def _tokenize_rank_text(text):

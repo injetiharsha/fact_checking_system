@@ -40,6 +40,7 @@ class FinalVerdictEngine:
             support_score,
             refute_score,
             score_gap_threshold=self.min_score_gap_for_definitive_verdict,
+            evidence_list=evidence_list,
         )
 
         if verdict == "NEUTRAL":

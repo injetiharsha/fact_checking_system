@@ -505,17 +505,57 @@ class DocumentPipeline:
                 candidate_result = normalized_candidate
             candidate_results.append(candidate_result)
 
+        source_word_count = len((text or "").split())
+        dynamic_min_candidate_words = max(10, min(36, int(source_word_count * 0.22)))
+
         def image_result_score(item):
             if not isinstance(item, dict):
-                return (-1.0, -1.0, -1.0)
+                return (-1.0, -1.0, -1.0, -1.0)
             verdict = str(item.get("final_verdict") or "NEUTRAL").upper()
             confidence = float(item.get("confidence", 0.0) or 0.0)
             verdict_bonus = 1.0 if verdict in {"TRUE", "FALSE"} else 0.4
             support_count = len([ev for ev in item.get("evidence", []) if str((ev or {}).get("stance", "")).upper() in {"SUPPORT", "REFUTE"}])
-            return (verdict_bonus, confidence, float(support_count))
+
+            # Prefer claims with richer factual detail when confidence is close.
+            claim_text = self._clean_image_candidate(item.get("selected_claim") or "")
+            word_count = len(claim_text.split()) if claim_text else 0
+            punctuation_count = claim_text.count(",") + claim_text.count(";") + claim_text.count(":")
+            numeric_tokens = len(re.findall(r"\d+[\d,./-]*", claim_text))
+            range_markers = len(re.findall(r"[-–—]|\bto\b", claim_text, flags=re.IGNORECASE))
+            unit_markers = len(re.findall(r"\b(km|kmph|kph|mph|mm|cm|percent|%)\b", claim_text, flags=re.IGNORECASE))
+            detail_marker_bonus = min(0.06, (numeric_tokens * 0.012) + (range_markers * 0.006) + (unit_markers * 0.008))
+
+            if 16 <= word_count <= 42:
+                specificity_bonus = 0.04
+            elif 12 <= word_count <= 40:
+                specificity_bonus = 0.02
+            elif word_count > 50:
+                specificity_bonus = -0.03
+            else:
+                specificity_bonus = -0.01
+            specificity_bonus -= min(0.03, punctuation_count * 0.01)
+            specificity_bonus += detail_marker_bonus
+
+            # When OCR text is long, discourage overly short selected claims.
+            short_claim_penalty = 0.0
+            if source_word_count >= 30 and word_count < dynamic_min_candidate_words:
+                gap = dynamic_min_candidate_words - word_count
+                short_claim_penalty = min(0.18, 0.03 + (gap * 0.01))
+
+            confidence_adjusted = confidence + specificity_bonus - short_claim_penalty
+            return (verdict_bonus, confidence_adjusted, confidence, float(support_count))
 
         if candidate_results:
-            best_index = max(range(len(candidate_results)), key=lambda idx: image_result_score(candidate_results[idx]))
+            qualified_indices = []
+            for idx, item in enumerate(candidate_results):
+                if not isinstance(item, dict):
+                    continue
+                candidate_text = self._clean_image_candidate(item.get("selected_claim") or "")
+                if len(candidate_text.split()) >= dynamic_min_candidate_words:
+                    qualified_indices.append(idx)
+
+            candidate_pool = qualified_indices if qualified_indices else list(range(len(candidate_results)))
+            best_index = max(candidate_pool, key=lambda idx: image_result_score(candidate_results[idx]))
             result = candidate_results[best_index]
         else:
             best_index = None
@@ -545,10 +585,22 @@ class DocumentPipeline:
             result["image_selected_candidates"] = candidate_claims[:3]
             ocr_details_result = result.get("ocr_details")
             if isinstance(ocr_details_result, dict):
+                preanalysis_candidates = list(ocr_details_result.get("selected_claim_candidates") or [])
                 if winning_claim:
                     ocr_details_result["selected_claim"] = winning_claim
                 ocr_details_result["selected_claim_preanalysis"] = candidate_claims[0] if candidate_claims else None
                 ocr_details_result["selected_claims"] = candidate_claims[:3]
+                ocr_details_result["selected_claim_candidates_preanalysis"] = preanalysis_candidates[:3]
+                ocr_details_result["selected_claim_candidates"] = [
+                    {
+                        "text": item.get("selected_claim"),
+                        "score": round(float(item.get("confidence", 0.0) or 0.0), 3),
+                        "score_source": "post_analysis_confidence",
+                        "candidate_index": item.get("candidate_index"),
+                        "final_verdict": item.get("final_verdict"),
+                    }
+                    for item in candidate_summaries
+                ]
         claim_pipeline_elapsed = round(time.time() - claim_pipeline_start, 3)
         total_elapsed = round(time.time() - total_start, 3)
         print("Image document->claim pipeline:", claim_pipeline_elapsed, "sec")

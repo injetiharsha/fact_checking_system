@@ -1,6 +1,5 @@
 import unittest
 
-from evidence.government_india.mospi import MOSPIAPI
 from evidence.government_india.rbi import RBIAPI
 from evidence.international.worldbank import WorldBankAPI
 from evidence.international.who import WHOAPI
@@ -12,12 +11,6 @@ class APIQueryRoutingTest(unittest.TestCase):
     def test_worldbank_recognizes_common_country_alias(self):
         api = WorldBankAPI()
         self.assertEqual(api.extract_country_code("India GDP in 2024"), "IND")
-
-    def test_mospi_detects_metric_and_uses_latest_fallback(self):
-        api = MOSPIAPI()
-        row = api.fetch("India GDP growth")
-        self.assertIsNotNone(row)
-        self.assertIn("latest reported period", row["text"])
 
     def test_rbi_uses_topic_specific_context(self):
         api = RBIAPI()

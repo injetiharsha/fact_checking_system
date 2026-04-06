@@ -6,6 +6,7 @@ import sys
 import re
 import os
 import hashlib
+import html
 from urllib.parse import urlparse
 from evidence.router import EvidenceRouter
 from evidence.relevance import RelevanceScorer
@@ -68,6 +69,27 @@ def _safe_console_text(value):
     out = str(value)
     enc = getattr(sys.stdout, "encoding", None) or "utf-8"
     return out.encode(enc, errors="replace").decode(enc, errors="replace")
+
+
+def _sanitize_evidence_text(text):
+    cleaned = str(text or "")
+    if not cleaned:
+        return ""
+    cleaned = html.unescape(cleaned)
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _sanitize_evidence_rows(rows):
+    sanitized = []
+    for row in rows or []:
+        item = dict(row)
+        item["text"] = _sanitize_evidence_text(item.get("text", ""))
+        if "context_text" in item:
+            item["context_text"] = _sanitize_evidence_text(item.get("context_text", ""))
+        sanitized.append(item)
+    return sanitized
 
 
 def _build_ux_warnings(claim):
@@ -145,6 +167,44 @@ def _lead_position_bonus(sentence_index, total_sentences):
     if sentence_index <= 8:
         return 0.02
     return 0.0
+
+
+def _weather_alert_reasoning(claim, sentence):
+    claim_text = " ".join((claim or "").lower().split())
+    sent_text = " ".join((sentence or "").lower().split())
+    if not claim_text or not sent_text:
+        return None
+
+    weather_terms = {
+        "rain", "rains", "rainfall", "thunder", "thunderstorm", "lightning",
+        "storm", "storms", "wind", "winds", "gust", "gusty", "hail",
+    }
+    alert_terms = {
+        "warning", "warnings", "alert", "alerts", "advisory", "forecast",
+        "issued", "likely", "possibility", "expected",
+    }
+
+    claim_tokens = _token_set(claim_text)
+    sent_tokens = _token_set(sent_text)
+    overlap = len(claim_tokens & sent_tokens)
+
+    claim_weather = any(term in claim_text for term in weather_terms)
+    sent_weather = any(term in sent_text for term in weather_terms)
+    claim_alert = any(term in claim_text for term in alert_terms)
+    sent_alert = any(term in sent_text for term in alert_terms)
+    if not (claim_weather and claim_alert and sent_weather and sent_alert):
+        return None
+
+    claim_nums = set(re.findall(r"\d+[\d,./-]*", claim_text))
+    sent_nums = set(re.findall(r"\d+[\d,./-]*", sent_text))
+    numeric_alignment = bool(claim_nums and sent_nums and (claim_nums & sent_nums))
+
+    if any(marker in sent_text for marker in ("no warning", "not issued", "did not issue", "denied", "false claim")):
+        return "REFUTE"
+
+    if overlap >= 4 and (numeric_alignment or overlap >= 6):
+        return "SUPPORT"
+    return None
 
 
 def _metadata_or_shell_penalty(sentence, source_name=None, context_text=None):
@@ -498,6 +558,7 @@ def _should_skip_claim_reporting_sentence(claim, sentence, source_name=None, con
 
 def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, source_name=None, context_result=None):
 
+    text = _sanitize_evidence_text(text)
     if not text:
         return None
 
@@ -713,9 +774,62 @@ class ClaimPipeline:
         self.enable_retrieval_v2 = os.getenv("ENABLE_RETRIEVAL_V2", "0").strip().lower() in {"1", "true", "yes", "on"}
         self.enable_verifier_v2 = os.getenv("ENABLE_VERIFIER_V2", "0").strip().lower() in {"1", "true", "yes", "on"}
         self.enable_llm_verifier = os.getenv("ENABLE_LLM_VERIFIER", "0").strip().lower() in {"1", "true", "yes", "on"}
-        self.include_verbose_api_fields = os.getenv("API_INCLUDE_VERBOSE_FIELDS", "0").strip().lower() in {"1", "true", "yes", "on"}
+        self.include_verbose_api_fields = os.getenv("API_INCLUDE_VERBOSE_FIELDS", "1").strip().lower() in {"1", "true", "yes", "on"}
         self.enable_session_cache_short_circuit = os.getenv("ENABLE_SESSION_CACHE_SHORT_CIRCUIT", "1").strip().lower() in {"1", "true", "yes", "on"}
         self.session_cache_short_circuit_min_similarity = float(os.getenv("SESSION_CACHE_SHORT_CIRCUIT_MIN_SIMILARITY", "0.82"))
+
+    @staticmethod
+    def _normalize_source_modality(source_modality):
+        value = str(source_modality or "text").strip().lower()
+        if value in {"image", "img"}:
+            return "image"
+        if value in {"pdf", "document"}:
+            return "pdf"
+        if value in {"web", "url"}:
+            return "web"
+        return "text"
+
+    def _scoring_profile_for_modality(self, source_modality):
+        modality = self._normalize_source_modality(source_modality)
+        profiles = {
+            "text": {
+                "strong_relevance": self.strong_relevance_threshold,
+                "strong_quality": self.strong_quality_threshold,
+                "soft_relevance": self.soft_relevance_threshold,
+                "soft_quality": self.soft_quality_threshold,
+                "min_strong_evidence": self.min_strong_evidence_for_forced_verdict,
+                "single_source_decisive_confidence": self.single_source_decisive_confidence,
+                "single_source_min_weight": self.single_source_min_weight,
+            },
+            "web": {
+                "strong_relevance": self.strong_relevance_threshold,
+                "strong_quality": self.strong_quality_threshold,
+                "soft_relevance": self.soft_relevance_threshold,
+                "soft_quality": self.soft_quality_threshold,
+                "min_strong_evidence": self.min_strong_evidence_for_forced_verdict,
+                "single_source_decisive_confidence": self.single_source_decisive_confidence,
+                "single_source_min_weight": self.single_source_min_weight,
+            },
+            "pdf": {
+                "strong_relevance": 0.48,
+                "strong_quality": 0.45,
+                "soft_relevance": 0.34,
+                "soft_quality": 0.30,
+                "min_strong_evidence": 1,
+                "single_source_decisive_confidence": 0.89,
+                "single_source_min_weight": 0.72,
+            },
+            "image": {
+                "strong_relevance": 0.55,
+                "strong_quality": 0.50,
+                "soft_relevance": 0.40,
+                "soft_quality": 0.34,
+                "min_strong_evidence": 2,
+                "single_source_decisive_confidence": 0.92,
+                "single_source_min_weight": 0.78,
+            },
+        }
+        return modality, profiles[modality]
 
     def _trim_evidence_payload(self, rows):
         trimmed = []
@@ -1037,6 +1151,8 @@ class ClaimPipeline:
         claim_type_result,
         context_result,
         language,
+        source_modality,
+        scoring_profile,
         evidence_retrieved,
         evidence_cleaned,
         scored_evidence,
@@ -1071,6 +1187,7 @@ class ClaimPipeline:
                 "llm_verifier_policy": self.llm_verifier.policy if bool(llm_verifier_enabled) else None,
             },
             "language_detected": language,
+            "source_modality": source_modality,
             "claim_type": {
                 "label": claim_type_result["type"].value,
                 "confidence": round(float(claim_type_result.get("confidence", 0.0)), 3),
@@ -1095,15 +1212,20 @@ class ClaimPipeline:
                 "session_cache_hits": list(trace.get("session_cache_hits", [])) if isinstance(trace, dict) else [],
                 "session_cache_lookup": dict(trace.get("session_cache_lookup", {})) if isinstance(trace, dict) else {},
                 "session_cache_store": dict(trace.get("session_cache_store", {})) if isinstance(trace, dict) else {},
+                "search_cap": int(trace.get("search_cap", 0)) if isinstance(trace, dict) else 0,
+                "retrieval_attempt": int(trace.get("retrieval_attempt", 1)) if isinstance(trace, dict) else 1,
+                "retrieval_expanded": bool(trace.get("retrieval_expanded", False)) if isinstance(trace, dict) else False,
             },
             "retrieval_version": "v2" if self.enable_retrieval_v2 else "v1",
             "reranker_provider": getattr(self.relevance_scorer, "provider_name", "current"),
             "thresholds": {
-                "strong_relevance": self.strong_relevance_threshold,
-                "strong_quality": self.strong_quality_threshold,
-                "soft_relevance": self.soft_relevance_threshold,
-                "soft_quality": self.soft_quality_threshold,
-                "min_strong_evidence_for_definitive_verdict": self.min_strong_evidence_for_forced_verdict,
+                "strong_relevance": scoring_profile["strong_relevance"],
+                "strong_quality": scoring_profile["strong_quality"],
+                "soft_relevance": scoring_profile["soft_relevance"],
+                "soft_quality": scoring_profile["soft_quality"],
+                "min_strong_evidence_for_definitive_verdict": scoring_profile["min_strong_evidence"],
+                "single_source_decisive_confidence": scoring_profile["single_source_decisive_confidence"],
+                "single_source_min_weight": scoring_profile["single_source_min_weight"],
             },
             "evidence_stats": {
                 "retrieved": evidence_retrieved,
@@ -1130,10 +1252,11 @@ class ClaimPipeline:
     def _build_fallback_evidence_preview(self, evidence_rows, limit=5):
         preview = []
         for ev in evidence_rows[:limit]:
+            preview_text = _sanitize_evidence_text(ev.get("text", ""))
             preview.append({
                 "source": ev.get("source", "Unknown"),
                 "url": ev.get("url"),
-                "text": ev.get("text", ""),
+                "text": preview_text,
                 "weight": round(float(ev.get("weight", 0.0)), 3),
                 "confidence": 0.0,
                 "stance": "UNSCORED",
@@ -1141,9 +1264,61 @@ class ClaimPipeline:
             })
         return preview
 
-    async def run(self, claim, source_url=None, source_text=None, source_language=None, allow_llm_verifier=None, cancel_event=None, progress_callback=None):
+    def _compute_neutral_confidence(self, results=None, scored_evidence=None, forced_neutral=False):
+        result_rows = [dict(r) for r in (results or []) if isinstance(r, dict)]
+        score_rows = [dict(r) for r in (scored_evidence or []) if isinstance(r, dict)]
+
+        rows = result_rows or score_rows
+        if not rows:
+            return 0.0
+
+        def _safe_float(row, key, fallback=0.0):
+            try:
+                return float(row.get(key, fallback) or fallback)
+            except Exception:
+                return float(fallback)
+
+        source_count = len(rows)
+        avg_weight = sum(_safe_float(r, "weight", 0.35) for r in rows) / max(source_count, 1)
+        avg_quality = sum(_safe_float(r, "quality_score", 0.35) for r in rows) / max(source_count, 1)
+        avg_relevance = sum(_safe_float(r, "relevance_score", 0.30) for r in rows) / max(source_count, 1)
+
+        combined_values = []
+        for row in rows:
+            combined = _safe_float(row, "combined_score", 0.0)
+            if combined <= 0.0:
+                combined = _safe_float(row, "relevance_score", 0.30) * _safe_float(row, "quality_score", 0.35)
+            combined_values.append(combined)
+        avg_combined = sum(combined_values) / max(len(combined_values), 1)
+
+        stance_rows = [r for r in result_rows if str(r.get("stance", "")).upper() in {"SUPPORT", "REFUTE", "NEUTRAL"}]
+        support_count = len([r for r in stance_rows if str(r.get("stance", "")).upper() == "SUPPORT"])
+        refute_count = len([r for r in stance_rows if str(r.get("stance", "")).upper() == "REFUTE"])
+        conflict_penalty = 0.08 if support_count > 0 and refute_count > 0 else 0.0
+
+        confidence = (
+            0.10
+            + (0.45 * avg_combined)
+            + (0.16 * avg_quality)
+            + (0.12 * avg_relevance)
+            + (0.12 * avg_weight)
+            + (0.10 * min(source_count / 10.0, 1.0))
+            - conflict_penalty
+        )
+
+        upper = 0.60 if forced_neutral else 0.72
+        return round(max(0.08, min(upper, confidence)), 3)
+
+    async def run(self, claim, source_url=None, source_text=None, source_language=None, source_modality="text", allow_llm_verifier=None, cancel_event=None, progress_callback=None, search_cap=6, _expanded_retry_done=False):
         self._raise_if_cancelled(cancel_event)
+        try:
+            search_cap = int(search_cap)
+        except Exception:
+            search_cap = 6
+        search_cap = max(2, min(10, search_cap))
+
         original_claim = claim
+        normalized_modality, scoring_profile = self._scoring_profile_for_modality(source_modality)
         self._emit_progress(progress_callback, stage="input", status="done", detail="Claim accepted for analysis")
         await self._flush_progress()
         ux_warnings = _build_ux_warnings(claim)
@@ -1153,6 +1328,7 @@ class ClaimPipeline:
         trace = {
             "claim": claim,
             "original_claim": original_claim,
+            "source_modality": normalized_modality,
             "search_results": [],
             "scraped_pages": [],
             "evidence_selected": [],
@@ -1161,6 +1337,9 @@ class ClaimPipeline:
             "session_cache_hits": [],
             "session_cache_lookup": {},
             "session_cache_store": {},
+            "search_cap": search_cap,
+            "retrieval_attempt": 2 if _expanded_retry_done else 1,
+            "retrieval_expanded": bool(_expanded_retry_done),
             "final_verdict": None
         }
 
@@ -1287,19 +1466,21 @@ class ClaimPipeline:
             normalized_source_text = translate_to_english(source_text, language)
             normalized_source_text = normalize_claim(normalized_source_text)
 
-        cached_evidence_raw = self._get_document_source_cache_hits(
-            source_url=source_url,
-            source_text=normalized_source_text,
-            trace=trace,
-        )
-        if not cached_evidence_raw:
-            cached_evidence_raw = self._get_session_cache_short_circuit_hits(
-            claim,
-            context_result=context_result,
-            source_url=source_url,
-            source_text=normalized_source_text,
-            trace=trace,
+        cached_evidence_raw = []
+        if not _expanded_retry_done:
+            cached_evidence_raw = self._get_document_source_cache_hits(
+                source_url=source_url,
+                source_text=normalized_source_text,
+                trace=trace,
             )
+            if not cached_evidence_raw:
+                cached_evidence_raw = self._get_session_cache_short_circuit_hits(
+                claim,
+                context_result=context_result,
+                source_url=source_url,
+                source_text=normalized_source_text,
+                trace=trace,
+                )
 
         self._raise_if_cancelled(cancel_event)
         # retrieve evidence from router
@@ -1324,6 +1505,8 @@ class ClaimPipeline:
                     language=language,
                     source_text=normalized_source_text,
                     progress_callback=progress_callback,
+                    max_sources=search_cap,
+                    force_refresh=bool(_expanded_retry_done),
                 )
             except asyncio.CancelledError:
                 return {
@@ -1386,6 +1569,15 @@ class ClaimPipeline:
 
         if cleaned:
             evidence_raw = cleaned
+
+        if self._is_indian_multilingual_claim(language, context_result=context_result):
+            india_scoped = self._filter_national_source_evidence(evidence_raw, context_result=context_result)
+            if len(india_scoped) >= 2:
+                evidence_raw = india_scoped
+                trace.setdefault("policy_flags", {})["india_scoped_filter_applied"] = True
+                trace.setdefault("policy_flags", {})["india_scoped_filter_count"] = len(india_scoped)
+
+        evidence_raw = _sanitize_evidence_rows(evidence_raw)
 
         print("Cleaned evidence:", len(evidence_raw))
         evidence_cleaned_count = len(evidence_raw)
@@ -1487,14 +1679,14 @@ class ClaimPipeline:
                 adjusted_weight = ev["weight"]
 
                 if (
-                    effective_relevance >= self.strong_relevance_threshold
-                    and quality_score >= self.strong_quality_threshold
+                    effective_relevance >= scoring_profile["strong_relevance"]
+                    and quality_score >= scoring_profile["strong_quality"]
                 ):
                     evidence_tier = "strong"
                     strong_evidence_count += 1
                 elif (
-                    effective_relevance >= self.soft_relevance_threshold
-                    and quality_score >= self.soft_quality_threshold
+                    effective_relevance >= scoring_profile["soft_relevance"]
+                    and quality_score >= scoring_profile["soft_quality"]
                 ):
                     evidence_tier = "soft"
                     adjusted_weight = round(ev["weight"] * (0.8 if index == 0 else 0.72), 3)
@@ -1569,12 +1761,17 @@ class ClaimPipeline:
         if not scored_evidence:
             print("No usable evidence found - abstaining")
             fallback_evidence_preview = self._build_fallback_evidence_preview(evidence_raw)
+            abstain_confidence = self._compute_neutral_confidence(
+                results=[],
+                scored_evidence=fallback_evidence_preview,
+                forced_neutral=True,
+            )
             return self._finalize_api_payload({
                 "claim": claim,
                 "language": language,
                 "evidence": fallback_evidence_preview,
                 "final_verdict": "NEUTRAL",
-                "confidence": 0.45,
+                "confidence": abstain_confidence,
                 "conflict_analysis": "Insufficient evidence",
                 "citations": [],
                 "logical_analysis": logic_metadata,
@@ -1583,6 +1780,8 @@ class ClaimPipeline:
                     claim_type_result=claim_type_result,
                     context_result=context_result,
                     language=language,
+                    source_modality=normalized_modality,
+                    scoring_profile=scoring_profile,
                     evidence_retrieved=evidence_retrieved_count,
                     evidence_cleaned=evidence_cleaned_count,
                     scored_evidence=[],
@@ -1612,7 +1811,7 @@ class ClaimPipeline:
         print(f"Domain diversity filter - score: {diversity_score:.2f}")
         print("Domain diversity filtering:", round(time.time() - start_diversity, 3), "sec")
 
-        scored_evidence = scored_evidence[:6]
+        scored_evidence = scored_evidence[:search_cap]
 
         trace["session_cache_store"] = self._session_retrieval_cache.store(
             claim,
@@ -1643,6 +1842,7 @@ class ClaimPipeline:
             self._raise_if_cancelled(cancel_event)
 
             highlighted = ev["text"]
+            highlighted = _sanitize_evidence_text(highlighted)
 
             print("\nSTANCE CHECK")
             safe_highlighted = (highlighted or "").replace("\ufeff", "").encode(
@@ -1652,6 +1852,8 @@ class ClaimPipeline:
             print("Evidence:", safe_highlighted)
 
             verifier_input = ev.get("context_text") if self.enable_verifier_v2 else None
+            if verifier_input is not None:
+                verifier_input = _sanitize_evidence_text(verifier_input)
             if self.enable_verifier_v2:
                 stance_result = self.verifier_v2.verify(claim, highlighted, verifier_input)
             else:
@@ -1700,6 +1902,14 @@ class ClaimPipeline:
                             "confidence": 0.9 if rank_check == "REFUTE" else 0.86,
                             "source": "heuristic_rank_rescue",
                         }
+                if stance_result.get("stance") == "NEUTRAL":
+                    weather_check = _weather_alert_reasoning(claim, highlighted)
+                    if weather_check:
+                        stance_result = {
+                            "stance": weather_check,
+                            "confidence": 0.82 if weather_check == "REFUTE" else 0.78,
+                            "source": "heuristic_weather_alert_rescue",
+                        }
 
             results.append({
                 "source": ev["source"],
@@ -1743,7 +1953,7 @@ class ClaimPipeline:
         if (
             logic_verdict in {"SUPPORT", "REFUTE"}
             and len(non_neutral) >= 2
-            and strong_evidence_count >= self.min_strong_evidence_for_forced_verdict
+            and strong_evidence_count >= scoring_profile["min_strong_evidence"]
             and not _is_capital_relation_claim(claim, context_result)
         ):
             results.append({
@@ -1773,8 +1983,8 @@ class ClaimPipeline:
         refute_items = [r for r in results if r.get("stance") == "REFUTE"]
         decisive_single = any(
             r.get("stance") in {"SUPPORT", "REFUTE"}
-            and float(r.get("confidence", 0.0)) >= self.single_source_decisive_confidence
-            and float(r.get("weight", 0.0)) >= self.single_source_min_weight
+            and float(r.get("confidence", 0.0)) >= scoring_profile["single_source_decisive_confidence"]
+            and float(r.get("weight", 0.0)) >= scoring_profile["single_source_min_weight"]
             for r in results
         )
         dominant_items = support_items if len(support_items) >= len(refute_items) else refute_items
@@ -1806,7 +2016,7 @@ class ClaimPipeline:
                 soft_directional_consensus = True
         if (
             (
-                strong_evidence_count < self.min_strong_evidence_for_forced_verdict
+                strong_evidence_count < scoring_profile["min_strong_evidence"]
                 and not decisive_single
                 and not soft_consensus
                 and not soft_directional_consensus
@@ -1817,6 +2027,65 @@ class ClaimPipeline:
             confidence = min(confidence, 0.55)
             conflict_summary = "Insufficient decisive evidence for definitive verdict"
             forced_neutral = True
+
+        all_neutral = bool(results) and all(str(r.get("stance", "")).upper() == "NEUTRAL" for r in results)
+        if verdict == "NEUTRAL" and all_neutral and search_cap < 10 and not _expanded_retry_done:
+            print("All evidence remained neutral; retrying with expanded source cap to 10.")
+            return await self.run(
+                original_claim,
+                source_url=source_url,
+                source_text=source_text,
+                source_language=source_language,
+                source_modality=source_modality,
+                allow_llm_verifier=allow_llm_verifier,
+                cancel_event=cancel_event,
+                progress_callback=progress_callback,
+                search_cap=10,
+                _expanded_retry_done=True,
+            )
+
+        if verdict == "NEUTRAL":
+            confidence = self._compute_neutral_confidence(
+                results=results,
+                scored_evidence=scored_evidence,
+                forced_neutral=forced_neutral,
+            )
+
+        decisive_external = [
+            row for row in results
+            if str(row.get("stance") or "").upper() in {"SUPPORT", "REFUTE"}
+            and str(row.get("source") or "").lower() != "logic_engine"
+            and not str(row.get("url") or "").startswith("internal://")
+        ]
+        strong_support_external = [
+            row for row in decisive_external
+            if str(row.get("stance") or "").upper() == "SUPPORT"
+            and float(row.get("confidence", 0.0) or 0.0) >= 0.58
+        ]
+        strong_refute_external = [
+            row for row in decisive_external
+            if str(row.get("stance") or "").upper() == "REFUTE"
+            and float(row.get("confidence", 0.0) or 0.0) >= 0.58
+        ]
+
+        if verdict == "TRUE" and not strong_support_external:
+            verdict = "NEUTRAL"
+            forced_neutral = True
+            conflict_summary = "No decisive external supporting evidence"
+            confidence = self._compute_neutral_confidence(
+                results=results,
+                scored_evidence=scored_evidence,
+                forced_neutral=True,
+            )
+        elif verdict == "FALSE" and not strong_refute_external:
+            verdict = "NEUTRAL"
+            forced_neutral = True
+            conflict_summary = "No decisive external refuting evidence"
+            confidence = self._compute_neutral_confidence(
+                results=results,
+                scored_evidence=scored_evidence,
+                forced_neutral=True,
+            )
 
         capital_rescue = _capital_relation_rescue(claim, results, context_result=context_result)
         if capital_rescue and verdict == "NEUTRAL":
@@ -1838,6 +2107,8 @@ class ClaimPipeline:
             claim_type_result=claim_type_result,
             context_result=context_result,
             language=language,
+            source_modality=normalized_modality,
+            scoring_profile=scoring_profile,
             evidence_retrieved=evidence_retrieved_count,
             evidence_cleaned=evidence_cleaned_count,
             scored_evidence=scored_evidence,
@@ -1874,6 +2145,7 @@ class ClaimPipeline:
 
         return self._finalize_api_payload({
             "claim": claim,
+            "claim_original": original_claim,
             "language": language,
             "evidence": results,
             "final_verdict": verdict,

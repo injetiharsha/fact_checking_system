@@ -250,7 +250,29 @@ class ClaimContextClassifier:
             trained_result = self._classify_with_worker(claim, original_claim=original_claim, language=language)
             if trained_result is not None:
                 return trained_result
-        return self._heuristic_classify(claim, original_claim=original_claim, language=language)
+        return self._model_unavailable_context(original_claim=original_claim, language=language)
+
+    def _model_unavailable_context(self, original_claim: str | None = None, language: str | None = None) -> dict:
+        # Non-heuristic fallback: keep context neutral when trained model output is unavailable.
+        locality = self._detect_language_locality(language, (original_claim or "").lower())
+        state_focus = None
+        states = locality.get("states") or []
+        if states:
+            state_focus = str(states[0])
+        return {
+            "domain": "general_factual",
+            "subcategory": "encyclopedic",
+            "confidence": 0.0,
+            "decision_source": "no_context_model_available",
+            "risk_flags": ["regional_local_claim"] if state_focus else [],
+            "state_focus": state_focus,
+            "language": language or "unknown",
+            "query_language": locality.get("query_language"),
+            "region_hints": locality.get("countries", []),
+            "original_claim": original_claim,
+            "taxonomy_version": "v1",
+            "available_domains": list(CONTEXT_TAXONOMY.keys()),
+        }
 
     def _heuristic_classify(self, claim: str, original_claim: str | None = None, language: str | None = None) -> dict:
         claim_text = " ".join((claim or "").strip().lower().split())
@@ -355,8 +377,8 @@ class ClaimContextClassifier:
         label = str(payload.get("label") or "general_factual").lower()
         confidence = float(payload.get("confidence") or 0.0)
         if confidence < self.MODEL_CONFIDENCE_THRESHOLD:
-            fallback = self._heuristic_classify(claim, original_claim=original_claim, language=language)
-            fallback["decision_source"] = "bootstrap_lexical_low_trained_context_confidence"
+            fallback = self._model_unavailable_context(original_claim=original_claim, language=language)
+            fallback["decision_source"] = "trained_context_low_confidence"
             fallback["model_domain"] = label
             fallback["model_confidence"] = round(confidence, 3)
             fallback["scores"] = payload.get("scores", {})
