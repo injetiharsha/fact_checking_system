@@ -46,12 +46,16 @@ let basePreview = "";
 let progressPollTimer = null;
 let currentProgressId = null;
 let currentProgressSnapshot = null;
+let progressPollInFlight = false;
 let originalReport = null;
 let renderedReport = null;
 let reportLanguageOverride = null;
 let modeSwitchTimeout = null;
 let currentImagePreviewUrl = null;
 let currentImageClaimSelectionState = null;
+
+const PROGRESS_POLL_INTERVAL_MS = 3000;
+const API_RETRY_STATUSES = new Set([502, 503, 504]);
 
 const modeTips = {
   claim: "Tip: include a concrete subject, timeframe, and measurable fact for better evidence retrieval.",
@@ -177,6 +181,29 @@ function buildApiUrl(path) {
   if (!apiBaseUrl) return path;
   if (!path.startsWith("/")) return `${apiBaseUrl}/${path}`;
   return `${apiBaseUrl}${path}`;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(url, init = {}, options = {}) {
+  const retries = Number(options.retries || 0);
+  const retryDelayMs = Number(options.retryDelayMs || 900);
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetch(url, init);
+      if (!API_RETRY_STATUSES.has(response.status) || attempt === retries) {
+        return response;
+      }
+    } catch (error) {
+      if (attempt === retries) throw error;
+    }
+    await sleep(retryDelayMs * (attempt + 1));
+  }
+
+  return fetch(url, init);
 }
 
 for (const tab of tabs) {
@@ -553,24 +580,39 @@ function applyProgressPayload(payload) {
 }
 
 function startProgressPolling(progressId) {
-  const fetchProgress = async () => {
+  const pollOnce = async () => {
     if (!progressId || progressId !== currentProgressId) return;
+    if (progressPollInFlight) return;
+    progressPollInFlight = true;
+
     try {
-      const response = await fetch(buildApiUrl(`/progress/${encodeURIComponent(progressId)}`));
+      const response = await fetchWithRetry(
+        buildApiUrl(`/progress/${encodeURIComponent(progressId)}`),
+        { cache: "no-store" },
+        { retries: 1, retryDelayMs: 700 },
+      );
       const payload = await response.json();
       if (!response.ok || payload.error) return;
       applyProgressPayload(payload);
       if (["done", "error", "cancelled"].includes(payload.status)) {
         stopProgressTimers();
         updateElapsedTimer();
+        return;
       }
     } catch (_error) {
       return;
+    } finally {
+      progressPollInFlight = false;
+      if (progressId === currentProgressId && !progressPollTimer) {
+        progressPollTimer = setTimeout(() => {
+          progressPollTimer = null;
+          pollOnce();
+        }, PROGRESS_POLL_INTERVAL_MS);
+      }
     }
   };
 
-  fetchProgress();
-  progressPollTimer = setInterval(fetchProgress, 700);
+  pollOnce();
 }
 
 function completeProgress() {
@@ -615,9 +657,10 @@ function stopProgressTimers() {
     elapsedTimer = null;
   }
   if (progressPollTimer) {
-    clearInterval(progressPollTimer);
+    clearTimeout(progressPollTimer);
     progressPollTimer = null;
   }
+  progressPollInFlight = false;
 }
 
 function updateElapsedTimer() {
@@ -667,12 +710,16 @@ async function callApiForMode(signal, progressId = null) {
 }
 
 async function postJson(url, body, signal = null, headers = {}) {
-  const response = await fetch(buildApiUrl(url), {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify(body),
-    signal,
-  });
+  const response = await fetchWithRetry(
+    buildApiUrl(url),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+      signal,
+    },
+    { retries: 1, retryDelayMs: 1000 },
+  );
   return handleResponse(response);
 }
 
@@ -682,12 +729,16 @@ async function postFile(url, file, signal = null, headers = {}, fields = {}) {
   Object.entries(fields || {}).forEach(([key, value]) => {
     if (value != null && String(value).trim()) formData.append(key, String(value).trim());
   });
-  const response = await fetch(buildApiUrl(url), {
-    method: "POST",
-    body: formData,
-    headers,
-    signal,
-  });
+  const response = await fetchWithRetry(
+    buildApiUrl(url),
+    {
+      method: "POST",
+      body: formData,
+      headers,
+      signal,
+    },
+    { retries: 1, retryDelayMs: 1000 },
+  );
   return handleResponse(response);
 }
 
@@ -1204,11 +1255,9 @@ function renderSourceMedia(evidence) {
   const items = chosen.map((ev) => {
     const domain = extractDomain(ev.url || "");
     if (!domain) return "";
-    const logo = `https://logo.clearbit.com/${domain}`;
     const sourceLabel = sourceLabelForEvidence(ev);
     return `
       <a class="source-media-item" href="${escapeAttr(ev.url)}" target="_blank" rel="noopener noreferrer">
-        <img src="${escapeAttr(logo)}" alt="${escapeHtml(domain)} logo" loading="lazy" onerror="this.src='https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64'">
         <div>
           <div>${escapeHtml(sourceLabel || domain)}</div>
           <p class="meta">${escapeHtml(domain)}</p>
