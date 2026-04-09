@@ -1,4 +1,5 @@
 import re
+import os
 import json
 import subprocess
 import sys
@@ -25,19 +26,21 @@ class ClaimTypeClassifier:
     MIXED_BAND = 0.15
 
     def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Prefer GPU if available, but allow override via config
+        self.device = torch.device(os.getenv("CLAIM_TYPE_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.tokenizer = None
         self.model = None
         self.model_mode = "heuristic"
         self.trained_checkpoint = None
-        self.trained_device = "cpu"
+        self.trained_device = self.device.type if hasattr(self.device, "type") else "cpu"
         self.helper_script = Path(__file__).with_name("subprocess_infer.py")
 
         runtime = runtime_model_settings("claim_type")
         checkpoint = runtime.get("checkpoint")
         if runtime.get("enabled") and checkpoint is not None:
             self.trained_checkpoint = Path(checkpoint)
-            self.trained_device = runtime.get("device") or "cpu"
+            # Prefer GPU if available, but allow override
+            self.trained_device = runtime.get("device") or ("cuda" if torch.cuda.is_available() else "cpu")
             self.model_mode = "trained_multiclass"
             print(
                 "ClaimTypeClassifier using trained checkpoint via isolated inference:",

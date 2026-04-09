@@ -2,11 +2,25 @@ from pipeline.claim_pipeline import extract_best_sentences, _should_skip_claim_r
 
 
 class RetrievalPipelineV2:
-    def __init__(self, relevance_scorer, quality_scorer, strong_relevance_threshold=0.42, soft_relevance_threshold=0.28):
+    def __init__(
+        self,
+        relevance_scorer,
+        quality_scorer,
+        strong_relevance_threshold=0.42,
+        soft_relevance_threshold=0.28,
+        candidate_sentences_per_doc=4,
+        max_selected_docs=4,
+        passages_per_doc=2,
+        max_selected_passages=6,
+    ):
         self.relevance_scorer = relevance_scorer
         self.quality_scorer = quality_scorer
         self.strong_relevance_threshold = strong_relevance_threshold
         self.soft_relevance_threshold = soft_relevance_threshold
+        self.candidate_sentences_per_doc = max(1, int(candidate_sentences_per_doc))
+        self.max_selected_docs = max(1, int(max_selected_docs))
+        self.passages_per_doc = max(1, int(passages_per_doc))
+        self.max_selected_passages = max(1, int(max_selected_passages))
 
     def select_evidence(self, claim, evidence_raw, sentence_cache, context_result=None, trace=None):
         documents = []
@@ -27,7 +41,7 @@ class RetrievalPipelineV2:
                     claim,
                     text,
                     self.relevance_scorer,
-                    max_sentences=4,
+                    max_sentences=self.candidate_sentences_per_doc,
                     source_name=ev.get("source"),
                     context_result=context_result,
                 )
@@ -88,13 +102,13 @@ class RetrievalPipelineV2:
                 "url": ev["url"],
                 "weight": ev["weight"],
                 "document_score": max(row["combined_score"] for row in passage_rows),
-                "passages": passage_rows[:3],
+                "passages": passage_rows[: max(1, self.passages_per_doc + 1)],
             })
 
         documents.sort(key=lambda row: row["document_score"], reverse=True)
-        selected_docs = documents[:4]
+        selected_docs = documents[: self.max_selected_docs]
         selected_passages = []
         for doc in selected_docs:
-            selected_passages.extend(doc["passages"][:2])
+            selected_passages.extend(doc["passages"][: self.passages_per_doc])
         selected_passages.sort(key=lambda row: row["combined_score"], reverse=True)
-        return selected_passages[:6]
+        return selected_passages[: self.max_selected_passages]

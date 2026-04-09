@@ -75,3 +75,9 @@ Why this is the promoted stack:
 Current recommendation:
 
 - `stance restorefast_patch2 + relevance v9 + checkability v2_run2 + locked retrieval/verifier path + llm verifier`
+
+## Stance + Context Training Plan
+
+For local-first Colab GPU training (local data ownership, single final checkpoint save, local download/install), use:
+
+- `STANCE_CONTEXT_COLAB_LOCAL_PLAN.md`

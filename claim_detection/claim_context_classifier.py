@@ -1,4 +1,6 @@
 import json
+import os
+import torch
 import re
 import subprocess
 import sys
@@ -163,7 +165,7 @@ class ClaimContextClassifier:
 
     def __init__(self):
         self.trained_checkpoint = None
-        self.trained_device = "cpu"
+        self.trained_device = os.getenv("CONTEXT_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")
         self.helper_script = Path(__file__).with_name("context_subprocess_infer.py")
         self._worker = None
         self._worker_lock = threading.Lock()
@@ -173,7 +175,7 @@ class ClaimContextClassifier:
         checkpoint = runtime.get("checkpoint")
         if runtime.get("enabled") and checkpoint is not None:
             self.trained_checkpoint = Path(checkpoint)
-            self.trained_device = runtime.get("device") or "cpu"
+            self.trained_device = runtime.get("device") or ("cuda" if torch.cuda.is_available() else "cpu")
 
     def _start_worker(self) -> bool:
         if self._worker_ready and self._worker is not None and self._worker.poll() is None:

@@ -1,7 +1,7 @@
 seed: 42
 splits:
-  validation_ratio: 0.1
-  test_ratio: 0.1
+  validation_ratio: 0.15
+  test_ratio: 0.15
 sources:
   - key: fever
     enabled: true
@@ -20,3 +20,10 @@ sources:
     dataset_name: allenai/scifact
     split: train
     sample_limit: 1000
+  - key: xnli_hi
+    enabled: true
+    dataset_name: xnli
+    dataset_kwargs:
+      language: hi
+    split: train
+    sample_limit: 20000

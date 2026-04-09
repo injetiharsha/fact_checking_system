@@ -45,6 +45,15 @@ class DocumentPipeline:
         )
         self.context_llm_timeout = float(os.getenv("LLM_CONTEXT_TIMEOUT_SECONDS", "30"))
         self.pdf_analysis_max_pages = self._safe_env_int("PDF_ANALYSIS_MAX_PAGES", 4)
+        # Guardrails for claim-selection latency on long OCR/text blocks.
+        self.claim_selection_max_candidates = self._safe_env_int("CLAIM_SELECTION_MAX_CANDIDATES", 36)
+        self.image_claim_selection_max_blocks = self._safe_env_int("IMAGE_CLAIM_SELECTION_MAX_BLOCKS", 72)
+        self.image_claim_candidates_to_evaluate = max(3, min(5, self._safe_env_int("IMAGE_CLAIM_CANDIDATES_TO_EVALUATE", 3)))
+        self.image_candidate_precheck_search_cap = max(2, min(10, self._safe_env_int("IMAGE_CLAIM_PRECHECK_SEARCH_CAP", 5)))
+        self.image_candidate_final_search_cap = max(
+            self.image_candidate_precheck_search_cap,
+            min(15, self._safe_env_int("IMAGE_CLAIM_FINAL_SEARCH_CAP", 10)),
+        )
 
     def _safe_env_int(self, name, default):
         try:
@@ -435,7 +444,11 @@ class DocumentPipeline:
         selection_start = time.time()
         self._emit_progress(progress_callback, stage="claim_selection", status="active", detail="Selecting central claim from OCR text")
         await self._flush_progress()
-        selection = await asyncio.to_thread(self._select_image_main_claim, text)
+        # Clean paragraph-like OCR can skip expensive block synthesis/scoring.
+        if self._is_clean_paragraph_ocr_text(text):
+            selection = await asyncio.to_thread(self._select_text_main_claim, text, True)
+        else:
+            selection = await asyncio.to_thread(self._select_image_main_claim, text)
         selection_elapsed = round(time.time() - selection_start, 3)
         print("Image claim selection:", selection_elapsed, "sec")
         self._emit_progress(progress_callback, stage="claim_selection", status="done", detail=f"Claim selected in {selection_elapsed} sec")
@@ -443,7 +456,7 @@ class DocumentPipeline:
         candidate_claims = []
         seen_candidates = set()
         for candidate in (selection.get("top_claims") or []):
-            cleaned = self._clean_image_candidate(candidate)
+            cleaned = self._compact_image_claim(candidate)
             if not cleaned:
                 continue
             key = re.sub(r"\W+", " ", cleaned.lower(), flags=re.UNICODE).strip()
@@ -453,12 +466,26 @@ class DocumentPipeline:
             candidate_claims.append(cleaned)
         main_claim = selection.get("claim")
         if main_claim:
-            cleaned_main = self._clean_image_candidate(main_claim)
+            cleaned_main = self._compact_image_claim(main_claim)
             if cleaned_main:
                 key = re.sub(r"\W+", " ", cleaned_main.lower(), flags=re.UNICODE).strip()
                 if key not in seen_candidates:
                     candidate_claims.insert(0, cleaned_main)
                     seen_candidates.add(key)
+        if len(candidate_claims) < self.image_claim_candidates_to_evaluate:
+            fallback_selection = await asyncio.to_thread(self._select_image_main_claim, text)
+            for candidate in (fallback_selection.get("top_claims") or []):
+                cleaned = self._compact_image_claim(candidate)
+                if not cleaned:
+                    continue
+                key = re.sub(r"\W+", " ", cleaned.lower(), flags=re.UNICODE).strip()
+                if not key or key in seen_candidates:
+                    continue
+                seen_candidates.add(key)
+                candidate_claims.append(cleaned)
+                if len(candidate_claims) >= self.image_claim_candidates_to_evaluate:
+                    break
+
         if not candidate_claims and main_claim:
             candidate_claims = [main_claim]
         if not candidate_claims:
@@ -478,11 +505,11 @@ class DocumentPipeline:
         enriched_ocr["selection_reason"] = selection.get("reason")
         enriched_ocr["selected_claim_score"] = selection.get("score")
         enriched_ocr["selected_claim_candidates"] = selection.get("candidates", [])[:3]
-        enriched_ocr["selected_claims"] = candidate_claims[:3]
+        enriched_ocr["selected_claims"] = candidate_claims[: self.image_claim_candidates_to_evaluate]
 
         claim_pipeline_start = time.time()
         candidate_results = []
-        for candidate_claim in candidate_claims[:3]:
+        for candidate_claim in candidate_claims[: self.image_claim_candidates_to_evaluate]:
             self._raise_if_cancelled(cancel_event)
             candidate_result = await self._process_text(
                 text,
@@ -491,9 +518,10 @@ class DocumentPipeline:
                 source_text=text,
                 source_language=source_language,
                 source_modality="image",
-                allow_llm_verifier=True,
+                allow_llm_verifier=False,
                 cancel_event=cancel_event,
                 progress_callback=progress_callback,
+                search_cap=self.image_candidate_precheck_search_cap,
             )
             if isinstance(candidate_result, dict):
                 normalized_candidate = dict(candidate_result)
@@ -524,6 +552,15 @@ class DocumentPipeline:
             range_markers = len(re.findall(r"[-–—]|\bto\b", claim_text, flags=re.IGNORECASE))
             unit_markers = len(re.findall(r"\b(km|kmph|kph|mph|mm|cm|percent|%)\b", claim_text, flags=re.IGNORECASE))
             detail_marker_bonus = min(0.06, (numeric_tokens * 0.012) + (range_markers * 0.006) + (unit_markers * 0.008))
+            long_claim_penalty = 0.0
+            if word_count > 22:
+                long_claim_penalty = min(0.35, 0.05 + ((word_count - 22) * 0.015))
+
+            clause_penalty = 0.0
+            lower_claim = claim_text.lower()
+            clause_penalty += min(0.08, lower_claim.count(" and ") * 0.02)
+            clause_penalty += min(0.08, lower_claim.count(" but ") * 0.02)
+            clause_penalty += min(0.08, punctuation_count * 0.015)
 
             if 16 <= word_count <= 42:
                 specificity_bonus = 0.04
@@ -542,7 +579,7 @@ class DocumentPipeline:
                 gap = dynamic_min_candidate_words - word_count
                 short_claim_penalty = min(0.18, 0.03 + (gap * 0.01))
 
-            confidence_adjusted = confidence + specificity_bonus - short_claim_penalty
+            confidence_adjusted = confidence + specificity_bonus - short_claim_penalty - long_claim_penalty - clause_penalty
             return (verdict_bonus, confidence_adjusted, confidence, float(support_count))
 
         if candidate_results:
@@ -551,12 +588,37 @@ class DocumentPipeline:
                 if not isinstance(item, dict):
                     continue
                 candidate_text = self._clean_image_candidate(item.get("selected_claim") or "")
-                if len(candidate_text.split()) >= dynamic_min_candidate_words:
+                word_count = len(candidate_text.split())
+                if word_count >= dynamic_min_candidate_words and word_count <= 22:
                     qualified_indices.append(idx)
 
             candidate_pool = qualified_indices if qualified_indices else list(range(len(candidate_results)))
             best_index = max(candidate_pool, key=lambda idx: image_result_score(candidate_results[idx]))
             result = candidate_results[best_index]
+            if (
+                isinstance(result, dict)
+                and isinstance(result.get("selected_claim"), str)
+                and self.image_candidate_final_search_cap > self.image_candidate_precheck_search_cap
+            ):
+                result = await self._process_text(
+                    text,
+                    ocr_details=enriched_ocr,
+                    selected_claim=result.get("selected_claim"),
+                    source_text=text,
+                    source_language=source_language,
+                    source_modality="image",
+                    allow_llm_verifier=False,
+                    cancel_event=cancel_event,
+                    progress_callback=progress_callback,
+                    search_cap=self.image_candidate_final_search_cap,
+                    force_fresh_retrieval=True,
+                )
+                if isinstance(result, dict):
+                    result["image_best_candidate_recheck"] = {
+                        "enabled": True,
+                        "precheck_search_cap": self.image_candidate_precheck_search_cap,
+                        "final_search_cap": self.image_candidate_final_search_cap,
+                    }
         else:
             best_index = None
             result = {"error": "Could not analyze image claim candidates"}
@@ -582,14 +644,14 @@ class DocumentPipeline:
 
             result["image_candidate_results"] = candidate_summaries
             result["image_selected_candidate_index"] = best_index
-            result["image_selected_candidates"] = candidate_claims[:3]
+            result["image_selected_candidates"] = candidate_claims[: self.image_claim_candidates_to_evaluate]
             ocr_details_result = result.get("ocr_details")
             if isinstance(ocr_details_result, dict):
                 preanalysis_candidates = list(ocr_details_result.get("selected_claim_candidates") or [])
                 if winning_claim:
                     ocr_details_result["selected_claim"] = winning_claim
                 ocr_details_result["selected_claim_preanalysis"] = candidate_claims[0] if candidate_claims else None
-                ocr_details_result["selected_claims"] = candidate_claims[:3]
+                ocr_details_result["selected_claims"] = candidate_claims[: self.image_claim_candidates_to_evaluate]
                 ocr_details_result["selected_claim_candidates_preanalysis"] = preanalysis_candidates[:3]
                 ocr_details_result["selected_claim_candidates"] = [
                     {
@@ -618,6 +680,16 @@ class DocumentPipeline:
         cleaned = re.sub(r"\s+", " ", (text or "")).strip(" -\t\r\n|:;,.")
         cleaned = re.sub(r"^[\u2022\u2023\u25E6\u2043\-\*\#]+\s*", "", cleaned)
         return cleaned.strip()
+
+    def _compact_image_claim(self, text, max_words=18):
+        claim = self._clean_image_candidate(text)
+        if not claim:
+            return ""
+        claim = re.split(r"[.!?\n\r]", claim, maxsplit=1)[0].strip()
+        words = claim.split()
+        if len(words) > max_words:
+            claim = " ".join(words[:max_words]).strip()
+        return claim
 
     def _extract_page_heading(self, page_text):
         heading_keywords = {
@@ -875,6 +947,8 @@ class DocumentPipeline:
                 if key and key not in seen:
                     seen.add(key)
                     blocks.append((idx, cleaned))
+                    if len(blocks) >= self.image_claim_selection_max_blocks:
+                        return blocks
 
             for window in range(2, max_sentence_window + 1):
                 if idx + window > len(sentence_candidates):
@@ -889,6 +963,8 @@ class DocumentPipeline:
                 if key and key not in seen:
                     seen.add(key)
                     blocks.append((idx, merged))
+                    if len(blocks) >= self.image_claim_selection_max_blocks:
+                        return blocks
 
         return blocks
 
@@ -1081,10 +1157,29 @@ class DocumentPipeline:
         if claim:
             return claim
 
+        def _is_weak_clause(candidate_text):
+            lowered = " ".join((candidate_text or "").lower().split())
+            if not lowered:
+                return True
+            transition_starters = (
+                "at the same time", "meanwhile", "however", "ఇదే సమయంలో", "అయితే", "ఇక",
+            )
+            if lowered.startswith(transition_starters):
+                return True
+            weak_modal_markers = (
+                "possibility", "likely", "chance", "could", "may",
+                "అవకాశం", "వీచే అవకాశం", "ఉందని", "కావచ్చని", "సంభావ్యత",
+            )
+            if any(marker in lowered for marker in weak_modal_markers) and not re.search(r"\d", lowered):
+                return True
+            return False
+
         normalized = re.sub(r"\s+", " ", (text or "")).strip()
         for sentence in re.split(r"(?<=[.!?\u0964])\s+", normalized):
             cleaned = self._clean_image_candidate(sentence)
             if not cleaned:
+                continue
+            if _is_weak_clause(cleaned):
                 continue
             words = cleaned.split()
             if len(words) < 6:
@@ -1164,6 +1259,8 @@ class DocumentPipeline:
                 continue
             seen.add(key)
             claim_candidates.append(cleaned)
+            if len(claim_candidates) >= self.claim_selection_max_candidates:
+                break
 
         if not claim_candidates:
             return {
@@ -1215,6 +1312,22 @@ class DocumentPipeline:
             if word_count > 0 and word_count < 6:
                 lead_context_penalty = 0.08
 
+            lowered = " ".join(candidate_text.lower().split())
+            weak_modal_penalty = 0.0
+            # Penalize clause-like/modal-only candidates that often miss the main factual subject.
+            weak_modal_markers = (
+                "possibility", "likely", "may ", "could ", "chance", "expected to",
+                "అవకాశం", "వీచే అవకాశం", "ఉందని", "సంభావ్యత", "కావచ్చని",
+            )
+            if any(marker in lowered for marker in weak_modal_markers):
+                weak_modal_penalty += 0.06
+
+            transition_starters = (
+                "at the same time", "meanwhile", "however", "ఇదే సమయంలో", "అయితే", "ఇక",
+            )
+            if lowered.startswith(transition_starters):
+                weak_modal_penalty += 0.05
+
             length_bonus = 0.0
             if 8 <= word_count <= 24:
                 length_bonus = 0.08
@@ -1226,7 +1339,7 @@ class DocumentPipeline:
                 length_bonus = -0.03
 
             punctuation_penalty = min(0.10, punctuation_count * 0.02)
-            return base_score + length_bonus - punctuation_penalty - lead_context_penalty
+            return base_score + length_bonus - punctuation_penalty - lead_context_penalty - weak_modal_penalty
 
         ranked_selection = sorted(scored, key=selection_rank, reverse=True)
         selected_best = ranked_selection[0] if ranked_selection else best
@@ -1335,7 +1448,7 @@ class DocumentPipeline:
             "top_claims": concise_top_claims,
         }
 
-    async def _process_text(self, text, source_url=None, ocr_details=None, selected_claim=None, source_text=None, source_language=None, source_modality="text", allow_llm_verifier=True, cancel_event=None, progress_callback=None):
+    async def _process_text(self, text, source_url=None, ocr_details=None, selected_claim=None, source_text=None, source_language=None, source_modality="text", allow_llm_verifier=True, cancel_event=None, progress_callback=None, search_cap=None, force_fresh_retrieval=False):
         self._raise_if_cancelled(cancel_event)
 
         if not text:
@@ -1343,7 +1456,11 @@ class DocumentPipeline:
 
         words = (text or "").strip().split()
         if selected_claim is not None:
-            main_claim = selected_claim
+            main_claim = self._clean_image_candidate(selected_claim)
+            claim_words = main_claim.split()
+            if len(claim_words) > 32:
+                # Keep image-selected claims concise so retrieval queries remain targeted.
+                main_claim = " ".join(claim_words[:32]).strip()
         elif ocr_details is not None:
             main_claim = self._select_image_main_claim(text).get("claim")
         elif source_url is None and 3 <= len(words) <= 20:
@@ -1368,6 +1485,8 @@ class DocumentPipeline:
             allow_llm_verifier=allow_llm_verifier,
             cancel_event=cancel_event,
             progress_callback=progress_callback,
+            search_cap=search_cap,
+            force_fresh_retrieval=force_fresh_retrieval,
         )
         results.append(claim_result)
 

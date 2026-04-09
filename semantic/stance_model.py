@@ -45,18 +45,12 @@ class StanceDetector:
             "REFUTE": "REFUTE",
         }
 
-        print("\nNLI INPUT")
-        safe_claim = (claim or "").replace("\ufeff", "").encode(
-            sys.stdout.encoding or "utf-8",
-            errors="replace",
-        ).decode(sys.stdout.encoding or "utf-8", errors="replace")
-        safe_evidence = (evidence or "").replace("\ufeff", "").encode(
-            sys.stdout.encoding or "utf-8",
-            errors="replace",
-        ).decode(sys.stdout.encoding or "utf-8", errors="replace")
-        print("Claim:", safe_claim)
-        print("Evidence:", safe_evidence)
-        print("Prediction:", label, confidence)
+        # Debug prints removed for speed. Uncomment for debugging.
+        # if os.getenv("STANCE_DEBUG", "0") == "1":
+        #     print("\nNLI INPUT")
+        #     print("Claim:", claim)
+        #     print("Evidence:", evidence)
+        #     print("Prediction:", label, confidence)
 
         stance = stance_map.get(label, "NEUTRAL")
         filtered = self._postfilter_model_stance(

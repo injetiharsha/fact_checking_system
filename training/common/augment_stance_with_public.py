@@ -39,7 +39,11 @@ def normalize_text(value: Any) -> str:
 
 def extract_records(dataset_key: str, rows: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
     normalized: list[Dict[str, Any]] = []
-    label_map = LABEL_MAPS[dataset_key]
+    # Use 'xnli' label map for all xnli_* keys
+    key_for_map = dataset_key
+    if dataset_key.startswith('xnli'):
+        key_for_map = 'mnli'  # XNLI uses same label mapping as MNLI
+    label_map = LABEL_MAPS[key_for_map]
 
     for idx, row in enumerate(rows, start=1):
         if dataset_key == "fever":
@@ -88,11 +92,22 @@ def load_public_records(config: Dict[str, Any]) -> list[Dict[str, Any]]:
 
         dataset_key = source["key"]
         dataset_name = source["dataset_name"]
-        dataset_kwargs = source.get("dataset_kwargs", {})
         split = source.get("split", "train")
         sample_limit = int(source.get("sample_limit", 0))
 
-        ds = load_dataset(dataset_name, **dataset_kwargs, split=split)
+        # For XNLI, pass language as positional argument if present
+        if dataset_name == "xnli":
+            language = None
+            if "dataset_kwargs" in source and "language" in source["dataset_kwargs"]:
+                language = source["dataset_kwargs"]["language"]
+            if language:
+                ds = load_dataset(dataset_name, language, split=split)
+            else:
+                ds = load_dataset(dataset_name, split=split)
+        else:
+            dataset_kwargs = source.get("dataset_kwargs", {})
+            ds = load_dataset(dataset_name, **dataset_kwargs, split=split)
+
         if sample_limit > 0:
             ds = ds.select(range(min(sample_limit, len(ds))))
 

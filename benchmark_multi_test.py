@@ -511,7 +511,13 @@ async def main():
     args = parser.parse_args()
 
     active_claims, active_truth = load_claim_batch(args.claims_file)
-    results, claim_times, total_time = await run_benchmark(active_claims, active_truth)
+
+    try:
+        results, claim_times, total_time = await asyncio.wait_for(run_benchmark(active_claims, active_truth), timeout=600)
+    except asyncio.TimeoutError:
+        print("\n==============================")
+        print("BENCHMARK FAILED: Timeout after 600 seconds.")
+        results, claim_times, total_time = [], [], 600.0
 
     metrics = evaluate(results)
 

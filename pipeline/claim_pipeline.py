@@ -774,9 +774,23 @@ class ClaimPipeline:
         self.enable_retrieval_v2 = os.getenv("ENABLE_RETRIEVAL_V2", "0").strip().lower() in {"1", "true", "yes", "on"}
         self.enable_verifier_v2 = os.getenv("ENABLE_VERIFIER_V2", "0").strip().lower() in {"1", "true", "yes", "on"}
         self.enable_llm_verifier = os.getenv("ENABLE_LLM_VERIFIER", "0").strip().lower() in {"1", "true", "yes", "on"}
+        self.enable_neutral_expanded_retry = os.getenv("ENABLE_NEUTRAL_EXPANDED_RETRY", "0").strip().lower() in {"1", "true", "yes", "on"}
         self.include_verbose_api_fields = os.getenv("API_INCLUDE_VERBOSE_FIELDS", "1").strip().lower() in {"1", "true", "yes", "on"}
         self.enable_session_cache_short_circuit = os.getenv("ENABLE_SESSION_CACHE_SHORT_CIRCUIT", "1").strip().lower() in {"1", "true", "yes", "on"}
         self.session_cache_short_circuit_min_similarity = float(os.getenv("SESSION_CACHE_SHORT_CIRCUIT_MIN_SIMILARITY", "0.82"))
+        self.default_search_cap = max(2, min(15, self._safe_env_int("CLAIM_PIPELINE_DEFAULT_SEARCH_CAP", 8)))
+        self.max_search_cap = max(self.default_search_cap, min(20, self._safe_env_int("CLAIM_PIPELINE_MAX_SEARCH_CAP", 15)))
+        self.retrieval_v2_candidate_sentences_per_doc = max(2, min(8, self._safe_env_int("RETRIEVAL_V2_CANDIDATE_SENTENCES_PER_DOC", 4)))
+        self.retrieval_v2_max_selected_docs = max(2, min(12, self._safe_env_int("RETRIEVAL_V2_MAX_SELECTED_DOCS", 6)))
+        self.retrieval_v2_passages_per_doc = max(1, min(4, self._safe_env_int("RETRIEVAL_V2_PASSAGES_PER_DOC", 2)))
+        self.retrieval_v2_max_selected_passages = max(4, min(20, self._safe_env_int("RETRIEVAL_V2_MAX_SELECTED_PASSAGES", 10)))
+
+    @staticmethod
+    def _safe_env_int(name, default):
+        try:
+            return int(str(os.getenv(name, str(default))).strip())
+        except Exception:
+            return default
 
     @staticmethod
     def _normalize_source_modality(source_modality):
@@ -832,11 +846,21 @@ class ClaimPipeline:
         return modality, profiles[modality]
 
     def _trim_evidence_payload(self, rows):
+        # Deduplicate by normalized text and limit to top 4 by combined_score
+        seen = set()
         trimmed = []
-        for row in rows or []:
+        for row in sorted(rows or [], key=lambda x: float(x.get("combined_score", 0.0)), reverse=True):
+            text = (row.get("text") or "").strip().lower()
+            if not text or text in seen:
+                continue
+            if len(text.split()) < 6 or len(text.split()) > 80:
+                continue
+            seen.add(text)
             item = dict(row)
             item.pop("context_text", None)
             trimmed.append(item)
+            if len(trimmed) >= 4:
+                break
         return trimmed
 
     @staticmethod
@@ -852,6 +876,45 @@ class ClaimPipeline:
             progress_callback(event)
         except Exception:
             return
+
+    @staticmethod
+    def _dedupe_scored_evidence_by_url(rows, max_per_url=1):
+        try:
+            max_per_url = max(1, int(max_per_url))
+        except Exception:
+            max_per_url = 1
+
+        grouped = {}
+        for row in rows or []:
+            item = dict(row or {})
+            url = str(item.get("url") or "").strip().lower()
+            if not url:
+                continue
+            grouped.setdefault(url, []).append(item)
+
+        deduped = []
+        for _, items in grouped.items():
+            ranked = sorted(
+                items,
+                key=lambda item: (
+                    float(item.get("combined_score") or 0.0),
+                    float(item.get("relevance_score") or 0.0),
+                    float(item.get("quality_score") or 0.0),
+                    float(item.get("weight") or 0.0),
+                ),
+                reverse=True,
+            )
+            deduped.extend(ranked[:max_per_url])
+
+        deduped.sort(
+            key=lambda item: (
+                float(item.get("combined_score") or 0.0),
+                float(item.get("relevance_score") or 0.0),
+                float(item.get("quality_score") or 0.0),
+            ),
+            reverse=True,
+        )
+        return deduped
 
     @staticmethod
     async def _flush_progress():
@@ -1143,6 +1206,10 @@ class ClaimPipeline:
             self._retrieval_v2 = RetrievalPipelineV2(
                 relevance_scorer=self.relevance_scorer,
                 quality_scorer=self.quality_scorer,
+                candidate_sentences_per_doc=self.retrieval_v2_candidate_sentences_per_doc,
+                max_selected_docs=self.retrieval_v2_max_selected_docs,
+                passages_per_doc=self.retrieval_v2_passages_per_doc,
+                max_selected_passages=self.retrieval_v2_max_selected_passages,
             )
         return self._retrieval_v2
 
@@ -1294,7 +1361,7 @@ class ClaimPipeline:
         stance_rows = [r for r in result_rows if str(r.get("stance", "")).upper() in {"SUPPORT", "REFUTE", "NEUTRAL"}]
         support_count = len([r for r in stance_rows if str(r.get("stance", "")).upper() == "SUPPORT"])
         refute_count = len([r for r in stance_rows if str(r.get("stance", "")).upper() == "REFUTE"])
-        conflict_penalty = 0.08 if support_count > 0 and refute_count > 0 else 0.0
+        conflict_penalty = 0.16 if support_count > 0 and refute_count > 0 else 0.0
 
         confidence = (
             0.10
@@ -1306,16 +1373,18 @@ class ClaimPipeline:
             - conflict_penalty
         )
 
-        upper = 0.60 if forced_neutral else 0.72
+        upper = 0.58 if forced_neutral else 0.66
         return round(max(0.08, min(upper, confidence)), 3)
 
-    async def run(self, claim, source_url=None, source_text=None, source_language=None, source_modality="text", allow_llm_verifier=None, cancel_event=None, progress_callback=None, search_cap=6, _expanded_retry_done=False):
+    async def run(self, claim, source_url=None, source_text=None, source_language=None, source_modality="text", allow_llm_verifier=None, cancel_event=None, progress_callback=None, search_cap=None, _expanded_retry_done=False, force_fresh_retrieval=False):
         self._raise_if_cancelled(cancel_event)
+        if search_cap is None:
+            search_cap = self.default_search_cap
         try:
             search_cap = int(search_cap)
         except Exception:
-            search_cap = 6
-        search_cap = max(2, min(10, search_cap))
+            search_cap = self.default_search_cap
+        search_cap = max(2, min(self.max_search_cap, search_cap))
 
         original_claim = claim
         normalized_modality, scoring_profile = self._scoring_profile_for_modality(source_modality)
@@ -1323,6 +1392,9 @@ class ClaimPipeline:
         await self._flush_progress()
         ux_warnings = _build_ux_warnings(claim)
         llm_verifier_enabled = self.enable_llm_verifier if allow_llm_verifier is None else bool(allow_llm_verifier)
+        if normalized_modality == "image":
+            llm_verifier_enabled = False
+        verifier_v2_enabled = self.enable_verifier_v2 and normalized_modality != "image"
 
         # trace object for debugging pipeline flow
         trace = {
@@ -1467,7 +1539,7 @@ class ClaimPipeline:
             normalized_source_text = normalize_claim(normalized_source_text)
 
         cached_evidence_raw = []
-        if not _expanded_retry_done:
+        if not _expanded_retry_done and not force_fresh_retrieval:
             cached_evidence_raw = self._get_document_source_cache_hits(
                 source_url=source_url,
                 source_text=normalized_source_text,
@@ -1495,6 +1567,10 @@ class ClaimPipeline:
                 print("Evidence retrieved from session cache:", len(evidence_raw))
         else:
             try:
+                retrieval_source_cap = search_cap
+                if normalized_modality == "image":
+                    retrieval_source_cap = min(self.max_search_cap, max(search_cap + 2, search_cap))
+
                 evidence_raw = await self.router.get_evidence(
                     claim,
                     exclude_domain=exclude_domain,
@@ -1505,8 +1581,8 @@ class ClaimPipeline:
                     language=language,
                     source_text=normalized_source_text,
                     progress_callback=progress_callback,
-                    max_sources=search_cap,
-                    force_refresh=bool(_expanded_retry_done),
+                    max_sources=retrieval_source_cap,
+                    force_refresh=bool(_expanded_retry_done or force_fresh_retrieval),
                 )
             except asyncio.CancelledError:
                 return {
@@ -1811,6 +1887,9 @@ class ClaimPipeline:
         print(f"Domain diversity filter - score: {diversity_score:.2f}")
         print("Domain diversity filtering:", round(time.time() - start_diversity, 3), "sec")
 
+        # Avoid duplicate source rows from the same URL in final evidence output.
+        scored_evidence = self._dedupe_scored_evidence_by_url(scored_evidence, max_per_url=1)
+
         scored_evidence = scored_evidence[:search_cap]
 
         trace["session_cache_store"] = self._session_retrieval_cache.store(
@@ -1834,8 +1913,9 @@ class ClaimPipeline:
 
         results = []
         stance_results = None
-        if not self.enable_verifier_v2:
-            highlighted_texts = [ev["text"] for ev in scored_evidence]
+        if not verifier_v2_enabled:
+            # Use context window for stance detection if available
+            highlighted_texts = [ev.get("context_text") or ev["text"] for ev in scored_evidence]
             stance_results = self.stance.detect_many(highlighted_texts, claim)
 
         for index, ev in enumerate(scored_evidence):
@@ -1851,10 +1931,10 @@ class ClaimPipeline:
             ).decode(sys.stdout.encoding or "utf-8", errors="replace")
             print("Evidence:", safe_highlighted)
 
-            verifier_input = ev.get("context_text") if self.enable_verifier_v2 else None
+            verifier_input = ev.get("context_text") if verifier_v2_enabled else None
             if verifier_input is not None:
                 verifier_input = _sanitize_evidence_text(verifier_input)
-            if self.enable_verifier_v2:
+            if verifier_v2_enabled:
                 stance_result = self.verifier_v2.verify(claim, highlighted, verifier_input)
             else:
                 stance_result = stance_results[index]
@@ -2029,8 +2109,14 @@ class ClaimPipeline:
             forced_neutral = True
 
         all_neutral = bool(results) and all(str(r.get("stance", "")).upper() == "NEUTRAL" for r in results)
-        if verdict == "NEUTRAL" and all_neutral and search_cap < 10 and not _expanded_retry_done:
-            print("All evidence remained neutral; retrying with expanded source cap to 10.")
+        if (
+            verdict == "NEUTRAL"
+            and all_neutral
+            and search_cap < self.max_search_cap
+            and not _expanded_retry_done
+            and self.enable_neutral_expanded_retry
+        ):
+            print(f"All evidence remained neutral; retrying with expanded source cap to {self.max_search_cap}.")
             return await self.run(
                 original_claim,
                 source_url=source_url,
@@ -2040,7 +2126,7 @@ class ClaimPipeline:
                 allow_llm_verifier=allow_llm_verifier,
                 cancel_event=cancel_event,
                 progress_callback=progress_callback,
-                search_cap=10,
+                search_cap=self.max_search_cap,
                 _expanded_retry_done=True,
             )
 
@@ -2086,6 +2172,28 @@ class ClaimPipeline:
                 scored_evidence=scored_evidence,
                 forced_neutral=True,
             )
+
+        # Guardrail: mixed support/refute evidence with weak margin should not end as TRUE/FALSE.
+        if verdict in {"TRUE", "FALSE"} and support_items and refute_items:
+            support_strength = sum(
+                float(r.get("confidence", 0.0) or 0.0) * float(r.get("weight", 0.0) or 0.0)
+                for r in support_items
+            )
+            refute_strength = sum(
+                float(r.get("confidence", 0.0) or 0.0) * float(r.get("weight", 0.0) or 0.0)
+                for r in refute_items
+            )
+            total_strength = support_strength + refute_strength
+            strength_margin = abs(support_strength - refute_strength) / max(total_strength, 1e-6)
+            if confidence < 0.4 or strength_margin < 0.2:
+                verdict = "NEUTRAL"
+                forced_neutral = True
+                conflict_summary = "Conflicting support/refute evidence with weak decision margin"
+                confidence = self._compute_neutral_confidence(
+                    results=results,
+                    scored_evidence=scored_evidence,
+                    forced_neutral=True,
+                )
 
         capital_rescue = _capital_relation_rescue(claim, results, context_result=context_result)
         if capital_rescue and verdict == "NEUTRAL":

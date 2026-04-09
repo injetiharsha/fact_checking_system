@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import subprocess
 import sys
@@ -30,14 +31,14 @@ class ClaimCheckabilityClassifier:
     def __init__(self):
         self.model_mode = "heuristic"
         self.trained_checkpoint = None
-        self.trained_device = "cpu"
+        self.trained_device = os.getenv("CLAIM_CHECKABILITY_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")
         self.helper_script = Path(__file__).with_name("checkability_subprocess_infer.py")
 
         runtime = runtime_model_settings("claim_checkability")
         checkpoint = runtime.get("checkpoint")
         if runtime.get("enabled") and checkpoint is not None:
             self.trained_checkpoint = Path(checkpoint)
-            self.trained_device = runtime.get("device") or "cpu"
+            self.trained_device = runtime.get("device") or ("cuda" if torch.cuda.is_available() else "cpu")
             self.model_mode = "trained_multiclass"
             print(
                 "ClaimCheckabilityClassifier configured for trained checkpoint:",

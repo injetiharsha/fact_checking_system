@@ -63,7 +63,11 @@ def _sanitize_ipc_text(text, max_chars=1200):
 
 
 class NLIModel:
-    TRAINED_CONFIDENCE_THRESHOLD = 0.58
+    def _print_device_once(self):
+        if not hasattr(self, "_device_printed"):
+            print(f"[NLIModel] Device in use for claim analysis: {self.device} (CUDA available: {torch.cuda.is_available()})")
+            self._device_printed = True
+            self.TRAINED_CONFIDENCE_THRESHOLD = 0.58
 
     def __init__(self):
         self._lock = threading.Lock()
@@ -219,6 +223,7 @@ class NLIModel:
                 pass
 
     def predict(self, claim, evidence):
+        self._print_device_once()
         cache_key = (
             " ".join((claim or "").strip().lower().split()),
             " ".join((evidence or "").strip().lower().split()),
@@ -318,7 +323,8 @@ class NLIModel:
         self._prediction_cache[cache_key] = result
         return result
 
-    def predict_many(self, claim, evidences):
+    def predict_many(self, claim, evidences, batch_size=16):
+        self._print_device_once()
         if not evidences:
             return []
 
@@ -335,18 +341,54 @@ class NLIModel:
             else:
                 missing.append((index, evidence, cache_key))
 
-        if missing:
-            worker_predictions = None
-            if self.trained_checkpoint is not None and (self.model is None or self.tokenizer is None):
-                worker_predictions = self._predict_many_with_worker(
-                    claim,
-                    [item[1] for item in missing],
-                )
-            if worker_predictions is not None:
-                for (index, _, cache_key), prediction in zip(missing, worker_predictions):
-                    self._prediction_cache[cache_key] = prediction
-                    outputs[index] = prediction
+        # Split into batches to avoid OOM
+        def batcher(seq, size):
+            for pos in range(0, len(seq), size):
+                yield seq[pos:pos+size]
 
+        def run_batch(batch_claim, batch_evidences):
+            try:
+                return self._predict_with_cached_model_many(batch_claim, batch_evidences)
+            except RuntimeError as e:
+                if "out of memory" in str(e).lower() and self.device.type == "cuda":
+                    print("[NLIModel] CUDA OOM, retrying on CPU...")
+                    torch.cuda.empty_cache()
+                    self.device = torch.device("cpu")
+                    self.model.to(self.device)
+                    return self._predict_with_cached_model_many(batch_claim, batch_evidences)
+                else:
+                    raise
+
+        # Helper for batch prediction
+        def _predict_with_cached_model_many(claim, evidences):
+            inputs = self.tokenizer(
+                [claim] * len(evidences),
+                evidences,
+                return_tensors="pt",
+                truncation=True,
+                padding=True,
+            ).to(self.device)
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                probs = F.softmax(outputs.logits, dim=1)
+                predicted = torch.argmax(probs, dim=1).tolist()
+                confidences = probs.max(dim=1).values.tolist()
+                labels = [self.model.config.id2label.get(idx, f"LABEL_{idx}") for idx in predicted]
+                return list(zip(labels, confidences))
+
+        self._predict_with_cached_model_many = _predict_with_cached_model_many
+
+        if missing and self.model is not None and self.tokenizer is not None:
+            for batch in batcher(missing, batch_size):
+                batch_indices = [item[0] for item in batch]
+                batch_evidences = [item[1] for item in batch]
+                batch_keys = [item[2] for item in batch]
+                batch_results = run_batch(claim, batch_evidences)
+                for idx, result, key in zip(batch_indices, batch_results, batch_keys):
+                    self._prediction_cache[key] = result
+                    outputs[idx] = result
+
+        # Fallback for missing predictions
         for index, evidence in enumerate(evidences):
             if outputs[index] is None:
                 outputs[index] = self.predict(claim, evidence)
@@ -468,4 +510,3 @@ class NLIModel:
                 if allow_retry:
                     return self._predict_many_with_worker(claim, evidences, allow_retry=False)
                 return None
-
