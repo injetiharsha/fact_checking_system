@@ -1,0 +1,51 @@
+premise,hypothesis,label
+"The sky is blue.","The sky is green.",REFUTE
+"COVID-19 vaccines are effective.","Vaccines do not work against COVID-19.",REFUTE
+"The capital of France is Paris.","Paris is the capital of France.",SUPPORT
+"Water boils at 100 degrees Celsius.","Water boils at 90 degrees Celsius.",REFUTE
+"The earth revolves around the sun.","The sun revolves around the earth.",REFUTE
+"Python is a programming language.","Python is a type of snake.",NEUTRAL
+"Mount Everest is the tallest mountain.","Mount Everest is the smallest mountain.",REFUTE
+"The Great Wall of China is visible from space.","The Great Wall of China is not visible from space.",NEUTRAL
+"Bananas are yellow.","Bananas are blue.",REFUTE
+"Dogs are mammals.","Dogs are reptiles.",REFUTE
+"The internet is a global network.","The internet is a local network.",REFUTE
+"Fish can swim.","Fish can fly.",REFUTE
+"The sun rises in the east.","The sun rises in the west.",REFUTE
+"A triangle has three sides.","A triangle has four sides.",REFUTE
+"Water is wet.","Water is dry.",REFUTE
+"Birds can fly.","Birds cannot fly.",NEUTRAL
+"The moon orbits the earth.","The earth orbits the moon.",REFUTE
+"Chocolate is sweet.","Chocolate is bitter.",NEUTRAL
+"A year has 12 months.","A year has 10 months.",REFUTE
+"Cats are mammals.","Cats are birds.",REFUTE
+"The Pacific is the largest ocean.","The Atlantic is the largest ocean.",REFUTE
+"Humans need oxygen to live.","Humans do not need oxygen.",REFUTE
+"The Amazon is a rainforest.","The Amazon is a desert.",REFUTE
+"Gold is a metal.","Gold is a gas.",REFUTE
+"The Sahara is a desert.","The Sahara is a forest.",REFUTE
+"The Statue of Liberty is in New York.","The Statue of Liberty is in Paris.",REFUTE
+"The human heart pumps blood.","The human heart pumps air.",REFUTE
+"A square has four equal sides.","A square has three equal sides.",REFUTE
+"The speed of light is faster than sound.","Sound is faster than light.",REFUTE
+"The Great Wall of China is in China.","The Great Wall of China is in India.",REFUTE
+"The Nile is the longest river in Africa.","The Nile is the shortest river in Africa.",REFUTE
+"The human brain controls the body.","The human brain controls the weather.",REFUTE
+"Diamonds are hard.","Diamonds are soft.",REFUTE
+"The Eiffel Tower is in Paris.","The Eiffel Tower is in London.",REFUTE
+"The currency of Japan is Yen.","The currency of Japan is Dollar.",REFUTE
+"The freezing point of water is 0°C.","The freezing point of water is 100°C.",REFUTE
+"The boiling point of water is 100°C.","The boiling point of water is 0°C.",REFUTE
+"The human body has 206 bones.","The human body has 100 bones.",REFUTE
+"The tallest animal is the giraffe.","The tallest animal is the elephant.",REFUTE
+"The largest planet is Jupiter.","The largest planet is Mars.",REFUTE
+"The smallest continent is Australia.","The smallest continent is Europe.",REFUTE
+"The chemical symbol for water is H2O.","The chemical symbol for water is CO2.",REFUTE
+"The capital of India is New Delhi.","The capital of India is Mumbai.",REFUTE
+"The Sahara is the largest hot desert.","The Sahara is the largest cold desert.",REFUTE
+"The human eye can see light.","The human eye can see sound.",REFUTE
+"The tallest mountain is Mount Everest.","The tallest mountain is K2.",REFUTE
+"The largest mammal is the blue whale.","The largest mammal is the elephant.",REFUTE
+"The coldest continent is Antarctica.","The coldest continent is Africa.",REFUTE
+"The hottest planet is Venus.","The hottest planet is Mercury.",REFUTE
+"The capital of the USA is Washington, D.C.","The capital of the USA is New York.",REFUTE

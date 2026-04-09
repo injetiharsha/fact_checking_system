@@ -1,0 +1,15 @@
+context_class,relevance_level,rows,total_chars,avg_chars
+economics_business,primary,68,28478,418.79411764705884
+entertainment,primary,78,28424,364.4102564102564
+environment_climate,primary,75,28528,380.37333333333333
+general_factual,primary,76,28506,375.07894736842104
+geography,primary,70,28518,407.4
+health,primary,74,28535,385.6081081081081
+history,primary,73,28526,390.7671232876712
+law_crime,primary,82,28567,348.3780487804878
+politics_government,primary,71,28547,402.07042253521126
+science,primary,67,28563,426.3134328358209
+society_culture,primary,74,28567,386.0405405405405
+space_astronomy,primary,77,29344,381.09090909090907
+sports,primary,75,28439,379.18666666666667
+technology,primary,68,28412,417.8235294117647
