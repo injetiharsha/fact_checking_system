@@ -1,5 +1,6 @@
 # semantic/stance_model.py
 
+import os
 import re
 import sys
 from models.stance.nli_model import NLIModel
@@ -26,6 +27,10 @@ class StanceDetector:
     def __init__(self, v2_mode=False):
         self.model = NLIModel()
         self.v2_mode = v2_mode
+        self.enable_polarized_stance = os.getenv("ENABLE_POLARIZED_STANCE", "0").strip().lower() in {"1", "true", "yes", "on"}
+        self.polarized_min_overlap = max(2, int(os.getenv("POLARIZED_STANCE_MIN_OVERLAP", "3")))
+        self.polarized_min_confidence = float(os.getenv("POLARIZED_STANCE_MIN_CONFIDENCE", "0.68"))
+        self.polarized_support_min_confidence = float(os.getenv("POLARIZED_STANCE_SUPPORT_MIN_CONFIDENCE", "0.72"))
 
     def detect(self, evidence, claim):
         evidence = (evidence or "")[:800]
@@ -87,6 +92,15 @@ class StanceDetector:
         if overlap >= self.LEXICAL_RESCUE_MIN_OVERLAP and any(c in text for c in refute_cues):
             return {"stance": "REFUTE", "confidence": 0.62, "source": "heuristic_refute_rescue"}
 
+        polarized = self._polarize_neutral_stance(
+            claim=claim,
+            evidence=evidence,
+            confidence=float(confidence),
+            overlap=overlap,
+        )
+        if polarized is not None:
+            return polarized
+
         return {
             "stance": "NEUTRAL",
             "confidence": round(confidence, 3),
@@ -141,6 +155,16 @@ class StanceDetector:
                 continue
             if overlap >= self.LEXICAL_RESCUE_MIN_OVERLAP and any(c in text for c in refute_cues):
                 results.append({"stance": "REFUTE", "confidence": 0.62, "source": "heuristic_refute_rescue"})
+                continue
+
+            polarized = self._polarize_neutral_stance(
+                claim=claim,
+                evidence=evidence,
+                confidence=float(confidence),
+                overlap=overlap,
+            )
+            if polarized is not None:
+                results.append(polarized)
                 continue
 
             results.append({
@@ -465,5 +489,67 @@ class StanceDetector:
             or any(token in evidence_text for token in ("founded", "established", "fell", "began", "created", "started", "officially began"))
         )
         return temporal_claim and temporal_evidence
+
+    def _polarize_neutral_stance(self, claim, evidence, confidence, overlap):
+        if not self.enable_polarized_stance:
+            return None
+        if overlap < self.polarized_min_overlap:
+            return None
+
+        claim_text = (claim or "").lower()
+        evidence_text = (evidence or "").lower()
+
+        if self._has_reporting_quote_context(evidence_text):
+            return None
+
+        if self._has_explicit_refute_language(evidence_text):
+            return {
+                "stance": "REFUTE",
+                "confidence": round(max(0.6, min(float(confidence), 0.74)), 3),
+                "source": "polarized_refute_inference",
+            }
+
+        support_shapes = (
+            " is ",
+            " are ",
+            " was ",
+            " were ",
+            " has ",
+            " have ",
+            " consists of ",
+            " refers to ",
+        )
+        has_support_shape = any(marker in f" {evidence_text} " for marker in support_shapes)
+        claim_tokens = {
+            t for t in re.findall(r"[a-z0-9]+", claim_text)
+            if len(t) > 2 and t not in {"the", "and", "for", "with", "from", "that"}
+        }
+        evidence_tokens = set(re.findall(r"[a-z0-9]+", evidence_text))
+        token_overlap = len(claim_tokens & evidence_tokens)
+
+        if (
+            float(confidence) >= self.polarized_support_min_confidence
+            and token_overlap >= self.polarized_min_overlap
+            and has_support_shape
+            and not self._has_explicit_refute_language(evidence_text)
+        ):
+            return {
+                "stance": "SUPPORT",
+                "confidence": round(max(0.6, min(float(confidence), 0.76)), 3),
+                "source": "polarized_support_inference",
+            }
+
+        if (
+            float(confidence) >= self.polarized_min_confidence
+            and token_overlap >= max(self.polarized_min_overlap + 1, 4)
+            and not self._has_explicit_refute_language(evidence_text)
+        ):
+            return {
+                "stance": "SUPPORT",
+                "confidence": round(max(0.58, min(float(confidence), 0.7)), 3),
+                "source": "polarized_support_inference",
+            }
+
+        return None
 
 

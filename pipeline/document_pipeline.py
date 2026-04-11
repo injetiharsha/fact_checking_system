@@ -1,3 +1,5 @@
+
+
 import os
 import re
 import time
@@ -20,6 +22,17 @@ class DocumentPipeline:
     def __init__(self):
         self.web_ingestor = WebpageIngestor()
         self.extractor = ClaimExtractor()
+        # For PDF, add premium search backends and trusted sources as additional help (not exclusive)
+        if os.getenv("PDF_USE_PREMIUM_SEARCH", "1").strip().lower() in {"1", "true", "yes", "on"}:
+            # If not already present, add premium backends to the backend order
+            current_policy = os.getenv("SEARCH_POLICY", "hybrid").strip().lower()
+            if current_policy == "hybrid":
+                # Hybrid: cheap first, then premium
+                os.environ["SEARCH_POLICY"] = "hybrid"
+            else:
+                os.environ["SEARCH_POLICY"] = current_policy
+            # Add a flag to let evidence/router.py or general_search.py prioritize trusted sources if available
+            os.environ["TRUSTED_SOURCES_PREFERRED"] = "1"
         self.claim_pipeline = ClaimPipeline()
         self.context_summary_mode = os.getenv("CONTEXT_SUMMARY_MODE", "extractive").strip().lower()
         self.context_summary_max_chars = max(120, int(os.getenv("CONTEXT_SUMMARY_MAX_CHARS", "280")))
@@ -44,15 +57,15 @@ class DocumentPipeline:
             or "gpt-4o-mini"
         )
         self.context_llm_timeout = float(os.getenv("LLM_CONTEXT_TIMEOUT_SECONDS", "30"))
-        self.pdf_analysis_max_pages = self._safe_env_int("PDF_ANALYSIS_MAX_PAGES", 4)
+        self.pdf_analysis_max_pages = self._safe_env_int("PDF_ANALYSIS_MAX_PAGES", 8)
         # Guardrails for claim-selection latency on long OCR/text blocks.
-        self.claim_selection_max_candidates = self._safe_env_int("CLAIM_SELECTION_MAX_CANDIDATES", 36)
-        self.image_claim_selection_max_blocks = self._safe_env_int("IMAGE_CLAIM_SELECTION_MAX_BLOCKS", 72)
-        self.image_claim_candidates_to_evaluate = max(3, min(5, self._safe_env_int("IMAGE_CLAIM_CANDIDATES_TO_EVALUATE", 3)))
-        self.image_candidate_precheck_search_cap = max(2, min(10, self._safe_env_int("IMAGE_CLAIM_PRECHECK_SEARCH_CAP", 5)))
+        self.claim_selection_max_candidates = self._safe_env_int("CLAIM_SELECTION_MAX_CANDIDATES", 60)
+        self.image_claim_selection_max_blocks = self._safe_env_int("IMAGE_CLAIM_SELECTION_MAX_BLOCKS", 120)
+        self.image_claim_candidates_to_evaluate = max(5, min(10, self._safe_env_int("IMAGE_CLAIM_CANDIDATES_TO_EVALUATE", 7)))
+        self.image_candidate_precheck_search_cap = max(5, min(20, self._safe_env_int("IMAGE_CLAIM_PRECHECK_SEARCH_CAP", 10)))
         self.image_candidate_final_search_cap = max(
             self.image_candidate_precheck_search_cap,
-            min(15, self._safe_env_int("IMAGE_CLAIM_FINAL_SEARCH_CAP", 10)),
+            min(25, self._safe_env_int("IMAGE_CLAIM_FINAL_SEARCH_CAP", 20)),
         )
 
     def _safe_env_int(self, name, default):
@@ -126,6 +139,11 @@ class DocumentPipeline:
         return await self._process_text(text, source_url=url, source_modality="web")
 
     async def process_pdf(self, file_path, page_range=None, cancel_event=None, progress_callback=None):
+        # --- PAGE RANGE FILTERING ---
+        analysis_warning = None
+        last_page_results = []
+        last_page_summaries = []
+        last_aggregate_verdicts = []
         total_start = time.time()
         self._emit_progress(progress_callback, stage="document_parse", status="active", detail="Extracting PDF text and page structure")
         await self._flush_progress()
@@ -136,6 +154,8 @@ class DocumentPipeline:
         self._raise_if_cancelled(cancel_event)
         text = (pdf_result or {}).get("text", "")
         pages = list((pdf_result or {}).get("pages") or [])
+        print(f"[DEBUG] Extracted PDF text (first 200 chars): {text[:200]}")
+        print(f"[DEBUG] Number of pages extracted: {len(pages)}")
         total_pages_detected = len(pages)
         self._emit_progress(progress_callback, stage="document_parse", status="done", detail=f"Extracted {total_pages_detected or 1} page(s)")
         await self._flush_progress()
@@ -143,6 +163,7 @@ class DocumentPipeline:
         source_language = self._infer_source_language(text, ocr_details)
 
         if not text:
+            print("[DEBUG] Early return: text is empty", flush=True)
             return {"error": "Could not extract text"}
 
         if ocr_details is not None and not ocr_details.get("usable", False):
@@ -161,41 +182,49 @@ class DocumentPipeline:
             }
 
         if not pages:
+            print("[DEBUG] Early return: pages is empty, using fallback page", flush=True)
             pages = [{
                 "page_number": 1,
                 "text": text,
                 "source": (pdf_result or {}).get("extraction_source", "pdf"),
             }]
+        print("[DEBUG] After not pages block", flush=True)
+        print(f"[DEBUG] pages length: {len(pages)}", flush=True)
+        if pages:
+            print(f"[DEBUG] pages[0] keys: {list(pages[0].keys())}", flush=True)
+            print(f"[DEBUG] pages[0] text (first 100 chars): {pages[0].get('text','')[:100]}", flush=True)
 
-        selected_page_range = self._parse_page_range(page_range, total_pages_detected)
-        if selected_page_range:
-            start_page, end_page = selected_page_range
-            pages = [
-                page for page in pages
-                if start_page <= int((page or {}).get("page_number") or 0) <= end_page
-            ]
-            if not pages:
-                raise ValueError("No pages matched the selected page range.")
+        # --- PAGE RANGE FILTERING ---
+        filtered_pages = pages
+        if page_range:
+            try:
+                start, end = self._parse_page_range(page_range, len(pages))
+                filtered_pages = [p for p in pages if start <= (p.get("page_number", 0) or 0) <= end]
+                print(f"[DEBUG] Filtering pages: {start}-{end}, got {len(filtered_pages)} pages", flush=True)
+            except Exception as e:
+                print(f"[DEBUG] Page range parse error: {e}", flush=True)
+                filtered_pages = pages
+        else:
+            print("[DEBUG] No page_range specified, using all pages", flush=True)
 
-        if self.pdf_analysis_max_pages > 0:
-            pages = pages[:self.pdf_analysis_max_pages]
+        print("[DEBUG] About to call _assign_sections_to_pages", flush=True)
+        sectionized_pages = self._assign_sections_to_pages(filtered_pages)
+        print(f"[DEBUG] sectionized_pages length: {len(sectionized_pages)}", flush=True)
+        for i, sp in enumerate(sectionized_pages):
+            t = sp.get('text', '')
+            print(f"[DEBUG] Sectionized Page {i+1} text length: {len(t)} | preview: {t[:100]}", flush=True)
+        if sectionized_pages:
+            print(f"[DEBUG] Proceeding to claim extraction for {len(sectionized_pages)} sectionized pages", flush=True)
+            print(f"[DEBUG] sectionized_pages[0] keys: {list(sectionized_pages[0].keys())}", flush=True)
+            print(f"[DEBUG] sectionized_pages[0] text (first 100 chars): {sectionized_pages[0].get('text','')[:100]}", flush=True)
 
-        analysis_warning = None
-        if total_pages_detected > 5:
-            analysis_warning = (
-                f"Time-intensive PDF detected ({total_pages_detected} pages). "
-                f"Analyzing first {len(pages)} pages only."
-            )
-        if selected_page_range:
-            selected_note = f"Selected pages {selected_page_range[0]}-{selected_page_range[1]}."
-            analysis_warning = f"{selected_note} {analysis_warning}".strip() if analysis_warning else selected_note
-
-        sectionized_pages = self._assign_sections_to_pages(pages)
         section_text_by_key = {}
         section_topic_by_key = {}
         for page in sectionized_pages:
             self._raise_if_cancelled(cancel_event)
             page_text = (page or {}).get("text", "")
+            print(f"[DEBUG] PDF page {page.get('page_number')} extracted text (first 200 chars): {page_text[:200]}", flush=True)
+            print(f"[DEBUG] PDF page {page.get('page_number')} text length: {len(page_text)}", flush=True)
             section_key = (page or {}).get("section_key", "document_overview")
             section_topic = (page or {}).get("section_topic", "Document Overview")
             if page_text and page_text.strip():
@@ -207,124 +236,328 @@ class DocumentPipeline:
             for key, chunks in section_text_by_key.items()
         }
 
-        page_results = []
+        # --- PDF claim analysis: loop/parallel style like image/text pipeline ---
+        all_claim_candidates = []
+        for page in sectionized_pages:
+            page_text = (page or {}).get("text", "")
+            claim_selection = self._select_text_main_claim(page_text, self._should_use_pdf_fast_path(page))
+            candidates = claim_selection.get("candidates", [])
+            claim_texts = [self._clean_image_candidate((c or {}).get("text", "")) for c in candidates]
+            if not claim_texts:
+                claim_texts = [claim_selection.get("claim")] if claim_selection.get("claim") else []
+            all_claim_candidates.append(claim_texts)
+
+        # --- Improved claim and evidence reporting ---
+        candidate_results = []
         page_summaries = []
         aggregate_verdicts = []
-        for page in sectionized_pages:
+        section_overview_map = {}
+        for idx, page in enumerate(sectionized_pages):
             self._raise_if_cancelled(cancel_event)
             page_text = (page or {}).get("text", "")
-            if not page_text or not page_text.strip():
-                continue
-
             page_number = (page or {}).get("page_number")
             page_source = (page or {}).get("source")
             section_key = (page or {}).get("section_key", "document_overview")
             section_topic = (page or {}).get("section_topic", "Document Overview")
-            summary_start = time.time()
-            page_context_summary = await asyncio.to_thread(self._generate_context_summary, page_text, section_topic)
-            print(f"PDF page {page_number} context summary:", round(time.time() - summary_start, 3), "sec")
-            selection_start = time.time()
-            self._emit_progress(
-                progress_callback,
-                stage="claim_selection",
-                status="active",
-                detail=f"Selecting claim from page {page_number}",
-                substep=f"page_{page_number}",
-                substatus="active",
-            )
-            await self._flush_progress()
-            selection = await asyncio.to_thread(
-                self._select_text_main_claim,
-                page_text,
-                self._should_use_pdf_fast_path(page),
-            )
-            print(f"PDF page {page_number} claim selection:", round(time.time() - selection_start, 3), "sec")
-            self._emit_progress(
-                progress_callback,
-                stage="claim_selection",
-                status="active",
-                detail=f"Selected claim on page {page_number}",
-                substep=f"page_{page_number}",
-                substatus="done",
-            )
-            await self._flush_progress()
-            selected_claim = selection.get("claim")
-
-            for stage_id in ("structured_api", "web_search", "extraction", "relevance", "stance", "verdict"):
-                self._emit_progress(
-                    progress_callback,
-                    stage=stage_id,
-                    status="pending",
-                    detail=f"Waiting for page {page_number}",
+            claim_candidates = all_claim_candidates[idx]
+            page_claims = []
+            for selected_claim in claim_candidates:
+                page_result = await self._process_text(
+                    page_text,
+                    ocr_details=None,
+                    selected_claim=selected_claim,
+                    source_text=section_context_by_key.get(section_key) or page_text,
+                    source_language=source_language,
+                    source_modality="pdf",
+                    allow_llm_verifier=True,
+                    cancel_event=cancel_event,
+                    progress_callback=progress_callback,
                 )
-            await self._flush_progress()
+                if isinstance(page_result, dict):
+                    page_rows = page_result.get("results") if isinstance(page_result.get("results"), list) else []
+                    page_claim_result = dict(page_rows[0]) if page_rows and isinstance(page_rows[0], dict) else dict(page_result)
+                    page_claim_result["page_number"] = page_number
+                    page_claim_result["page_source"] = page_source
+                    page_claim_result["section_topic"] = section_topic
+                    page_claim_result["page_analysis"] = page_result
+                    # Print sources for each claim
+                    evidence_rows = page_claim_result.get("evidence_rows", [])
+                    print(f"[RESULT] Page {page_number} Claim: {selected_claim}")
+                    for ev in evidence_rows:
+                        print(f"  Evidence: {ev.get('text','')[:120]} | Source: {ev.get('source','')} | URL: {ev.get('url','')}")
+                    # Force evidence_rows assignment for frontend and debug
+                    page_claim_result["evidence_rows"] = list(evidence_rows) if evidence_rows else []
+                    page_claim_result["evidence"] = list(evidence_rows) if evidence_rows else []
+                    print(f"[DEBUG] Claim evidence count: {len(page_claim_result['evidence'])}")
+                    for ev in page_claim_result["evidence"]:
+                        print(f"  Evidence: {ev.get('text','')[:100]} | Source: {ev.get('source','')} | URL: {ev.get('url','')}")
+                    page_claims.append(page_claim_result)
+            candidate_results.extend(page_claims)
+            # Page-level summary
+            page_summaries.append({
+                "page_number": page_number,
+                "page_source": page_source,
+                "section_topic": section_topic,
+                "claims": page_claims,
+                "context_summary": await asyncio.to_thread(self._generate_context_summary, page_text, section_topic),
+            })
+            # Section overview aggregation
+            section_key_norm = self._normalize_section_key(section_topic)
+            bucket = section_overview_map.setdefault(section_key_norm, {
+                "section_topic": section_topic,
+                "pages": [],
+                "true_claims": 0,
+                "false_claims": 0,
+                "neutral_claims": 0,
+            })
+            if page_number is not None:
+                bucket["pages"].append(page_number)
+            for claim in page_claims:
+                verdict = str(claim.get("final_verdict") or "").upper()
+                if verdict == "TRUE":
+                    bucket["true_claims"] += 1
+                elif verdict == "FALSE":
+                    bucket["false_claims"] += 1
+                else:
+                    bucket["neutral_claims"] += 1
 
-            page_pipeline_start = time.time()
-            page_result = await self._process_text(
-                page_text,
-                ocr_details=None,
-                selected_claim=selected_claim,
-                source_text=section_context_by_key.get(section_key) or page_text,
-                source_language=source_language,
-                source_modality="pdf",
-                allow_llm_verifier=True,
-                cancel_event=cancel_event,
-                progress_callback=progress_callback,
-            )
-            print(f"PDF page {page_number} claim pipeline:", round(time.time() - page_pipeline_start, 3), "sec")
-            if isinstance(page_result, dict):
-                page_rows = page_result.get("results") if isinstance(page_result.get("results"), list) else []
-                page_claim_result = dict(page_rows[0]) if page_rows and isinstance(page_rows[0], dict) else dict(page_result)
-                page_claim_result["page_number"] = page_number
-                page_claim_result["page_source"] = page_source
-                page_claim_result["section_topic"] = section_topic
-                page_claim_result["page_analysis"] = page_result
-                page_results.append(page_claim_result)
+        document_score = score_document(candidate_results)
+        section_overview = []
+        for section_key, bucket in section_overview_map.items():
+            if bucket["false_claims"] > 0 and bucket["false_claims"] >= bucket["true_claims"]:
+                section_verdict = "Likely Unreliable"
+            elif bucket["true_claims"] > 0 and bucket["false_claims"] == 0:
+                section_verdict = "Likely Reliable"
+            else:
+                section_verdict = "Mixed / Needs Review"
+            section_overview.append({
+                "section_topic": bucket["section_topic"],
+                "pages": sorted(bucket["pages"]),
+                "claims_analyzed": bucket["true_claims"] + bucket["false_claims"] + bucket["neutral_claims"],
+                "true_claims": bucket["true_claims"],
+                "false_claims": bucket["false_claims"],
+                "neutral_claims": bucket["neutral_claims"],
+                "section_verdict": section_verdict,
+                "section_context_summary": await asyncio.to_thread(
+                    self._generate_context_summary,
+                    section_context_by_key.get(section_key, ""),
+                    bucket["section_topic"],
+                ),
+            })
 
-                evidence_rows = page_claim_result.get("evidence") if isinstance(page_claim_result.get("evidence"), list) else []
-                strong_rows = [
-                    row for row in evidence_rows
-                    if str((row or {}).get("evidence_tier", "")).lower() == "strong"
-                ]
-                strongest_row = None
-                if evidence_rows:
-                    strongest_row = max(
-                        evidence_rows,
-                        key=lambda row: float((row or {}).get("combined_score", 0.0) or 0.0),
+        self._emit_progress(
+            progress_callback,
+            stage="verdict",
+            status="active",
+            detail=f"Aggregating document verdict across {len(candidate_results)} claim(s)",
+        )
+        await self._flush_progress()
+        total_elapsed = round(time.time() - total_start, 3)
+        print("TOTAL PDF DOCUMENT PIPELINE TIME:", total_elapsed, "sec")
+        self._emit_progress(
+            progress_callback,
+            stage="verdict",
+            status="done",
+            detail=f"{document_score['verdict']} across {len(candidate_results)} claim(s)",
+        )
+        await self._flush_progress()
+        return {
+            "source_url": None,
+            "ocr_details": ocr_details,
+            "total_pages_detected": total_pages_detected,
+            "claims_analyzed": len(candidate_results),
+            "pages_analyzed": len(sectionized_pages),
+            "analysis_warning": analysis_warning,
+            "pdf_analysis_max_pages": self.pdf_analysis_max_pages,
+            "true_claims": document_score["true"],
+            "false_claims": document_score["false"],
+            "neutral_claims": document_score["neutral"],
+            "document_credibility_score": document_score["score"],
+            "document_verdict": document_score["verdict"],
+            "context_summarizer_mode": self._resolved_summary_mode(),
+            "pipeline_timing_seconds": {
+                "total": total_elapsed,
+            },
+            "page_results": page_summaries,
+            "aggregate_verdicts": aggregate_verdicts,
+            "section_overview": section_overview,
+            "results": candidate_results,
+        }
+        analysis_warning = None
+        last_page_results = []
+        last_page_summaries = []
+        last_aggregate_verdicts = []
+        total_start = time.time()
+        self._emit_progress(progress_callback, stage="document_parse", status="active", detail="Extracting PDF text and page structure")
+        await self._flush_progress()
+        self._raise_if_cancelled(cancel_event)
+        extract_start = time.time()
+        pdf_result = await asyncio.to_thread(extract_pdf_with_details, file_path)
+        print("PDF extract:", round(time.time() - extract_start, 3), "sec")
+        self._raise_if_cancelled(cancel_event)
+        text = (pdf_result or {}).get("text", "")
+        pages = list((pdf_result or {}).get("pages") or [])
+        print(f"[DEBUG] Extracted PDF text (first 200 chars): {text[:200]}")
+        print(f"[DEBUG] Number of pages extracted: {len(pages)}")
+        total_pages_detected = len(pages)
+        self._emit_progress(progress_callback, stage="document_parse", status="done", detail=f"Extracted {total_pages_detected or 1} page(s)")
+        await self._flush_progress()
+        ocr_details = (pdf_result or {}).get("ocr_details")
+        source_language = self._infer_source_language(text, ocr_details)
+
+        if not text:
+            print("[DEBUG] Early return: text is empty", flush=True)
+            return {"error": "Could not extract text"}
+
+        if ocr_details is not None and not ocr_details.get("usable", False):
+            return {
+                "error": "Could not reliably extract text from PDF",
+                "ocr_details": {
+                    "reason": ocr_details.get("reason"),
+                    "avg_confidence": ocr_details.get("avg_confidence"),
+                    "word_count": ocr_details.get("word_count"),
+                    "script_ratio": ocr_details.get("script_ratio"),
+                    "ocr_langs": ocr_details.get("ocr_langs"),
+                    "ocr_pages_scanned": ocr_details.get("ocr_pages_scanned"),
+                    "usable_page_count": ocr_details.get("usable_page_count"),
+                    "text_preview": text[:240],
+                },
+            }
+
+        if not pages:
+            print("[DEBUG] Early return: pages is empty, using fallback page", flush=True)
+            pages = [{
+                "page_number": 1,
+                "text": text,
+                "source": (pdf_result or {}).get("extraction_source", "pdf"),
+            }]
+        print("[DEBUG] After not pages block", flush=True)
+        print(f"[DEBUG] pages length: {len(pages)}", flush=True)
+        if pages:
+            print(f"[DEBUG] pages[0] keys: {list(pages[0].keys())}", flush=True)
+            print(f"[DEBUG] pages[0] text (first 100 chars): {pages[0].get('text','')[:100]}", flush=True)
+
+        for i, page in enumerate(pages):
+            t = page.get("text", "")
+            print(f"[DEBUG] Page {i+1} text length: {len(t)} | preview: {t[:100]}", flush=True)
+
+        print("[DEBUG] About to call _assign_sections_to_pages", flush=True)
+        sectionized_pages = self._assign_sections_to_pages(pages)
+        print(f"[DEBUG] sectionized_pages length: {len(sectionized_pages)}", flush=True)
+        for i, sp in enumerate(sectionized_pages):
+            t = sp.get("text", "")
+            print(f"[DEBUG] Sectionized Page {i+1} text length: {len(t)} | preview: {t[:100]}", flush=True)
+        if sectionized_pages:
+            print(f"[DEBUG] Proceeding to claim extraction for {len(sectionized_pages)} sectionized pages", flush=True)
+            print(f"[DEBUG] sectionized_pages[0] keys: {list(sectionized_pages[0].keys())}", flush=True)
+            print(f"[DEBUG] sectionized_pages[0] text (first 100 chars): {sectionized_pages[0].get('text','')[:100]}", flush=True)
+
+        section_text_by_key = {}
+        section_topic_by_key = {}
+        for page in sectionized_pages:
+            self._raise_if_cancelled(cancel_event)
+            page_text = (page or {}).get("text", "")
+            print(f"[DEBUG] PDF page {page.get('page_number')} extracted text (first 200 chars): {page_text[:200]}", flush=True)
+            print(f"[DEBUG] PDF page {page.get('page_number')} text length: {len(page_text)}", flush=True)
+            section_key = (page or {}).get("section_key", "document_overview")
+            section_topic = (page or {}).get("section_topic", "Document Overview")
+            if page_text and page_text.strip():
+                section_text_by_key.setdefault(section_key, []).append(page_text)
+            section_topic_by_key[section_key] = section_topic
+
+        section_context_by_key = {
+            key: "\n".join(chunks)[:8000]
+            for key, chunks in section_text_by_key.items()
+        }
+
+        max_attempts = 2
+        print(f"[DEBUG] Number of sectionized_pages: {len(sectionized_pages)}; page numbers: {[p.get('page_number') for p in sectionized_pages]}", flush=True)
+        all_claim_candidates = []
+        for page in sectionized_pages:
+            page_text = (page or {}).get("text", "")
+            claim_selection = self._select_text_main_claim(page_text, self._should_use_pdf_fast_path(page))
+            candidates = claim_selection.get("candidates", [])
+            if candidates:
+                print(f"[DEBUG] PDF page {page.get('page_number')} claim candidates: {[c.get('text','')[:100] for c in candidates]}", flush=True)
+            else:
+                print(f"[DEBUG] PDF page {page.get('page_number')} NO claim candidates found.", flush=True)
+            claim_texts = [self._clean_image_candidate((c or {}).get("text", "")) for c in candidates]
+            if not claim_texts:
+                claim_texts = [claim_selection.get("claim")] if claim_selection.get("claim") else []
+            all_claim_candidates.append(claim_texts)
+
+        attempt = 0
+        while attempt < max_attempts:
+            page_results = []
+            page_summaries = []
+            aggregate_verdicts = []
+            for idx, page in enumerate(sectionized_pages):
+                self._raise_if_cancelled(cancel_event)
+                page_text = (page or {}).get("text", "")
+                page_number = (page or {}).get("page_number")
+                page_source = (page or {}).get("source")
+                section_key = (page or {}).get("section_key", "document_overview")
+                section_topic = (page or {}).get("section_topic", "Document Overview")
+                claim_candidates = all_claim_candidates[idx]
+                selected_claim = claim_candidates[attempt] if attempt < len(claim_candidates) else claim_candidates[0] if claim_candidates else ""
+                selection = {"claim": selected_claim, "reason": "retry_loop"}
+
+                for stage_id in ("structured_api", "web_search", "extraction", "relevance", "stance", "verdict"):
+                    self._emit_progress(
+                        progress_callback,
+                        stage=stage_id,
+                        status="pending",
+                        detail=f"Waiting for page {page_number}",
                     )
+                await self._flush_progress()
 
-                page_summaries.append({
-                    "page_number": page_number,
-                    "page_source": page_source,
-                    "section_topic": section_topic,
-                    "page_context_summary": page_context_summary,
-                    "text_preview": page_text[:240],
-                    "selected_claim": selected_claim,
-                    "selection_reason": selection.get("reason"),
-                    "selected_claim_score": selection.get("score"),
-                    "selected_claim_candidates": selection.get("candidates", [])[:3],
-                    "final_verdict": page_claim_result.get("final_verdict"),
-                    "confidence": page_claim_result.get("confidence"),
-                })
-                aggregate_verdicts.append({
-                    "page_number": page_number,
-                    "section_topic": section_topic,
-                    "section_summary": self._build_section_summary(page_text, selected_claim),
-                    "page_context_summary": page_context_summary,
-                    "verdict": page_claim_result.get("final_verdict"),
-                    "confidence": page_claim_result.get("confidence"),
-                    "evidence_strength": "strong" if strong_rows else ("soft" if evidence_rows else "none"),
-                    "evidence_count": len(evidence_rows),
-                    "conflict_analysis": page_claim_result.get("conflict_analysis"),
-                    "strongest_evidence": {
-                        "stance": (strongest_row or {}).get("stance"),
-                        "source": (strongest_row or {}).get("source"),
-                        "url": (strongest_row or {}).get("url"),
-                        "text_preview": ((strongest_row or {}).get("text") or "")[:220],
-                    } if strongest_row else None,
-                })
+                page_pipeline_start = time.time()
+                page_result = await self._process_text(
+                    page_text,
+                    ocr_details=None,
+                    selected_claim=selected_claim,
+                    source_text=section_context_by_key.get(section_key) or page_text,
+                    source_language=source_language,
+                    source_modality="pdf",
+                    allow_llm_verifier=True,
+                    cancel_event=cancel_event,
+                    progress_callback=progress_callback,
+                )
+                print(f"PDF page {page_number} claim pipeline (attempt {attempt+1}):", round(time.time() - page_pipeline_start, 3), "sec")
+                if isinstance(page_result, dict):
+                    page_rows = page_result.get("results") if isinstance(page_result.get("results"), list) else []
+                    page_claim_result = dict(page_rows[0]) if page_rows and isinstance(page_rows[0], dict) else dict(page_result)
+                    page_claim_result["page_number"] = page_number
+                    page_claim_result["page_source"] = page_source
+                    page_claim_result["section_topic"] = section_topic
+                    page_claim_result["page_analysis"] = page_result
+                    page_results.append(page_claim_result)
 
-        document_score = score_document(page_results)
+                    page_context_summary = ""
+                    page_summaries.append({
+                        "page_number": page_number,
+                        "page_source": page_source,
+                        "section_topic": section_topic,
+                        "page_context_summary": page_context_summary,
+                        "text_preview": page_text[:240],
+                        "selected_claim": selected_claim,
+                        "selection_reason": selection.get("reason"),
+                        "selected_claim_score": None,
+                        "selected_claim_candidates": claim_candidates[:3],
+                        "final_verdict": page_claim_result.get("final_verdict"),
+                        "confidence": page_claim_result.get("confidence"),
+                    })
+
+            last_page_results = page_results
+            last_page_summaries = page_summaries
+            last_aggregate_verdicts = aggregate_verdicts
+            if any(str(r.get("final_verdict", "")).upper() in ("TRUE", "FALSE") for r in page_results):
+                break
+            attempt += 1
+
+        page_results = last_page_results
+        page_summaries = last_page_summaries
+        aggregate_verdicts = last_aggregate_verdicts
 
         section_overview_map = {}
         for row in page_results:
@@ -349,6 +582,7 @@ class DocumentPipeline:
             else:
                 bucket["neutral_claims"] += 1
 
+        document_score = score_document(page_results)
         section_overview = []
         for section_key, bucket in section_overview_map.items():
             if bucket["false_claims"] > 0 and bucket["false_claims"] >= bucket["true_claims"]:
@@ -358,10 +592,10 @@ class DocumentPipeline:
             else:
                 section_verdict = "Mixed / Needs Review"
 
-                section_overview.append({
+            section_overview.append({
                 "section_topic": bucket["section_topic"],
                 "pages": sorted(bucket["pages"]),
-                "claims_analyzed": len(bucket["pages"]),
+                "claims_analyzed": bucket["true_claims"] + bucket["false_claims"] + bucket["neutral_claims"],
                 "true_claims": bucket["true_claims"],
                 "false_claims": bucket["false_claims"],
                 "neutral_claims": bucket["neutral_claims"],
@@ -740,7 +974,12 @@ class DocumentPipeline:
 
     def _build_section_summary(self, page_text, selected_claim):
         heading = self._extract_page_heading(page_text)
-        claim = self._clean_image_candidate(selected_claim or "")
+        # If selected_claim is a list, join to string
+        if isinstance(selected_claim, list):
+            claim_str = " ".join([str(c) for c in selected_claim if c])
+        else:
+            claim_str = selected_claim or ""
+        claim = self._clean_image_candidate(claim_str)
         if claim:
             claim = re.sub(r"[\u2022\u2023\u25E6\u2043]+", " ", claim)
             claim = re.sub(r"\s+", " ", claim).strip()
@@ -762,6 +1001,10 @@ class DocumentPipeline:
         return cleaned.replace(" ", "_") or "document_overview"
 
     def _assign_sections_to_pages(self, pages):
+        print(f"[DEBUG] _assign_sections_to_pages: input pages: {len(pages)}", flush=True)
+        for i, page in enumerate(pages):
+            t = (page or {}).get('text', '')
+            print(f"[DEBUG] Input Page {i+1} text length: {len(t)} | preview: {t[:100]}", flush=True)
         assigned = []
         current_topic = "Document Overview"
 
@@ -776,6 +1019,10 @@ class DocumentPipeline:
             row["section_key"] = self._normalize_section_key(current_topic)
             assigned.append(row)
 
+        print(f"[DEBUG] _assign_sections_to_pages: output sectionized pages: {len(assigned)}", flush=True)
+        for i, row in enumerate(assigned):
+            t = row.get('text', '')
+            print(f"[DEBUG] Sectionized Page {i+1} topic: {row.get('section_topic','')} | text length: {len(t)} | preview: {t[:100]}", flush=True)
         return assigned
 
     def _heading_alignment_bonus(self, heading, candidate_text):
@@ -1305,45 +1552,43 @@ class DocumentPipeline:
 
         def selection_rank(item):
             candidate_text = self._clean_image_candidate(item.get("text", ""))
-            word_count = len(candidate_text.split()) if candidate_text else 0
             base_score = float(item.get("score", -1.0) or -1.0)
-            punctuation_count = candidate_text.count(",") + candidate_text.count(";") + candidate_text.count(":")
-            lead_context_penalty = 0.0
-            if word_count > 0 and word_count < 6:
-                lead_context_penalty = 0.08
+            return base_score
 
-            lowered = " ".join(candidate_text.lower().split())
-            weak_modal_penalty = 0.0
-            # Penalize clause-like/modal-only candidates that often miss the main factual subject.
-            weak_modal_markers = (
-                "possibility", "likely", "may ", "could ", "chance", "expected to",
-                "అవకాశం", "వీచే అవకాశం", "ఉందని", "సంభావ్యత", "కావచ్చని",
-            )
-            if any(marker in lowered for marker in weak_modal_markers):
-                weak_modal_penalty += 0.06
+        # Diversity filtering: penalize near-duplicate claims
+        def is_similar(a, b):
+            a_clean = re.sub(r"\W+", " ", a.lower()).strip()
+            b_clean = re.sub(r"\W+", " ", b.lower()).strip()
+            if not a_clean or not b_clean:
+                return False
+            a_set = set(a_clean.split())
+            b_set = set(b_clean.split())
+            overlap = len(a_set & b_set) / max(1, min(len(a_set), len(b_set)))
+            return overlap > 0.7
 
-            transition_starters = (
-                "at the same time", "meanwhile", "however", "ఇదే సమయంలో", "అయితే", "ఇక",
-            )
-            if lowered.startswith(transition_starters):
-                weak_modal_penalty += 0.05
+        unique_ranked = []
+        for item in sorted(scored, key=selection_rank, reverse=True):
+            candidate_text = self._clean_image_candidate(item.get("text", ""))
+            if not any(is_similar(candidate_text, self._clean_image_candidate(u.get("text", ""))) for u in unique_ranked):
+                unique_ranked.append(item)
 
-            length_bonus = 0.0
-            if 8 <= word_count <= 24:
-                length_bonus = 0.08
-            elif 25 <= word_count <= 34:
-                length_bonus = 0.03
-            elif word_count > 40:
-                length_bonus = -0.06
-            elif word_count > 28:
-                length_bonus = -0.03
-
-            punctuation_penalty = min(0.10, punctuation_count * 0.02)
-            return base_score + length_bonus - punctuation_penalty - lead_context_penalty - weak_modal_penalty
-
-        ranked_selection = sorted(scored, key=selection_rank, reverse=True)
+        ranked_selection = unique_ranked
         selected_best = ranked_selection[0] if ranked_selection else best
         selected_text = self._clean_image_candidate((selected_best or {}).get("text", ""))
+
+        # Margin threshold: only select if top score is sufficiently higher than next
+        margin_threshold = 0.07
+        if len(ranked_selection) > 1:
+            top_score = selection_rank(ranked_selection[0])
+            next_score = selection_rank(ranked_selection[1])
+            if top_score - next_score < margin_threshold:
+                # If not decisive, return both for review or pick both
+                return {
+                    "claim": [self._clean_image_candidate(item.get("text", "")) for item in ranked_selection[:2]],
+                    "reason": "page_context_selector_margin",
+                    "score": [selection_rank(item) for item in ranked_selection[:2]],
+                    "candidates": ranked_selection,
+                }
 
         return {
             "claim": selected_text or best["text"],
@@ -1456,7 +1701,7 @@ class DocumentPipeline:
 
         words = (text or "").strip().split()
         if selected_claim is not None:
-            main_claim = self._clean_image_candidate(selected_claim)
+            main_claim = self._clean_image_candidate(selected_claim) if not isinstance(selected_claim, list) else " ".join([self._clean_image_candidate(c) for c in selected_claim if c])
             claim_words = main_claim.split()
             if len(claim_words) > 32:
                 # Keep image-selected claims concise so retrieval queries remain targeted.
@@ -1467,6 +1712,11 @@ class DocumentPipeline:
             main_claim = (text or "").strip()
         else:
             main_claim = self.extractor.extract_main_claim(text)
+
+        # If main_claim is a list (from claim selection margin case), join to string for downstream processing
+        if isinstance(main_claim, list):
+            main_claim = " ".join([str(c) for c in main_claim if c])
+
         if not main_claim:
             return {
                 "error": (

@@ -10,7 +10,6 @@ from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from config import TAVILY_API_KEYS
 
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -31,9 +30,9 @@ class SearchEngine:
         self.cache_enabled = os.getenv("FACTLENS_CACHE_RETRIEVAL", "0") == "1"
         self.search_backend = (os.getenv("SEARCH_BACKEND") or "").strip().lower()
         self.search_policy = (os.getenv("SEARCH_POLICY") or "hybrid").strip().lower()
-        self.tavily_api_keys = list(TAVILY_API_KEYS)
-        self.tavily_api_key = self.tavily_api_keys[0] if self.tavily_api_keys else (os.getenv("TAVILY_API_KEY") or "").strip()
+        self.tavily_api_keys = self._load_tavily_api_keys()
         self._tavily_key_index = 0
+        self.tavily_api_key = self._current_tavily_key()
         self.serpapi_api_key = (os.getenv("SERPAPI_KEY") or "").strip()
         self.cache_dir = Path("logs/search_cache")
         self.usage_log_path = Path("logs/search_provider_usage.jsonl")
@@ -43,6 +42,31 @@ class SearchEngine:
         self._provider_backoff = {}
         self._connection_error_backoff_seconds = int(os.getenv("SEARCH_PROVIDER_BACKOFF_SECONDS", "180"))
         self._auth_error_backoff_seconds = int(os.getenv("SEARCH_PROVIDER_AUTH_BACKOFF_SECONDS", "900"))
+
+    def _load_tavily_api_keys(self):
+        keys = []
+        raw_multi = (os.getenv("TAVILY_API_KEYS") or "").strip()
+        if raw_multi:
+            for item in raw_multi.split(","):
+                key = item.strip()
+                if key and key not in keys:
+                    keys.append(key)
+        raw_single = (os.getenv("TAVILY_API_KEY") or "").strip()
+        if raw_single and raw_single not in keys:
+            keys.append(raw_single)
+        return keys
+
+    def _current_tavily_key(self):
+        if not self.tavily_api_keys:
+            return ""
+        return self.tavily_api_keys[self._tavily_key_index % len(self.tavily_api_keys)]
+
+    def _rotate_tavily_key(self):
+        if len(self.tavily_api_keys) <= 1:
+            return False
+        self._tavily_key_index = (self._tavily_key_index + 1) % len(self.tavily_api_keys)
+        self.tavily_api_key = self._current_tavily_key()
+        return True
 
     def search(self, query, max_results=15):
         backend_order = tuple(self._backend_order())
@@ -171,24 +195,35 @@ class SearchEngine:
         return self._search_duckduckgo(query, max_results=max_results)
 
     def _search_tavily(self, query, max_results=15):
-        api_key = self._next_tavily_api_key()
-        if not api_key:
-            return []
         payload = {
-            "api_key": api_key,
+            "api_key": self._current_tavily_key(),
             "query": query,
             "max_results": max(1, min(int(max_results), 20)),
             "search_depth": "basic",
             "include_answer": False,
             "include_raw_content": False,
         }
-        response = requests.post(
-            "https://api.tavily.com/search",
-            json=payload,
-            headers={"Content-Type": "application/json", **self.headers},
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
+        try:
+            response = requests.post(
+                "https://api.tavily.com/search",
+                json=payload,
+                headers={"Content-Type": "application/json", **self.headers},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as exc:
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+            if status_code in {401, 403, 429} and self._rotate_tavily_key():
+                payload["api_key"] = self._current_tavily_key()
+                response = requests.post(
+                    "https://api.tavily.com/search",
+                    json=payload,
+                    headers={"Content-Type": "application/json", **self.headers},
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+            else:
+                raise
         data = response.json() or {}
         items = []
         for row in data.get("results", [])[:max_results]:
@@ -203,13 +238,6 @@ class SearchEngine:
                 "provider": "tavily",
             })
         return items
-
-    def _next_tavily_api_key(self):
-        if not self.tavily_api_keys:
-            return self.tavily_api_key
-        key = self.tavily_api_keys[self._tavily_key_index % len(self.tavily_api_keys)]
-        self._tavily_key_index = (self._tavily_key_index + 1) % len(self.tavily_api_keys)
-        return key
 
     def _search_serpapi(self, query, max_results=15):
         per_page = max(1, min(int(max_results), 10))

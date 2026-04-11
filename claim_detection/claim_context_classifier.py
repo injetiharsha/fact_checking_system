@@ -178,54 +178,23 @@ class ClaimContextClassifier:
             self.trained_device = runtime.get("device") or ("cuda" if torch.cuda.is_available() else "cpu")
 
     def _start_worker(self) -> bool:
-        if self._worker_ready and self._worker is not None and self._worker.poll() is None:
-            return True
-        if self.trained_checkpoint is None or not self.helper_script.exists():
+        # In-memory model loading only, no subprocess.
+        if self.trained_checkpoint is None:
             return False
-
-        command = [
-            sys.executable,
-            str(self.helper_script),
-            "--checkpoint",
-            str(self.trained_checkpoint),
-            "--device",
-            self.trained_device,
-            "--serve",
-        ]
-
         try:
-            self._worker = subprocess.Popen(
-                command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
-                bufsize=1,
-            )
-        except Exception as exc:
-            print(f"Failed to start trained context worker: {exc}")
-            self._worker = None
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(str(self.trained_checkpoint), use_fast=False)
+            self.model = AutoModelForSequenceClassification.from_pretrained(str(self.trained_checkpoint)).to(self.trained_device)
+            self.model.eval()
+            print(f"ClaimContextClassifier loaded model on {self.trained_device} from {self.trained_checkpoint}")
+            self._worker_ready = True
+            return True
+        except Exception as e:
+            print(f"Failed to load context model: {e}")
+            self.model = None
+            self.tokenizer = None
             self._worker_ready = False
             return False
-
-        try:
-            ready_line = self._worker.stdout.readline().strip() if self._worker.stdout else ""
-            payload = json.loads(ready_line) if ready_line else {}
-            if payload.get("status") == "ready":
-                self._worker_ready = True
-                print(
-                    "ClaimContextClassifier using persistent context worker:",
-                    self.trained_checkpoint,
-                    "on",
-                    self.trained_device,
-                )
-                return True
-        except Exception as exc:
-            print(f"Context worker failed to initialize: {exc}")
-
-        self._stop_worker()
-        return False
 
     def _stop_worker(self) -> None:
         worker = self._worker
@@ -350,27 +319,30 @@ class ClaimContextClassifier:
             if not self._start_worker():
                 return None
             try:
-                payload = json.dumps({"text": claim}, ensure_ascii=False)
-                if not self._worker or not self._worker.stdin or not self._worker.stdout:
+                import torch.nn.functional as F
+
+                if self.model is None or self.tokenizer is None:
                     return None
-                self._worker.stdin.write(payload + "\n")
-                self._worker.stdin.flush()
-                result_line = self._worker.stdout.readline().strip()
-                if not result_line:
-                    stderr = ""
-                    if self._worker.stderr:
-                        try:
-                            stderr = self._worker.stderr.read(200)
-                        except Exception:
-                            stderr = ""
-                    if stderr:
-                        print(f"Trained context worker returned no output: {stderr}")
-                    self._stop_worker()
-                    return None
-                payload = json.loads(result_line)
-                if payload.get("error"):
-                    print(f"Trained context worker error: {payload['error']}")
-                    return None
+
+                inputs = self.tokenizer(
+                    claim,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=256,
+                ).to(self.trained_device)
+                with torch.no_grad():
+                    outputs = self.model(**inputs)
+                    probs = F.softmax(outputs.logits, dim=1)
+
+                predicted = torch.argmax(probs, dim=1).item()
+                payload = {
+                    "label": str(self.model.config.id2label.get(predicted, "general_factual")).lower(),
+                    "confidence": float(probs[0][predicted].item()),
+                    "scores": {
+                        str(self.model.config.id2label.get(idx, idx)).lower(): float(probs[0][idx].item())
+                        for idx in range(probs.shape[-1])
+                    },
+                }
             except Exception as exc:
                 print(f"Trained context worker inference failed: {exc}")
                 self._stop_worker()

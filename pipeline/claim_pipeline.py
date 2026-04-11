@@ -9,6 +9,11 @@ import hashlib
 import html
 from urllib.parse import urlparse
 from evidence.router import EvidenceRouter
+try:
+    from crawl4ai import crawl_claim_evidence
+    CRAWL4AI_AVAILABLE = True
+except ImportError:
+    CRAWL4AI_AVAILABLE = False
 from evidence.relevance import RelevanceScorer
 from evidence.quality import QualityScorer
 from evidence.citation_formatter import format_citations
@@ -32,8 +37,8 @@ from claim_detection.claim_type_classifier import ClaimTypeClassifier
 from claim_detection.claim_checkability import ClaimCheckabilityClassifier
 from claim_detection.claim_context_classifier import ClaimContextClassifier
 from evidence.domain_diversity_filter import DomainDiversityFilter
-from evidence.india_source_registry import get_india_state_source_hints, get_india_national_source_domains, get_all_india_state_source_domains
 from evidence.session_retrieval_cache import SessionRetrievalCache
+from evidence.index_reranker import IndexReranker
 
 try:
     nltk.data.find("tokenizers/punkt")
@@ -121,40 +126,7 @@ def _relation_bonus(claim, sentence):
 
 
 def _direct_answer_bonus(claim, sentence):
-    claim_text = " ".join((claim or "").lower().split())
-    sent_text = " ".join((sentence or "").lower().split())
-    if not claim_text or not sent_text:
-        return 0.0
-
-    bonus = 0.0
-    claim_tokens = _token_set(claim_text)
-    sent_tokens = _token_set(sent_text)
-    overlap = len(claim_tokens & sent_tokens)
-
-    if overlap >= 3 and any(token in sent_text for token in (" is ", " are ", " was ", " were ", " has ", " have ")):
-        bonus += 0.05
-
-    if "bananas are berries" in claim_text and "banana" in sent_text and "berr" in sent_text:
-        bonus += 0.14
-    if "bats are the only mammals capable of true flight" in claim_text and "only" in sent_text and "mammal" in sent_text and "true flight" in sent_text:
-        bonus += 0.18
-    if "country and a continent" in claim_text and "country" in sent_text and "continent" in sent_text and "australia" in sent_text:
-        bonus += 0.18
-    if "has two moons" in claim_text and "two moons" in sent_text:
-        bonus += 0.16
-    if "farthest planet from the sun" in claim_text and "farthest planet" in sent_text:
-        bonus += 0.16
-    if "largest planet in the solar system" in claim_text and "jupiter" in sent_text and "largest planet" in sent_text:
-        bonus += 0.2
-    if "moon landing was faked" in claim_text and any(marker in sent_text for marker in ("not the case", "debunk", "conspiracy theory", "scientific proof")):
-        bonus += 0.12
-    if "spread coronavirus" in claim_text and any(marker in sent_text for marker in ("does not cause", "not responsible", "no technical basis")):
-        bonus += 0.14
-    if _is_capital_relation_claim(claim, {"domain": "geography"}):
-        if "capital of" in sent_text or "capital city of" in sent_text:
-            bonus += 0.08
-
-    return bonus
+    return 0.0
 
 
 def _lead_position_bonus(sentence_index, total_sentences):
@@ -170,226 +142,30 @@ def _lead_position_bonus(sentence_index, total_sentences):
 
 
 def _weather_alert_reasoning(claim, sentence):
-    claim_text = " ".join((claim or "").lower().split())
-    sent_text = " ".join((sentence or "").lower().split())
-    if not claim_text or not sent_text:
-        return None
-
-    weather_terms = {
-        "rain", "rains", "rainfall", "thunder", "thunderstorm", "lightning",
-        "storm", "storms", "wind", "winds", "gust", "gusty", "hail",
-    }
-    alert_terms = {
-        "warning", "warnings", "alert", "alerts", "advisory", "forecast",
-        "issued", "likely", "possibility", "expected",
-    }
-
-    claim_tokens = _token_set(claim_text)
-    sent_tokens = _token_set(sent_text)
-    overlap = len(claim_tokens & sent_tokens)
-
-    claim_weather = any(term in claim_text for term in weather_terms)
-    sent_weather = any(term in sent_text for term in weather_terms)
-    claim_alert = any(term in claim_text for term in alert_terms)
-    sent_alert = any(term in sent_text for term in alert_terms)
-    if not (claim_weather and claim_alert and sent_weather and sent_alert):
-        return None
-
-    claim_nums = set(re.findall(r"\d+[\d,./-]*", claim_text))
-    sent_nums = set(re.findall(r"\d+[\d,./-]*", sent_text))
-    numeric_alignment = bool(claim_nums and sent_nums and (claim_nums & sent_nums))
-
-    if any(marker in sent_text for marker in ("no warning", "not issued", "did not issue", "denied", "false claim")):
-        return "REFUTE"
-
-    if overlap >= 4 and (numeric_alignment or overlap >= 6):
-        return "SUPPORT"
     return None
 
 
 def _metadata_or_shell_penalty(sentence, source_name=None, context_text=None):
-    sent_text = " ".join((sentence or "").lower().split())
-    source_text = " ".join((source_name or "").lower().split())
-    context = " ".join((context_text or "").lower().split())
-
-    metadata_markers = (
-        "document id",
-        "acquisition source",
-        "publication date",
-        "distribution limits",
-        "copyright work of the us gov",
-        "no preview available",
-        "subject category",
-    )
-    shell_markers = (
-        "how many moons does",
-        "how has nasa studied",
-        "how is nasa exploring",
-        "more about",
-        "this article is for students",
-        "6 min read",
-        "min read",
-        "in us english",
-    )
-    boilerplate_markers = (
-        "environment:",
-        "web desk",
-        "full rains",
-        "andhrapradesh full rains",
-        "epaper",
-    )
-
-    penalty = 0.0
-    if any(marker in sent_text for marker in metadata_markers):
-        penalty += 0.35
-    if any(marker in sent_text for marker in shell_markers):
-        penalty += 0.18
-    if "\\x" in sent_text or sent_text.count("\\u") >= 2:
-        penalty += 0.2
-    if "/search/" in source_text or source_text.strip() == "nasa":
-        penalty += 0.12
-    if sent_text.endswith("?"):
-        penalty += 0.08
-    if any(marker in sent_text for marker in boilerplate_markers):
-        penalty += 0.24
-    if sent_text.startswith("- ") or sent_text.startswith("•"):
-        penalty += 0.08
-    if ".. -" in sent_text or " - environment:" in sent_text:
-        penalty += 0.14
-    if penalty == 0.0 and context and any(marker in context for marker in metadata_markers):
-        penalty += 0.12
-    return penalty
+    return 0.0
 
 
 def _extract_capital_relation(text):
-    text = " ".join((text or "").strip().split())
-    if not text:
-        return None
-    fragments = [text]
-    for delimiter in ('"', "”", "“", ",", ";", ":"):
-        next_fragments = []
-        for fragment in fragments:
-            next_fragments.extend(part.strip() for part in fragment.split(delimiter) if part.strip())
-        fragments = next_fragments or fragments
-    patterns = (
-        r"\b(.+?)\s+(?:is|was|will be|shall be|became|be)\s+(?:the\s+)?capital(?:\s+city)?\s+of\s+(?:the\s+state\s+of\s+)?(.+?)(?:[\.]|$)",
-        r"\bcapital(?:\s+city)?\s+of\s+(?:the\s+state\s+of\s+)?(.+?)\s+(?:is|was)\s+(.+?)(?:[\.]|$)",
-    )
-    for fragment in fragments:
-        match = None
-        reverse = False
-        for idx, pattern in enumerate(patterns):
-            match = re.search(pattern, fragment, flags=re.IGNORECASE)
-            if match:
-                reverse = idx == 1
-                break
-        if not match:
-            continue
-        if reverse:
-            obj = match.group(1).strip(" \"'.,;:!?()[]{}").lower()
-            subject = match.group(2).strip(" \"'.,;:!?()[]{}").lower()
-        else:
-            subject = match.group(1).strip(" \"'.,;:!?()[]{}").lower()
-            obj = match.group(2).strip(" \"'.,;:!?()[]{}").lower()
-        obj = re.sub(r"^(the\s+state\s+of\s+)", "", obj)
-        subject = re.sub(r"^(the\s+city\s+of\s+)", "", subject)
-        if subject and obj:
-            return subject, obj
     return None
 
 
 def _capital_relation_rescue(claim, results, context_result=None):
-    if not _is_capital_relation_claim(claim, context_result):
-        return None
-
-    claim_relation = _extract_capital_relation(claim)
-    if not claim_relation:
-        return None
-
-    claim_subject, claim_object = claim_relation
-    support_hits = []
-    refute_hits = []
-    for item in results:
-        text = item.get("text") or ""
-        relation = _extract_capital_relation(text)
-        if not relation:
-            continue
-        ev_subject, ev_object = relation
-        if claim_subject == ev_subject and claim_object == ev_object:
-            support_hits.append(item)
-        elif (
-            (claim_subject == ev_subject and claim_object != ev_object)
-            or (claim_object == ev_object and claim_subject != ev_subject)
-        ):
-            refute_hits.append(item)
-
-    def strongest(items):
-        if not items:
-            return None
-        return max(
-            items,
-            key=lambda r: (
-                float(r.get("confidence", 0.0)),
-                float(r.get("combined_score", 0.0) or 0.0),
-                float(r.get("weight", 0.0)),
-            ),
-        )
-
-    best_support = strongest(support_hits)
-    best_refute = strongest(refute_hits)
-    if best_support and not best_refute and float(best_support.get("confidence", 0.0)) >= 0.62:
-        return "TRUE", max(0.72, float(best_support.get("confidence", 0.0)))
-    if best_refute and not best_support and float(best_refute.get("confidence", 0.0)) >= 0.78:
-        return "FALSE", max(0.78, float(best_refute.get("confidence", 0.0)))
     return None
 
 
 def _direct_fact_rescue(claim, results, context_result=None):
-    claim_text = " ".join((claim or "").lower().split())
-
-    if "has two moons" in claim_text:
-        for item in results:
-            text = " ".join((item.get("text") or "").lower().split())
-            if not text:
-                continue
-            if (
-                "two moons" in text
-                or ("phobos" in text and "deimos" in text)
-                or ("ఫోబోస్" in (item.get("text") or "") and "డీమోస్" in (item.get("text") or ""))
-                or ("రెండు" in (item.get("text") or "") and "చంద్ర" in (item.get("text") or ""))
-            ):
-                confidence = float(item.get("confidence", 0.0) or 0.0)
-                score = float(item.get("document_score", 0.0) or 0.0)
-                if max(confidence, score) >= 0.58:
-                    return "TRUE", max(0.78, confidence, score)
-
     return None
 
 
 def _is_misinformation_sensitive(claim, context_result=None):
-    claim_text = (claim or "").lower()
-    risk_flags = set((context_result or {}).get("risk_flags", []))
-    if "misinformation_sensitive" in risk_flags:
-        return True
-    triggers = (
-        "hoax",
-        "faked",
-        "fake",
-        "cures covid",
-        "spread coronavirus",
-        "spread covid",
-        "bleach cures",
-    )
-    return any(token in claim_text for token in triggers)
+    return False
 
 
 def _is_capital_relation_claim(claim, context_result=None):
-    claim_text = (claim or "").lower()
-    domain = str((context_result or {}).get("domain") or "").lower()
-    if "capital of" in claim_text or "capital city of" in claim_text:
-        return True
-    if domain == "geography" and "capital" in claim_text:
-        return True
     return False
 
 
@@ -398,161 +174,39 @@ def _is_official_public_admin_source(url):
     if not normalized:
         return False
     official_markers = (
+        ".gov",
         ".gov.in",
+        ".gov.uk",
+        ".gov.au",
+        ".gov.ca",
+        ".gc.ca",
+        ".gouv.fr",
+        ".admin.ch",
+        ".europa.eu",
+        ".parliament.uk",
+        ".state.gov",
+        ".nih.gov",
+        ".cdc.gov",
+        ".fda.gov",
+        ".nasa.gov",
+        ".who.int",
+        ".un.org",
+        ".oecd.org",
+        ".worldbank.org",
         ".gov/",
         ".gov?",
         ".gov#",
         ".gov.",
-        "ap.gov.in",
         "nic.in",
     )
     return any(marker in normalized for marker in official_markers)
 
 
 def _claim_reporting_penalty(claim, sentence, source_name=None, context_result=None):
-    if not _is_misinformation_sensitive(claim, context_result):
-        return 0.0
-
-    sent_text = (sentence or "").lower()
-    source_text = (source_name or "").lower()
-
-    reporting_markers = (
-        "conspiracy theor",
-        "conspiracy theory",
-        "during a speech",
-        "during an interview",
-        "according to",
-        "reportedly",
-        "report said",
-        "said that",
-        "described",
-        "called",
-        "some people claim",
-        "some people believe",
-        "have claimed",
-        "claimed that",
-        "began to gain traction",
-        "rumor",
-        "myth",
-        "hoax",
-        "heard all this before",
-        "their proponents",
-        "prove the images were faked",
-        "false claim",
-        "some persistent conspiracy theories",
-        "changed my mind",
-        "described climate change as a hoax",
-        "might have caused",
-        "has spoken on television about",
-        "have wondered",
-    )
-    factual_resolution_markers = (
-        "no evidence",
-        "scientific consensus",
-        "scientific papers",
-        "did happen",
-        "became the first humans",
-        "considered",
-        "unequivocal",
-        "incontrovertible",
-        "debunk",
-        "false",
-        "not happening",
-        "agree on",
-    )
-
-    reporting_hit = any(marker in sent_text for marker in reporting_markers)
-    if not reporting_hit and any(marker in source_text for marker in ("conspiracy", "debunked", "denial", "myth")):
-        reporting_hit = any(
-            token in sent_text for token in ("claim", "claimed", "theories", "theorists", "hoax", "faked")
-        )
-    if not reporting_hit:
-        return 0.0
-
-    if any(marker in sent_text for marker in factual_resolution_markers):
-        return 0.0
-
-    if "might have caused" in sent_text or "false claim" in sent_text:
-        return 0.3
-
-    return 0.22
+    return 0.0
 
 
 def _should_skip_claim_reporting_sentence(claim, sentence, source_name=None, context_result=None):
-    if not _is_misinformation_sensitive(claim, context_result):
-        return False
-
-    sent_text = (sentence or "").lower()
-    source_text = (source_name or "").lower()
-
-    hard_reporting_markers = (
-        "during a speech",
-        "during an interview",
-        "according to",
-        "reportedly",
-        "described as",
-        "called it",
-        "said that",
-        "thinks that nasa may have faked",
-        "fraction of the public thinks",
-        "conspiracy theories about",
-        "conspiracy theories claim",
-        "some people claim",
-        "some people believe",
-        "myth",
-        "rumor",
-        "hoax hoax",
-        "prove the images were faked",
-        "began to gain traction",
-        "false claim",
-        "changed my mind",
-        "might have caused",
-        "has spoken on television about",
-        "have wondered",
-    )
-    factual_resolution_markers = (
-        "despite overwhelming evidence to the contrary",
-        "became the first humans",
-        "successfully landed",
-        "did not",
-        "not a hoax",
-        "cannot",
-        "do not",
-        "scientific consensus",
-        "agree on",
-        "unequivocal",
-        "incontrovertible",
-        "debunk",
-    )
-
-    if any(marker in sent_text for marker in factual_resolution_markers):
-        return False
-
-    if any(marker in sent_text for marker in hard_reporting_markers):
-        return True
-
-    if (
-        _is_misinformation_sensitive(claim, context_result)
-        and (
-            ("said" in sent_text and "hoax" in sent_text)
-            or ("described" in sent_text and "hoax" in sent_text)
-            or ("claimed" in sent_text and any(token in sent_text for token in ("hoax", "fake", "cure", "spread")))
-            or ("might have caused" in sent_text)
-        )
-    ):
-        return True
-
-    if any(marker in source_text for marker in ("conspiracy", "debunk", "hoax")):
-        vague_reporting = (
-            "claim" in sent_text
-            or "theor" in sent_text
-            or "thinks that" in sent_text
-            or "people think" in sent_text
-            or "public thinks" in sent_text
-        )
-        if vague_reporting:
-            return True
-
     return False
 
 
@@ -752,6 +406,7 @@ class ClaimPipeline:
         self._stance = None
         self._verifier_v2 = None
         self._llm_verifier = None
+        self._index_reranker = None
         self._sentence_cache = {}
         self._session_retrieval_cache = SessionRetrievalCache()
         self._document_source_evidence_cache = {}
@@ -776,14 +431,16 @@ class ClaimPipeline:
         self.enable_llm_verifier = os.getenv("ENABLE_LLM_VERIFIER", "0").strip().lower() in {"1", "true", "yes", "on"}
         self.enable_neutral_expanded_retry = os.getenv("ENABLE_NEUTRAL_EXPANDED_RETRY", "0").strip().lower() in {"1", "true", "yes", "on"}
         self.include_verbose_api_fields = os.getenv("API_INCLUDE_VERBOSE_FIELDS", "1").strip().lower() in {"1", "true", "yes", "on"}
+        self.enable_crawl4ai = os.getenv("ENABLE_CRAWL4AI", "1").strip().lower() in {"1", "true", "yes", "on"} and CRAWL4AI_AVAILABLE
         self.enable_session_cache_short_circuit = os.getenv("ENABLE_SESSION_CACHE_SHORT_CIRCUIT", "1").strip().lower() in {"1", "true", "yes", "on"}
+        self.enable_index_rerank_experiment = os.getenv("ENABLE_INDEX_RERANK_EXPERIMENT", "0").strip().lower() in {"1", "true", "yes", "on"}
         self.session_cache_short_circuit_min_similarity = float(os.getenv("SESSION_CACHE_SHORT_CIRCUIT_MIN_SIMILARITY", "0.82"))
-        self.default_search_cap = max(2, min(15, self._safe_env_int("CLAIM_PIPELINE_DEFAULT_SEARCH_CAP", 8)))
-        self.max_search_cap = max(self.default_search_cap, min(20, self._safe_env_int("CLAIM_PIPELINE_MAX_SEARCH_CAP", 15)))
-        self.retrieval_v2_candidate_sentences_per_doc = max(2, min(8, self._safe_env_int("RETRIEVAL_V2_CANDIDATE_SENTENCES_PER_DOC", 4)))
-        self.retrieval_v2_max_selected_docs = max(2, min(12, self._safe_env_int("RETRIEVAL_V2_MAX_SELECTED_DOCS", 6)))
-        self.retrieval_v2_passages_per_doc = max(1, min(4, self._safe_env_int("RETRIEVAL_V2_PASSAGES_PER_DOC", 2)))
-        self.retrieval_v2_max_selected_passages = max(4, min(20, self._safe_env_int("RETRIEVAL_V2_MAX_SELECTED_PASSAGES", 10)))
+        self.default_search_cap = max(8, min(25, self._safe_env_int("CLAIM_PIPELINE_DEFAULT_SEARCH_CAP", 16)))
+        self.max_search_cap = max(self.default_search_cap, min(40, self._safe_env_int("CLAIM_PIPELINE_MAX_SEARCH_CAP", 30)))
+        self.retrieval_v2_candidate_sentences_per_doc = max(4, min(16, self._safe_env_int("RETRIEVAL_V2_CANDIDATE_SENTENCES_PER_DOC", 8)))
+        self.retrieval_v2_max_selected_docs = max(4, min(20, self._safe_env_int("RETRIEVAL_V2_MAX_SELECTED_DOCS", 12)))
+        self.retrieval_v2_passages_per_doc = max(2, min(8, self._safe_env_int("RETRIEVAL_V2_PASSAGES_PER_DOC", 4)))
+        self.retrieval_v2_max_selected_passages = max(8, min(40, self._safe_env_int("RETRIEVAL_V2_MAX_SELECTED_PASSAGES", 20)))
 
     @staticmethod
     def _safe_env_int(name, default):
@@ -951,51 +608,10 @@ class ClaimPipeline:
         return domain == allowed_domain or domain.endswith(f".{allowed_domain}")
 
     def _is_indian_multilingual_claim(self, language, context_result=None):
-        context_result = context_result or {}
-        query_language = str(context_result.get("query_language") or language or "").strip().lower()
-        return query_language in {
-            "hi", "te", "ta", "bn", "mr", "gu", "kn", "ml", "pa", "ur", "or", "as",
-            "hindi", "telugu", "tamil", "bengali", "marathi", "gujarati", "kannada", "malayalam", "punjabi", "urdu", "odia", "assamese",
-        }
+        return False
 
     def _is_india_scoped_source(self, row, context_result=None):
-        context_result = context_result or {}
-        domain = self._extract_domain(row.get("url") or row.get("source_url") or "")
-        source_text = " ".join([
-            str(row.get("source") or ""),
-            str(row.get("url") or ""),
-        ]).lower()
-
-        allowed_domains = set(get_india_national_source_domains())
-        allowed_domains.update(get_all_india_state_source_domains())
-        state_hints = get_india_state_source_hints(context_result.get("state_focus")).get("source_domains", [])
-        allowed_domains.update(str(item or "").strip().lower() for item in state_hints)
-
-        if domain and any(self._domain_matches(domain, allowed) for allowed in allowed_domains if allowed):
-            return True
-        if domain.endswith(".in"):
-            return True
-
-        india_markers = {
-            "india",
-            "indian",
-            "andhra",
-            "telangana",
-            "kerala",
-            "karnataka",
-            "tamil",
-            "telugu",
-            "hindi",
-            "bengali",
-            "marathi",
-            "gujarati",
-            "odisha",
-            "punjab",
-            "delhi",
-            "district",
-            "districts",
-        }
-        return any(marker in source_text for marker in india_markers)
+        return False
 
     def _filter_national_source_evidence(self, evidence_rows, context_result=None):
         context_result = context_result or {}
@@ -1200,6 +816,12 @@ class ClaimPipeline:
         return self._llm_verifier
 
     @property
+    def index_reranker(self):
+        if self._index_reranker is None:
+            self._index_reranker = IndexReranker()
+        return self._index_reranker
+
+    @property
     def retrieval_v2(self):
         if self._retrieval_v2 is None:
             from pipeline.retrieval_v2 import RetrievalPipelineV2
@@ -1267,7 +889,7 @@ class ClaimPipeline:
                 "decision_source": context_result.get("decision_source", "unknown"),
                 "risk_flags": list(context_result.get("risk_flags", [])),
                 "state_focus": context_result.get("state_focus"),
-                "local_source_hints": get_india_state_source_hints(context_result.get("state_focus")),
+                "local_source_hints": {},
                 "taxonomy_version": context_result.get("taxonomy_version", "v1"),
             },
             "routing": {
@@ -1282,6 +904,12 @@ class ClaimPipeline:
                 "search_cap": int(trace.get("search_cap", 0)) if isinstance(trace, dict) else 0,
                 "retrieval_attempt": int(trace.get("retrieval_attempt", 1)) if isinstance(trace, dict) else 1,
                 "retrieval_expanded": bool(trace.get("retrieval_expanded", False)) if isinstance(trace, dict) else False,
+            },
+            "experimental_rerank": {
+                "enabled": bool(trace.get("index_rerank", {}).get("enabled")) if isinstance(trace, dict) else False,
+                "baseline_order": list(trace.get("index_rerank_baseline_order", [])) if isinstance(trace, dict) else [],
+                "final_order": list(trace.get("index_rerank_final_order", [])) if isinstance(trace, dict) else [],
+                "profile": dict(trace.get("index_rerank", {})) if isinstance(trace, dict) else {},
             },
             "retrieval_version": "v2" if self.enable_retrieval_v2 else "v1",
             "reranker_provider": getattr(self.relevance_scorer, "provider_name", "current"),
@@ -1571,7 +1199,31 @@ class ClaimPipeline:
                 if normalized_modality == "image":
                     retrieval_source_cap = min(self.max_search_cap, max(search_cap + 2, search_cap))
 
-                evidence_raw = await self.router.get_evidence(
+                # --- Always call crawl4ai for PDF claims (additive) ---
+                evidence_raw = []
+                crawl4ai_rows = []
+                if self.enable_crawl4ai and normalized_modality == "pdf":
+                    try:
+                        print("[PDF] [Crawl4AI] Crawling evidence for claim...")
+                        crawl4ai_rows = await asyncio.get_event_loop().run_in_executor(
+                            None,
+                            lambda: crawl_claim_evidence(
+                                claim,
+                                exclude_domain=exclude_domain,
+                                language=language,
+                                context=context_result,
+                                max_results=retrieval_source_cap,
+                            )
+                        )
+                        if crawl4ai_rows:
+                            print(f"[PDF] [Crawl4AI] Retrieved {len(crawl4ai_rows)} evidence items.")
+                            trace["crawl4ai_used"] = True
+                    except Exception as e:
+                        print(f"[PDF] [Crawl4AI] Error: {e}")
+                        crawl4ai_rows = []
+
+                # Always call router.get_evidence and merge results
+                router_rows = await self.router.get_evidence(
                     claim,
                     exclude_domain=exclude_domain,
                     trace=trace,
@@ -1583,7 +1235,20 @@ class ClaimPipeline:
                     progress_callback=progress_callback,
                     max_sources=retrieval_source_cap,
                     force_refresh=bool(_expanded_retry_done or force_fresh_retrieval),
+                    source_modality=normalized_modality,
                 )
+                # Merge crawl4ai and router results, dedupe by URL
+                seen_urls = set()
+                for row in (crawl4ai_rows or []):
+                    url = (row.get("url") or "").strip()
+                    if url and url not in seen_urls:
+                        evidence_raw.append(row)
+                        seen_urls.add(url)
+                for row in (router_rows or []):
+                    url = (row.get("url") or "").strip()
+                    if url and url not in seen_urls:
+                        evidence_raw.append(row)
+                        seen_urls.add(url)
             except asyncio.CancelledError:
                 return {
                     "claim": claim,
@@ -1645,13 +1310,6 @@ class ClaimPipeline:
 
         if cleaned:
             evidence_raw = cleaned
-
-        if self._is_indian_multilingual_claim(language, context_result=context_result):
-            india_scoped = self._filter_national_source_evidence(evidence_raw, context_result=context_result)
-            if len(india_scoped) >= 2:
-                evidence_raw = india_scoped
-                trace.setdefault("policy_flags", {})["india_scoped_filter_applied"] = True
-                trace.setdefault("policy_flags", {})["india_scoped_filter_count"] = len(india_scoped)
 
         evidence_raw = _sanitize_evidence_rows(evidence_raw)
 
@@ -1725,19 +1383,6 @@ class ClaimPipeline:
                 metadata_penalty = float(candidate.get("metadata_penalty", 0.0))
                 direct_answer_bonus = float(candidate.get("direct_answer_bonus", 0.0))
                 lead_bonus = float(candidate.get("lead_bonus", 0.0))
-                if _should_skip_claim_reporting_sentence(
-                    claim,
-                    best_sentence,
-                    source_name=ev.get("source"),
-                    context_result=context_result,
-                ):
-                    print("Skipped claim-reporting evidence")
-                    trace["evidence_selected"].append({
-                        "url": ev["url"],
-                        "sentence": best_sentence,
-                        "skipped": "claim_reporting_sentence",
-                    })
-                    continue
                 relevance_start = time.time()
                 relevance_score = self.relevance_scorer.score(claim, best_sentence)
                 stage_timings["relevance_model_inference"] += time.time() - relevance_start
@@ -1982,15 +1627,6 @@ class ClaimPipeline:
                             "confidence": 0.9 if rank_check == "REFUTE" else 0.86,
                             "source": "heuristic_rank_rescue",
                         }
-                if stance_result.get("stance") == "NEUTRAL":
-                    weather_check = _weather_alert_reasoning(claim, highlighted)
-                    if weather_check:
-                        stance_result = {
-                            "stance": weather_check,
-                            "confidence": 0.82 if weather_check == "REFUTE" else 0.78,
-                            "source": "heuristic_weather_alert_rescue",
-                        }
-
             results.append({
                 "source": ev["source"],
                 "url": ev["url"],
@@ -2017,6 +1653,32 @@ class ClaimPipeline:
                 "source": stance_result.get("source", "model")
             })
 
+        if self.enable_index_rerank_experiment:
+            trace["index_rerank_baseline_order"] = [
+                {
+                    "source": item.get("source"),
+                    "url": item.get("url"),
+                    "stance": item.get("stance"),
+                    "combined_score": round(float(item.get("combined_score") or 0.0), 4),
+                    "confidence": round(float(item.get("confidence") or 0.0), 3),
+                    "text": item.get("text"),
+                }
+                for item in results
+            ]
+            results = self.index_reranker.rerank_results(claim, results, trace=trace)
+            trace["index_rerank_final_order"] = [
+                {
+                    "source": item.get("source"),
+                    "url": item.get("url"),
+                    "stance": item.get("stance"),
+                    "combined_score": round(float(item.get("combined_score") or 0.0), 4),
+                    "confidence": round(float(item.get("confidence") or 0.0), 3),
+                    "rerank_bonus": round(float(item.get("index_rerank_bonus") or 0.0), 4),
+                    "text": item.get("text"),
+                }
+                for item in results
+            ]
+
         results = self._consolidate_document_results(results, trace=trace)
         print("Document-level evidence items:", len(results))
         stage_timings["stance_total"] = round(time.time() - start, 3)
@@ -2034,7 +1696,6 @@ class ClaimPipeline:
             logic_verdict in {"SUPPORT", "REFUTE"}
             and len(non_neutral) >= 2
             and strong_evidence_count >= scoring_profile["min_strong_evidence"]
-            and not _is_capital_relation_claim(claim, context_result)
         ):
             results.append({
                 "source": "logic_engine",
@@ -2194,12 +1855,6 @@ class ClaimPipeline:
                     scored_evidence=scored_evidence,
                     forced_neutral=True,
                 )
-
-        capital_rescue = _capital_relation_rescue(claim, results, context_result=context_result)
-        if capital_rescue and verdict == "NEUTRAL":
-            verdict, confidence = capital_rescue
-            conflict_summary = "Direct capital-relation evidence resolved the claim"
-            forced_neutral = False
 
         citations = format_citations(results)
 

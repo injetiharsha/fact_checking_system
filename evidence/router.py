@@ -34,7 +34,6 @@ BLOCKED_DOMAINS = [
     "youtu.be",
     "twitter.com",
     "x.com",
-    "news.google.com",
 ]
 
 WEAK_RESULT_URL_MARKERS = (
@@ -117,13 +116,6 @@ LOW_SIGNAL_TITLE_MARKERS = (
     "citation",
 )
 
-BM25_STOPWORDS = {
-    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has",
-    "have", "in", "is", "it", "its", "of", "on", "or", "that", "the", "to",
-    "was", "were", "will", "with",
-}
-
-
 def _safe_console_text(value):
     text = str(value)
     enc = sys.stdout.encoding or "utf-8"
@@ -171,7 +163,7 @@ class EvidenceRouter:
     async def _flush_progress():
         await asyncio.sleep(0)
 
-    async def get_evidence(self, claim, exclude_domain=None, trace=None, context_result=None, claim_type_result=None, original_claim=None, language=None, source_text=None, progress_callback=None, max_sources=6, force_refresh=False):
+    async def get_evidence(self, claim, exclude_domain=None, trace=None, context_result=None, claim_type_result=None, original_claim=None, language=None, source_text=None, progress_callback=None, max_sources=6, force_refresh=False, source_modality=None):
         try:
             web_source_cap = int(max_sources)
         except Exception:
@@ -198,6 +190,32 @@ class EvidenceRouter:
                     "text": cleaned_source_text,
                     "weight": 1.25,
                 })
+
+        # --- Always add Wikipedia and NASA for PDF claims (additive, not fallback) ---
+        is_pdf = str(source_modality or context_result.get("source_modality", "")).lower() == "pdf"
+        if is_pdf:
+            # Wikipedia
+            try:
+                reference_hit = self.reference_fallback.fetch_wikipedia(claim)
+                if reference_hit and not any(ev.get("url") == reference_hit["url"] for ev in evidence_list):
+                    print("[PDF] Additive Wikipedia evidence:", reference_hit.get("url"))
+                    evidence_list.append(reference_hit)
+            except Exception as e:
+                print("[PDF] Wikipedia evidence error:", e)
+            # NASA
+            try:
+                nasa_result = self.nasa.fetch(claim)
+                if nasa_result:
+                    if isinstance(nasa_result, list):
+                        for row in nasa_result:
+                            if row and not any(ev.get("url") == row.get("url") for ev in evidence_list):
+                                print("[PDF] Additive NASA evidence:", row.get("url"))
+                                evidence_list.append(row)
+                    elif nasa_result and not any(ev.get("url") == nasa_result.get("url") for ev in evidence_list):
+                        print("[PDF] Additive NASA evidence:", nasa_result.get("url"))
+                        evidence_list.append(nasa_result)
+            except Exception as e:
+                print("[PDF] NASA evidence error:", e)
 
         # ----------------------------
         # 1. Structured APIs
@@ -501,7 +519,8 @@ class EvidenceRouter:
         self._emit_progress(progress_callback, stage="extraction", status="done", detail=f"Built {len(evidence_list)} evidence source(s)")
         await self._flush_progress()
 
-        if len(evidence_list) < 2:
+        # (No longer use Wikipedia as fallback for PDF, already added above)
+        if not is_pdf and len(evidence_list) < 2:
             reference_hit = self.reference_fallback.fetch_wikipedia(claim)
             if reference_hit and not any(
                 ev.get("url") == reference_hit["url"] for ev in evidence_list
@@ -648,7 +667,7 @@ class EvidenceRouter:
     def _tokenize_rank_text(text):
         return [
             token for token in re.findall(r"[a-z0-9]+", (text or "").lower())
-            if len(token) > 1 and token not in BM25_STOPWORDS
+            if len(token) > 1
         ]
 
     @staticmethod
