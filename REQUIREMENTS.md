@@ -40,6 +40,24 @@ Main groups:
 - training and experimentation: datasets, peft, scikit-learn, PyYAML
 - optional retrieval extras: FAISS, Playwright, LlamaIndex
 
+### GPU Environment
+
+For a CUDA-enabled local inference environment, use [requirements-gpu.txt](/abs/path/f:/fact_checking_system/requirements-gpu.txt).
+
+Recommended install order on a clean Python 3.10 virtual environment:
+
+```powershell
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+python -m pip install --upgrade --force-reinstall --index-url https://download.pytorch.org/whl/cu121 -r requirements-gpu.txt
+```
+
+Why this exists:
+
+- the repo needs a stable CUDA-enabled torch stack
+- `transformers`, `sentence-transformers`, `datasets`, `numpy`, and `torchvision` must stay compatible
+- ad-hoc package upgrades can silently break CUDA availability or model loading
+
 ### External Services
 
 For real-time fact-checking, at least one search path should be configured.

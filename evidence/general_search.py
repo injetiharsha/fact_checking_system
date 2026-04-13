@@ -4,6 +4,7 @@ import os
 import json
 import hashlib
 import time
+import unicodedata
 from pathlib import Path
 from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
 
@@ -12,7 +13,7 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
 
 
 class SearchEngine:
@@ -42,6 +43,7 @@ class SearchEngine:
         self._provider_backoff = {}
         self._connection_error_backoff_seconds = int(os.getenv("SEARCH_PROVIDER_BACKOFF_SECONDS", "180"))
         self._auth_error_backoff_seconds = int(os.getenv("SEARCH_PROVIDER_AUTH_BACKOFF_SECONDS", "900"))
+        self._multilingual_prefer_duckduckgo = (os.getenv("MULTILINGUAL_SEARCH_PREFER_DDG") or "1").strip() == "1"
 
     def _load_tavily_api_keys(self):
         keys = []
@@ -68,15 +70,18 @@ class SearchEngine:
         self.tavily_api_key = self._current_tavily_key()
         return True
 
-    def search(self, query, max_results=15):
-        backend_order = tuple(self._backend_order())
-        available_backends = tuple(self.available_backends())
+    def search(self, query, max_results=15, plan=None):
+        normalized_query = self._normalize_query_text(query)
+        backend_order = tuple(self._backend_order(normalized_query, plan=plan))
+        available_backends = tuple(self.available_backends(normalized_query, plan=plan))
         if not available_backends:
             available_backends = backend_order
+        plan_signature = self._plan_signature(plan)
         cache_key = (
-            (query or "").strip().lower(),
+            normalized_query.lower(),
             int(max_results),
             available_backends,
+            json.dumps(plan_signature, sort_keys=True),
         )
         if self.cache_enabled:
             cached = self._cache.get(cache_key)
@@ -88,7 +93,7 @@ class SearchEngine:
                     "cache_hit": True,
                 }
                 return list(cached)
-        disk_cached = self._load_disk_cache(query, max_results, available_backends)
+        disk_cached = self._load_disk_cache(normalized_query, max_results, available_backends, plan_signature)
         if disk_cached is not None:
             if self.cache_enabled:
                 self._cache[cache_key] = list(disk_cached)
@@ -104,31 +109,32 @@ class SearchEngine:
         selected_backend = None
         for backend in available_backends:
             try:
-                results = self._search_with_backend(backend, query, max_results=max_results)
+                results = self._search_with_backend(backend, normalized_query, max_results=max_results, plan=plan)
                 if results:
                     selected_backend = backend
                     self._provider_backoff.pop(backend, None)
                     break
             except Exception as e:
                 print(f"Search error [{backend}]: {type(e).__name__}: {e}")
-                self._log_usage(backend, query, 0, f"{type(e).__name__}: {e}")
+                self._log_usage(backend, normalized_query, 0, f"{type(e).__name__}: {e}")
                 self._record_backend_failure(backend, e)
 
         if self.cache_enabled and results:
             self._cache[cache_key] = list(results)
         if results and selected_backend:
-            self._save_disk_cache(query, max_results, available_backends, results)
-            self._log_usage(selected_backend, query, len(results), "ok")
+            self._save_disk_cache(normalized_query, max_results, available_backends, plan_signature, results)
+            self._log_usage(selected_backend, normalized_query, len(results), "ok")
         self.last_trace = {
             "backend_order": list(backend_order),
             "available_backends": list(available_backends),
             "selected_backend": selected_backend,
             "cache_hit": False,
+            "plan": dict(plan_signature),
         }
         return results
 
-    def available_backends(self):
-        backend_order = tuple(self._backend_order())
+    def available_backends(self, query=None, plan=None):
+        backend_order = tuple(self._backend_order(query, plan=plan))
         return [
             backend for backend in backend_order
             if not self._provider_in_backoff(backend)
@@ -158,21 +164,22 @@ class SearchEngine:
             return
         self._provider_backoff[backend] = {"until": until}
 
-    def _backend_order(self):
+    def _backend_order(self, query=None, plan=None):
+        multilingual_native_query = self._multilingual_prefer_duckduckgo and self._is_non_ascii_query(query)
+        # Always use hybrid policy: stable APIs first, DDG as last resort
         if (os.getenv("BENCHMARK_PRIMARY_SEARCH_ONLY") or "0").strip() == "1":
             return [self._resolved_backend()]
-        policy = self.search_policy
-        if policy == "cheap":
+        if multilingual_native_query:
+            if self.tavily_api_key:
+                return ["duckduckgo", "serpapi", "tavily"]
+            if self.serpapi_api_key:
+                return ["duckduckgo", "serpapi"]
             return ["duckduckgo"]
-        if policy == "api":
-            preferred = self._resolved_backend()
-            fallback_order = []
-            for candidate in (preferred, "tavily", "serpapi", "duckduckgo"):
-                if candidate not in fallback_order:
-                    fallback_order.append(candidate)
-            return fallback_order
-        # hybrid: cheap first, premium only if cheap fails.
-        return ["duckduckgo", "tavily", "serpapi"]
+        if self.tavily_api_key:
+            return ["tavily", "serpapi", "duckduckgo"]
+        if self.serpapi_api_key:
+            return ["serpapi", "duckduckgo"]
+        return ["duckduckgo"]
 
     def _resolved_backend(self):
         if self.search_backend in {"tavily", "serpapi", "duckduckgo"}:
@@ -183,18 +190,20 @@ class SearchEngine:
             return "serpapi"
         return "duckduckgo"
 
-    def _search_with_backend(self, backend, query, max_results=15):
+    def _search_with_backend(self, backend, query, max_results=15, plan=None):
         if backend == "tavily":
             if not self.tavily_api_key:
                 return []
-            return self._search_tavily(query, max_results=max_results)
+            return self._search_tavily(query, max_results=max_results, plan=plan)
         if backend == "serpapi":
             if not self.serpapi_api_key:
                 return []
-            return self._search_serpapi(query, max_results=max_results)
+            return self._search_serpapi(query, max_results=max_results, plan=plan)
         return self._search_duckduckgo(query, max_results=max_results)
 
-    def _search_tavily(self, query, max_results=15):
+    def _search_tavily(self, query, max_results=15, plan=None):
+        plan = plan or {}
+        query = self._normalize_query_text(query)
         payload = {
             "api_key": self._current_tavily_key(),
             "query": query,
@@ -203,11 +212,15 @@ class SearchEngine:
             "include_answer": False,
             "include_raw_content": False,
         }
+        recency_days = plan.get("recency_days")
+        if recency_days:
+            payload["topic"] = "news"
+            payload["days"] = max(1, min(int(recency_days), 365))
         try:
             response = requests.post(
                 "https://api.tavily.com/search",
                 json=payload,
-                headers={"Content-Type": "application/json", **self.headers},
+                headers={"Content-Type": "application/json; charset=utf-8", "Accept-Charset": "utf-8", **self.headers},
                 timeout=self.timeout,
             )
             response.raise_for_status()
@@ -218,7 +231,7 @@ class SearchEngine:
                 response = requests.post(
                     "https://api.tavily.com/search",
                     json=payload,
-                    headers={"Content-Type": "application/json", **self.headers},
+                    headers={"Content-Type": "application/json; charset=utf-8", "Accept-Charset": "utf-8", **self.headers},
                     timeout=self.timeout,
                 )
                 response.raise_for_status()
@@ -239,17 +252,29 @@ class SearchEngine:
             })
         return items
 
-    def _search_serpapi(self, query, max_results=15):
+    def _search_serpapi(self, query, max_results=15, plan=None):
+        plan = plan or {}
+        query = self._normalize_query_text(query)
         per_page = max(1, min(int(max_results), 10))
+        params = {
+            "engine": "google",
+            "q": query,
+            "num": per_page,
+            "api_key": self.serpapi_api_key,
+        }
+        language = str(plan.get("language") or "").strip().lower()
+        country = str(plan.get("country") or "").strip().lower()
+        if language:
+            params["hl"] = language
+        if country:
+            params["gl"] = country
+        tbs = self._serpapi_recency_param(plan.get("recency_days"))
+        if tbs:
+            params["tbs"] = tbs
         response = requests.get(
             "https://serpapi.com/search.json",
-            params={
-                "engine": "google",
-                "q": query,
-                "num": per_page,
-                "api_key": self.serpapi_api_key,
-            },
-            headers=self.headers,
+            params=params,
+            headers={"Accept-Charset": "utf-8", **self.headers},
             timeout=self.timeout,
         )
         response.raise_for_status()
@@ -270,6 +295,7 @@ class SearchEngine:
 
     def _search_duckduckgo(self, query, max_results=15):
         results = []
+        query = self._normalize_query_text(query)
         search_url = "https://html.duckduckgo.com/html/?q=" f"{quote_plus(query)}"
 
         response = requests.get(
@@ -297,6 +323,18 @@ class SearchEngine:
 
         return results
 
+    @staticmethod
+    def _normalize_query_text(query):
+        text = str(query or "")
+        text = unicodedata.normalize("NFC", text)
+        text = text.replace("\u200b", " ").replace("\ufeff", " ")
+        return " ".join(text.split())
+
+    @staticmethod
+    def _is_non_ascii_query(query):
+        text = str(query or "")
+        return any(ord(ch) > 127 for ch in text)
+
     def _normalize_result_url(self, href):
         resolved = urljoin("https://html.duckduckgo.com", href)
         parsed = urlparse(resolved)
@@ -311,20 +349,21 @@ class SearchEngine:
 
         return resolved
 
-    def _cache_file_path(self, query, max_results, backend_order):
+    def _cache_file_path(self, query, max_results, backend_order, plan_signature=None):
         payload = json.dumps(
             {
                 "q": (query or "").strip().lower(),
                 "max_results": int(max_results),
                 "backends": list(backend_order),
+                "plan": dict(plan_signature or {}),
             },
             sort_keys=True,
         )
         digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
         return self.cache_dir / f"{digest}.json"
 
-    def _load_disk_cache(self, query, max_results, backend_order):
-        path = self._cache_file_path(query, max_results, backend_order)
+    def _load_disk_cache(self, query, max_results, backend_order, plan_signature=None):
+        path = self._cache_file_path(query, max_results, backend_order, plan_signature)
         if not path.exists():
             return None
         try:
@@ -334,8 +373,8 @@ class SearchEngine:
         except Exception:
             return None
 
-    def _save_disk_cache(self, query, max_results, backend_order, results):
-        path = self._cache_file_path(query, max_results, backend_order)
+    def _save_disk_cache(self, query, max_results, backend_order, plan_signature, results):
+        path = self._cache_file_path(query, max_results, backend_order, plan_signature)
         try:
             with path.open("w", encoding="utf-8") as handle:
                 json.dump(
@@ -343,6 +382,7 @@ class SearchEngine:
                         "query": query,
                         "max_results": int(max_results),
                         "backends": list(backend_order),
+                        "plan": dict(plan_signature or {}),
                         "results": results,
                     },
                     handle,
@@ -351,6 +391,31 @@ class SearchEngine:
                 )
         except Exception:
             return
+
+    @staticmethod
+    def _serpapi_recency_param(recency_days):
+        if not recency_days:
+            return None
+        days = int(recency_days)
+        if days <= 1:
+            return "qdr:d"
+        if days <= 7:
+            return "qdr:w"
+        if days <= 31:
+            return "qdr:m"
+        return "qdr:y"
+
+    @staticmethod
+    def _plan_signature(plan):
+        if not isinstance(plan, dict):
+            return {}
+        return {
+            "language": str(plan.get("language") or "").strip().lower(),
+            "country": str(plan.get("country") or "").strip().lower(),
+            "region": str(plan.get("region") or "").strip().lower(),
+            "recency_days": int(plan.get("recency_days") or 0),
+            "intent_tags": list(plan.get("intent_tags") or []),
+        }
 
     def _log_usage(self, backend, query, result_count, status):
         try:

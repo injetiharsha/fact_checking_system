@@ -68,6 +68,7 @@ Use placeholders only in docs:
 SEARCH_BACKEND=tavily
 TAVILY_API_KEY=your_tavily_key
 NEWS_API_KEY=your_news_api_key
+NEWSAPI_ORG_KEY=your_newsapi_org_key
 SERPAPI_KEY=your_serpapi_key
 OPENFDA_API_KEY=your_openfda_key
 NASA_API_KEY=your_nasa_key
@@ -84,6 +85,8 @@ LLM_VERIFIER_MODEL=openai/gpt-oss-20b
 LLM_VERIFIER_TIMEOUT_SECONDS=45
 LLM_VERIFIER_POLICY=neutral_only
 LLM_VERIFIER_MAX_ITEMS=3
+LLM_VERIFIER_MAX_REQUESTS_PER_MINUTE=30
+LLM_VERIFIER_MAX_TOKENS_PER_MINUTE=8000
 ```
 
 Optional local fallback:

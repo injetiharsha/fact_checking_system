@@ -15,7 +15,7 @@ except ImportError as exc:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(ROOT / ".env")
+load_dotenv(ROOT / ".env", override=True)
 
 DEFAULT_CLAIMS_FILE = ROOT / "benchmark_claims" / "robust_mixed_50_v2.json"
 DEFAULT_OUTPUT = ROOT / "logs" / "tavily_eval_50.json"

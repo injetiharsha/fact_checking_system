@@ -39,6 +39,11 @@ from claim_detection.claim_context_classifier import ClaimContextClassifier
 from evidence.domain_diversity_filter import DomainDiversityFilter
 from evidence.session_retrieval_cache import SessionRetrievalCache
 from evidence.index_reranker import IndexReranker
+from pipeline.claim_type_utils import (
+    best_numeric_pairwise_rel_diff,
+    claim_type_label_lower,
+    collect_non_year_numeric_values,
+)
 
 try:
     nltk.data.find("tokenizers/punkt")
@@ -141,32 +146,12 @@ def _lead_position_bonus(sentence_index, total_sentences):
     return 0.0
 
 
-def _weather_alert_reasoning(claim, sentence):
-    return None
+def _claim_reporting_penalty(claim, sentence, source_name=None, context_result=None):
+    return 0.0
 
 
 def _metadata_or_shell_penalty(sentence, source_name=None, context_text=None):
     return 0.0
-
-
-def _extract_capital_relation(text):
-    return None
-
-
-def _capital_relation_rescue(claim, results, context_result=None):
-    return None
-
-
-def _direct_fact_rescue(claim, results, context_result=None):
-    return None
-
-
-def _is_misinformation_sensitive(claim, context_result=None):
-    return False
-
-
-def _is_capital_relation_claim(claim, context_result=None):
-    return False
 
 
 def _is_official_public_admin_source(url):
@@ -200,15 +185,6 @@ def _is_official_public_admin_source(url):
         "nic.in",
     )
     return any(marker in normalized for marker in official_markers)
-
-
-def _claim_reporting_penalty(claim, sentence, source_name=None, context_result=None):
-    return 0.0
-
-
-def _should_skip_claim_reporting_sentence(claim, sentence, source_name=None, context_result=None):
-    return False
-
 
 def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, source_name=None, context_result=None):
 
@@ -293,11 +269,13 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
     for sent, lexical_score, _, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text in semantic_shortlist:
         semantic_score = relevance_scorer.semantic_score(claim, sent)
         semantic_lookup[" ".join(sent.lower().split())] = semantic_score
+        context_anchor = relevance_scorer.fast_score(claim, context_text) * 0.08
         combined_score = (
             (semantic_score * 0.82)
             + (fast_score * 0.14)
             + direct_bonus
             + lead_bonus
+            + context_anchor
             - reporting_penalty
             - metadata_penalty
         )
@@ -391,7 +369,24 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
 
 class ClaimPipeline:
 
+
     def __init__(self):
+        print("\n[Pipeline Feature/Model Loadout]")
+        print(f"ENABLE_TRAINED_STANCE: {os.getenv('ENABLE_TRAINED_STANCE')}")
+        print(f"ENABLE_TRAINED_RELEVANCE: {os.getenv('ENABLE_TRAINED_RELEVANCE')}")
+        print(f"ENABLE_TRAINED_CLAIM_CHECKABILITY: {os.getenv('ENABLE_TRAINED_CLAIM_CHECKABILITY')}")
+        print(f"ENABLE_TRAINED_CONTEXT: {os.getenv('ENABLE_TRAINED_CONTEXT')}")
+        print(f"ENABLE_TRAINED_CLAIM_TYPE: {os.getenv('ENABLE_TRAINED_CLAIM_TYPE')}")
+        print(f"ENABLE_RETRIEVAL_V2: {os.getenv('ENABLE_RETRIEVAL_V2')}")
+        print(f"ENABLE_VERIFIER_V2: {os.getenv('ENABLE_VERIFIER_V2')}")
+        print(f"ENABLE_LLM_VERIFIER: {os.getenv('ENABLE_LLM_VERIFIER')}")
+        print(f"STANCE_CHECKPOINT: {os.getenv('STANCE_CHECKPOINT')}")
+        print(f"RELEVANCE_CHECKPOINT: {os.getenv('RELEVANCE_CHECKPOINT')}")
+        print(f"CLAIM_CHECKABILITY_CHECKPOINT: {os.getenv('CLAIM_CHECKABILITY_CHECKPOINT')}")
+        print(f"CONTEXT_CHECKPOINT: {os.getenv('CONTEXT_CHECKPOINT')}")
+        print(f"CLAIM_TYPE_CHECKPOINT: {os.getenv('CLAIM_TYPE_CHECKPOINT')}")
+        print(f"LLM_VERIFIER_MODEL: {os.getenv('LLM_VERIFIER_MODEL')}")
+        print("[End Pipeline Feature Print]\n")
 
         # initialize core components
         self.router = EvidenceRouter()
@@ -417,8 +412,8 @@ class ClaimPipeline:
         self.soft_relevance_threshold = 0.3
         self.soft_quality_threshold = 0.25
         self.min_strong_evidence_for_forced_verdict = 1
-        self.single_source_decisive_confidence = 0.85
-        self.single_source_min_weight = 0.7
+        self.single_source_decisive_confidence = 0.8
+        self.single_source_min_weight = 0.65
         self.soft_consensus_min_items = 3
         self.soft_consensus_min_avg_confidence = 0.85
         self.soft_consensus_min_avg_weight = 0.5
@@ -1005,6 +1000,7 @@ class ClaimPipeline:
         return round(max(0.08, min(upper, confidence)), 3)
 
     async def run(self, claim, source_url=None, source_text=None, source_language=None, source_modality="text", allow_llm_verifier=None, cancel_event=None, progress_callback=None, search_cap=None, _expanded_retry_done=False, force_fresh_retrieval=False):
+        print("\n[Pipeline Analysis Start]")
         self._raise_if_cancelled(cancel_event)
         if search_cap is None:
             search_cap = self.default_search_cap
@@ -1627,6 +1623,23 @@ class ClaimPipeline:
                             "confidence": 0.9 if rank_check == "REFUTE" else 0.86,
                             "source": "heuristic_rank_rescue",
                         }
+                # Numeric proximity rescue for continuous values (not years/ranks)
+                if stance_result.get("stance") == "NEUTRAL":
+                    claim_type = claim_type_label_lower(claim_type_result)
+                    domain = str((context_result or {}).get("domain") or "").lower()
+                    # Only apply proximity for factual/numerical claims in science/measurement/statistics domains
+                    allow_proximity = (
+                        claim_type in {"factual", "numerical"}
+                        and domain in {"science", "measurement", "statistics", "space_astronomy", "health", "general_factual"}
+                    )
+                    if allow_proximity:
+                        claim_nums = re.findall(r"[\d,]+(?:\.\d+)?", claim)
+                        ev_nums = re.findall(r"[\d,]+(?:\.\d+)?", highlighted)
+                        claim_vals = collect_non_year_numeric_values(claim_nums)
+                        ev_vals = collect_non_year_numeric_values(ev_nums)
+                        rel_diff = best_numeric_pairwise_rel_diff(claim_vals, ev_vals)
+                        if rel_diff is not None and rel_diff <= 0.02:  # within 2% (pairwise)
+                            stance_result = {"stance": "SUPPORT", "confidence": 0.82, "source": "numeric_proximity_rescue"}
             results.append({
                 "source": ev["source"],
                 "url": ev["url"],

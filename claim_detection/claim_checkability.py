@@ -1,4 +1,5 @@
 import json
+import torch
 import os
 import re
 import subprocess
@@ -31,106 +32,104 @@ class ClaimCheckabilityClassifier:
     def __init__(self):
         self.model_mode = "heuristic"
         self.trained_checkpoint = None
-        self.trained_device = os.getenv("CLAIM_CHECKABILITY_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.helper_script = Path(__file__).with_name("checkability_subprocess_infer.py")
+        self.device = torch.device(os.getenv("CLAIM_CHECKABILITY_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.model = None
+        self.tokenizer = None
 
         runtime = runtime_model_settings("claim_checkability")
         checkpoint = runtime.get("checkpoint")
         if runtime.get("enabled") and checkpoint is not None:
             self.trained_checkpoint = Path(checkpoint)
-            self.trained_device = runtime.get("device") or ("cuda" if torch.cuda.is_available() else "cpu")
-            self.model_mode = "trained_multiclass"
-            print(
-                "ClaimCheckabilityClassifier configured for trained checkpoint:",
-                checkpoint,
-            )
+            self.device = torch.device(runtime.get("device") or ("cuda" if torch.cuda.is_available() else "cpu"))
+            try:
+                from transformers import AutoModelForSequenceClassification, AutoTokenizer
+                self.tokenizer = AutoTokenizer.from_pretrained(str(self.trained_checkpoint), use_fast=False)
+                self.model = AutoModelForSequenceClassification.from_pretrained(str(self.trained_checkpoint)).to(self.device)
+                self.model.eval()
+                self.model_mode = "trained_multiclass"
+                print(f"ClaimCheckabilityClassifier loaded model on {self.device} from {self.trained_checkpoint}")
+            except Exception as e:
+                print(f"Failed to load checkability model: {e}")
+                self.model = None
+                self.tokenizer = None
 
     def classify(self, claim: str, claim_type_result=None, logical_metadata=None) -> dict:
-        if self.trained_checkpoint is not None:
-            trained = self._classify_with_subprocess(claim)
-            if trained is not None:
+        if self.model is not None and self.tokenizer is not None:
+            try:
+                import torch.nn.functional as F
+                inputs = self.tokenizer(
+                    claim,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=256,
+                ).to(self.device)
+                with torch.no_grad():
+                    outputs = self.model(**inputs)
+                    probs = F.softmax(outputs.logits, dim=1)
+                predicted = torch.argmax(probs, dim=1).item()
+                raw_label = str(self.model.config.id2label.get(predicted, f"LABEL_{predicted}")).lower()
+                subtype_map = {
+                    "factual_claim": ClaimCheckabilitySubtype.FACTUAL_CLAIM,
+                    "personal_statement": ClaimCheckabilitySubtype.PERSONAL_STATEMENT,
+                    "opinion": ClaimCheckabilitySubtype.OPINION,
+                    "question_or_rewrite": ClaimCheckabilitySubtype.QUESTION_OR_REWRITE,
+                    "empty": ClaimCheckabilitySubtype.EMPTY,
+                    "other_uncheckable": ClaimCheckabilitySubtype.OTHER_UNCHECKABLE,
+                }
+                subtype = subtype_map.get(raw_label, ClaimCheckabilitySubtype.OTHER_UNCHECKABLE)
+                label = ClaimCheckabilityLabel.CHECKABLE if raw_label == "factual_claim" else ClaimCheckabilityLabel.UNCHECKABLE
+                confidence = probs[0][predicted].item()
+                scores = {
+                    str(self.model.config.id2label.get(idx, idx)).lower(): float(probs[0][idx].item())
+                    for idx in range(probs.shape[-1])
+                }
+                result = {
+                    "label": label,
+                    "subtype": subtype,
+                    "allowed": label == ClaimCheckabilityLabel.CHECKABLE,
+                    "confidence": confidence,
+                    "reasoning": "Fine-tuned claim checkability model prediction.",
+                    "decision_source": "trained_model",
+                    "code": {
+                        ClaimCheckabilitySubtype.PERSONAL_STATEMENT: "not_checkable_personal_statement",
+                        ClaimCheckabilitySubtype.OPINION: "opinion_not_checkable",
+                        ClaimCheckabilitySubtype.QUESTION_OR_REWRITE: "question_input",
+                        ClaimCheckabilitySubtype.EMPTY: "empty_claim",
+                        ClaimCheckabilitySubtype.OTHER_UNCHECKABLE: "not_checkable_other",
+                        ClaimCheckabilitySubtype.FACTUAL_CLAIM: "checkable",
+                    }.get(subtype, "checkable"),
+                    "message": "" if label == ClaimCheckabilityLabel.CHECKABLE else {
+                        ClaimCheckabilitySubtype.PERSONAL_STATEMENT: "This looks like a personal statement, not a fact-checkable claim.",
+                        ClaimCheckabilitySubtype.OPINION: "This reads more like an opinion than a checkable factual claim.",
+                        ClaimCheckabilitySubtype.QUESTION_OR_REWRITE: "Questions are not directly fact-checked. Rephrase it as a claim.",
+                        ClaimCheckabilitySubtype.EMPTY: "Enter a fact-checkable claim before analysis.",
+                        ClaimCheckabilitySubtype.OTHER_UNCHECKABLE: "This input is not a fact-checkable claim.",
+                    }.get(subtype, "This input is not a fact-checkable claim."),
+                    "scores": scores,
+                }
+                # Rescue as factual if needed
                 if self._should_rescue_as_factual(
                     claim,
-                    trained,
+                    result,
                     claim_type_result=claim_type_result,
                     logical_metadata=logical_metadata,
                 ):
                     return self._build_result(
                         label=ClaimCheckabilityLabel.CHECKABLE,
                         subtype=ClaimCheckabilitySubtype.FACTUAL_CLAIM,
-                        confidence=max(0.72, 1.0 - float(trained.get("confidence", 0.0))),
+                        confidence=max(0.72, 1.0 - float(result.get("confidence", 0.0))),
                         reasoning="Sentence-level factual cues overrode an 'other_uncheckable' gate prediction.",
                         code="checkable_factual_rescue",
                         message="",
                     )
-                return trained
+                return result
+            except Exception as e:
+                print(f"Checkability model inference failed: {e}")
         return self._heuristic_classify(
             claim,
             claim_type_result=claim_type_result,
             logical_metadata=logical_metadata,
         )
-
-    def _classify_with_subprocess(self, claim: str) -> dict | None:
-        if self.trained_checkpoint is None:
-            return None
-        try:
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(self.helper_script),
-                    "--checkpoint",
-                    str(self.trained_checkpoint),
-                    "--device",
-                    str(self.trained_device),
-                    "--text",
-                    str(claim),
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            payload = json.loads(result.stdout.strip())
-            raw_label = str(payload.get("label") or "uncheckable").lower()
-            raw_subtype = str(payload.get("subtype") or "other_uncheckable").lower()
-            confidence = float(payload.get("confidence", 0.0) or 0.0)
-            label = ClaimCheckabilityLabel.CHECKABLE if raw_label == "checkable" else ClaimCheckabilityLabel.UNCHECKABLE
-            subtype_map = {
-                "factual_claim": ClaimCheckabilitySubtype.FACTUAL_CLAIM,
-                "personal_statement": ClaimCheckabilitySubtype.PERSONAL_STATEMENT,
-                "opinion": ClaimCheckabilitySubtype.OPINION,
-                "question_or_rewrite": ClaimCheckabilitySubtype.QUESTION_OR_REWRITE,
-                "empty": ClaimCheckabilitySubtype.EMPTY,
-                "other_uncheckable": ClaimCheckabilitySubtype.OTHER_UNCHECKABLE,
-            }
-            subtype = subtype_map.get(raw_subtype, ClaimCheckabilitySubtype.OTHER_UNCHECKABLE)
-            message_map = {
-                ClaimCheckabilitySubtype.PERSONAL_STATEMENT: "This looks like a personal statement, not a fact-checkable claim.",
-                ClaimCheckabilitySubtype.OPINION: "This reads more like an opinion than a checkable factual claim.",
-                ClaimCheckabilitySubtype.QUESTION_OR_REWRITE: "Questions are not directly fact-checked. Rephrase it as a claim.",
-                ClaimCheckabilitySubtype.EMPTY: "Enter a fact-checkable claim before analysis.",
-                ClaimCheckabilitySubtype.OTHER_UNCHECKABLE: "This input is not a fact-checkable claim.",
-            }
-            code_map = {
-                ClaimCheckabilitySubtype.PERSONAL_STATEMENT: "not_checkable_personal_statement",
-                ClaimCheckabilitySubtype.OPINION: "opinion_not_checkable",
-                ClaimCheckabilitySubtype.QUESTION_OR_REWRITE: "question_input",
-                ClaimCheckabilitySubtype.EMPTY: "empty_claim",
-                ClaimCheckabilitySubtype.OTHER_UNCHECKABLE: "not_checkable_other",
-                ClaimCheckabilitySubtype.FACTUAL_CLAIM: "checkable",
-            }
-            return {
-                "label": label,
-                "subtype": subtype,
-                "allowed": label == ClaimCheckabilityLabel.CHECKABLE,
-                "confidence": confidence,
-                "reasoning": "Fine-tuned claim checkability model prediction.",
-                "decision_source": "trained_model",
-                "code": code_map.get(subtype, "checkable"),
-                "message": "" if label == ClaimCheckabilityLabel.CHECKABLE else message_map.get(subtype, "This input is not a fact-checkable claim."),
-                "scores": payload.get("scores", {}),
-            }
-        except Exception:
-            return None
 
     def _build_result(
         self,

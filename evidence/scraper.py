@@ -17,6 +17,7 @@ class WebScraper:
 
         self.timeout = 6
         self.allow_insecure_retry = os.getenv("ALLOW_INSECURE_SCRAPE_RETRY", "0").strip().lower() in {"1", "true", "yes", "on"}
+        self.cache_extraction = os.getenv("FACTLENS_CACHE_EXTRACTION", "0").strip().lower() in {"1", "true", "yes", "on"}
 
     def scrape(self, url):
         result = self.scrape_with_metadata(url)
@@ -45,7 +46,7 @@ class WebScraper:
                 timeout=self.timeout,
                 retries=2,
                 verify=True,
-                cache_dir="logs/extraction_cache",
+                cache_dir="logs/extraction_cache" if self.cache_extraction else None,
             )
             if (
                 self.allow_insecure_retry
@@ -58,7 +59,7 @@ class WebScraper:
                     timeout=self.timeout,
                     retries=1,
                     verify=False,
-                    cache_dir="logs/extraction_cache_insecure",
+                    cache_dir="logs/extraction_cache_insecure" if self.cache_extraction else None,
                 )
             print(
                 "Extraction:",

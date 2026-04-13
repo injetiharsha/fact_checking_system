@@ -47,7 +47,9 @@ class StanceDetector:
             "LABEL_1": "NEUTRAL",
             "LABEL_2": "SUPPORT",
             "SUPPORT": "SUPPORT",
+            "SUPPORTS": "SUPPORT",
             "REFUTE": "REFUTE",
+            "REFUTES": "REFUTE",
         }
 
         # Debug prints removed for speed. Uncomment for debugging.
@@ -121,7 +123,9 @@ class StanceDetector:
                 "LABEL_1": "NEUTRAL",
                 "LABEL_2": "SUPPORT",
                 "SUPPORT": "SUPPORT",
+                "SUPPORTS": "SUPPORT",
                 "REFUTE": "REFUTE",
+                "REFUTES": "REFUTE",
             }
             stance = stance_map.get(label, "NEUTRAL")
             filtered = self._postfilter_model_stance(

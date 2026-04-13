@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 import asyncio
 import argparse
 import json
@@ -9,15 +11,15 @@ from pathlib import Path
 
 from pipeline.claim_pipeline import ClaimPipeline
 
-os.environ.setdefault("BENCHMARK_DISABLE_STRUCTURED_APIS", "1")
-os.environ.setdefault("FACTLENS_CACHE_RETRIEVAL", "1")
-os.environ.setdefault("BENCHMARK_PRIMARY_SEARCH_ONLY", "1")
+os.environ.setdefault("FACTLENS_CACHE_RETRIEVAL", "0")
+os.environ.setdefault("FACTLENS_CACHE_EXTRACTION", "0")
 
 pipeline = ClaimPipeline()
 
 # limit concurrent pipelines (important for scraping stability)
-MAX_CONCURRENT = int(os.getenv("BENCHMARK_MAX_CONCURRENT", "1"))
+MAX_CONCURRENT = int(os.getenv("BENCHMARK_MAX_CONCURRENT", "4"))
 CLAIM_DELAY_SECONDS = float(os.getenv("BENCHMARK_CLAIM_DELAY_SECONDS", "0.75"))
+BENCHMARK_TIMEOUT_SECONDS = float(os.getenv("BENCHMARK_TIMEOUT_SECONDS", "600"))
 semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
 
@@ -125,7 +127,7 @@ async def process_claim(i, claim, active_claims, active_truth):
 
         error_text = None
         try:
-            res = await pipeline.run(claim)
+            res = await pipeline.run(claim, force_fresh_retrieval=True)
         except Exception as exc:
             res = {
                 "final_verdict": "NEUTRAL",
@@ -200,6 +202,8 @@ async def run_benchmark(active_claims, active_truth):
 def evaluate(results):
     correct = 0
     neutral = 0
+    actual_neutral = 0
+    predicted_neutral = 0
     tp = 0
     tn = 0
     fp = 0
@@ -208,6 +212,10 @@ def evaluate(results):
     predicted_negative = 0
     actual_positive = 0
     actual_negative = 0
+    binary_total = 0
+    adjusted_binary_total = 0
+    labels = ("TRUE", "FALSE", "NEUTRAL")
+    confusion = {truth: Counter() for truth in labels}
     failed_by_expected = Counter()
     failed_by_predicted = Counter()
     failed_by_tag = Counter()
@@ -235,6 +243,13 @@ def evaluate(results):
             if not evidence_items:
                 return "insufficient_evidence"
             return "neutral_despite_evidence"
+
+        if truth == "NEUTRAL":
+            if pred == "TRUE":
+                return "overclaim_support_on_neutral"
+            if pred == "FALSE":
+                return "overclaim_refute_on_neutral"
+            return "neutral_other"
 
         if truth == "TRUE" and pred != "TRUE":
             if "numeric" in tags:
@@ -278,25 +293,37 @@ def evaluate(results):
 
         if pred == "NEUTRAL":
             neutral += 1
+            predicted_neutral += 1
 
-        if is_pos:
+        if truth == "NEUTRAL":
+            actual_neutral += 1
+        elif is_pos:
             actual_positive += 1
         else:
             actual_negative += 1
 
+        confusion.setdefault(truth, Counter())
+        confusion[truth][pred] += 1
+
         if pred_pos:
             predicted_positive += 1
-        else:
+        elif pred == "FALSE":
             predicted_negative += 1
 
-        if pred_pos and is_pos:
-            tp += 1
-        elif pred_pos and not is_pos:
-            fp += 1
-        elif not pred_pos and is_pos:
-            fn += 1
-        else:
-            tn += 1
+        if truth in {"TRUE", "FALSE"}:
+            binary_total += 1
+            if pred_pos and is_pos:
+                tp += 1
+            elif pred_pos and not is_pos:
+                fp += 1
+            elif pred == "FALSE" and is_pos:
+                fn += 1
+            elif pred == "FALSE" and not is_pos:
+                tn += 1
+            elif pred == "NEUTRAL" and is_pos:
+                fn += 1
+            elif pred == "NEUTRAL" and not is_pos:
+                tn += 1
 
         if blocked:
             blocked_not_checkable += 1
@@ -313,14 +340,20 @@ def evaluate(results):
                 adjusted_correct += 1
             if pred == "NEUTRAL":
                 adjusted_neutral += 1
-            if pred_pos and is_pos:
-                adjusted_tp += 1
-            elif pred_pos and not is_pos:
-                adjusted_fp += 1
-            elif not pred_pos and is_pos:
-                adjusted_fn += 1
-            else:
-                adjusted_tn += 1
+            if truth in {"TRUE", "FALSE"}:
+                adjusted_binary_total += 1
+                if pred_pos and is_pos:
+                    adjusted_tp += 1
+                elif pred_pos and not is_pos:
+                    adjusted_fp += 1
+                elif pred == "FALSE" and is_pos:
+                    adjusted_fn += 1
+                elif pred == "FALSE" and not is_pos:
+                    adjusted_tn += 1
+                elif pred == "NEUTRAL" and is_pos:
+                    adjusted_fn += 1
+                elif pred == "NEUTRAL" and not is_pos:
+                    adjusted_tn += 1
 
         if pred != truth:
             failed_by_expected[truth] += 1
@@ -372,29 +405,34 @@ def evaluate(results):
         "correct_predictions": correct,
         "accuracy": round(correct / total, 3) if total else 0.0,
         "neutral_rate": round(neutral / total, 3) if total else 0.0,
+        "actual_neutral": actual_neutral,
+        "predicted_neutral": predicted_neutral,
         "actual_positive": actual_positive,
         "actual_negative": actual_negative,
         "predicted_positive": predicted_positive,
         "predicted_negative": predicted_negative,
+        "binary_ground_truth_total": binary_total,
         "tp": tp,
         "tn": tn,
         "fp": fp,
         "fn": fn,
-        "false_positive_rate": round(fp / total, 3) if total else 0.0,
-        "false_negative_rate": round(fn / total, 3) if total else 0.0,
+        "false_positive_rate": round(fp / binary_total, 3) if binary_total else 0.0,
+        "false_negative_rate": round(fn / binary_total, 3) if binary_total else 0.0,
         "precision_true_class": round(precision, 3),
         "recall_true_class": round(recall, 3),
         "f1_true_class": round(f1, 3),
         "blocked_not_checkable_count": blocked_not_checkable,
         "adjusted_total_claims": adjusted_total,
         "adjusted_correct_predictions": adjusted_correct,
+        "adjusted_binary_ground_truth_total": adjusted_binary_total,
         "adjusted_accuracy_excluding_blocked": round(adjusted_correct / adjusted_total, 3) if adjusted_total else 0.0,
         "adjusted_neutral_rate_excluding_blocked": round(adjusted_neutral / adjusted_total, 3) if adjusted_total else 0.0,
-        "adjusted_false_positive_rate_excluding_blocked": round(adjusted_fp / adjusted_total, 3) if adjusted_total else 0.0,
-        "adjusted_false_negative_rate_excluding_blocked": round(adjusted_fn / adjusted_total, 3) if adjusted_total else 0.0,
+        "adjusted_false_positive_rate_excluding_blocked": round(adjusted_fp / adjusted_binary_total, 3) if adjusted_binary_total else 0.0,
+        "adjusted_false_negative_rate_excluding_blocked": round(adjusted_fn / adjusted_binary_total, 3) if adjusted_binary_total else 0.0,
         "adjusted_precision_true_class_excluding_blocked": round(adjusted_precision, 3),
         "adjusted_recall_true_class_excluding_blocked": round(adjusted_recall, 3),
         "adjusted_f1_true_class_excluding_blocked": round(adjusted_f1, 3),
+        "label_confusion_matrix": {truth: dict(row) for truth, row in confusion.items()},
         "failed_by_expected_verdict": dict(failed_by_expected),
         "failed_by_predicted_verdict": dict(failed_by_predicted),
         "failed_by_claim_tag": dict(failed_by_tag),
@@ -489,7 +527,7 @@ def save_results(results, metrics, claim_times, total_time, output_path):
         "benchmark_metrics": metrics,
         "run_validity": run_validity,
         "total_time_seconds": total_time,
-        "average_claim_time": round(sum(claim_times)/len(claim_times),3),
+        "average_claim_time": round(sum(claim_times) / len(claim_times), 3) if claim_times else 0.0,
         "stage_timing_summary": stage_summary,
         "claims": results
     }
@@ -513,11 +551,14 @@ async def main():
     active_claims, active_truth = load_claim_batch(args.claims_file)
 
     try:
-        results, claim_times, total_time = await asyncio.wait_for(run_benchmark(active_claims, active_truth), timeout=600)
+        results, claim_times, total_time = await asyncio.wait_for(
+            run_benchmark(active_claims, active_truth),
+            timeout=BENCHMARK_TIMEOUT_SECONDS,
+        )
     except asyncio.TimeoutError:
         print("\n==============================")
-        print("BENCHMARK FAILED: Timeout after 600 seconds.")
-        results, claim_times, total_time = [], [], 600.0
+        print(f"BENCHMARK FAILED: Timeout after {BENCHMARK_TIMEOUT_SECONDS} seconds.")
+        results, claim_times, total_time = [], [], BENCHMARK_TIMEOUT_SECONDS
 
     metrics = evaluate(results)
 

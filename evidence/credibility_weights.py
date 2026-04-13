@@ -88,4 +88,4 @@ def get_weight(url):
             return 0.2
 
     # Default unknown source
-    return 0.5
+    return 0.65

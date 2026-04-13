@@ -17,6 +17,7 @@ from evidence.international.openfda import OpenFDAAPI
 from evidence.trusted_news.news_api import TrustedNewsAPI
 
 from evidence.general_search import SearchEngine
+from evidence.search_planner import SearchPlanner
 from evidence.local_rag import LocalRAGRetriever
 from evidence.scraper import WebScraper
 from evidence.credibility_weights import get_weight
@@ -140,6 +141,7 @@ class EvidenceRouter:
 
         # search + scraping
         self.search_engine = SearchEngine()
+        self.search_planner = SearchPlanner()
         self.scraper = WebScraper()
         self.reference_fallback = ReferenceFallback()
         self._evidence_cache = {}
@@ -310,15 +312,17 @@ class EvidenceRouter:
         self._emit_progress(progress_callback, stage="web_search", status="active", detail="Searching web sources")
         await self._flush_progress()
 
-        query_plan = self._build_search_queries(
+        search_plan = self.search_planner.build_plan(
             claim,
             context_result,
             claim_type_result,
             original_claim=original_claim,
             language=language,
         )
+        query_plan = list(search_plan.get("queries") or [])
         if trace is not None:
             trace["search_queries"] = list(query_plan)
+            trace["search_plan"] = dict(search_plan)
 
         search_results = []
         seen_urls = set()
@@ -328,7 +332,7 @@ class EvidenceRouter:
                     trace["search_short_circuit_reason"] = "all_search_backends_in_backoff"
                 break
             per_query_limit = 8 if index == 0 else 4
-            for result in self.search_engine.search(query, max_results=per_query_limit):
+            for result in self.search_engine.search(query, max_results=per_query_limit, plan=search_plan):
                 if trace is not None:
                     trace["search_cache_hit"] = bool(self.search_engine.last_trace.get("cache_hit", False))
                 selected_backend = str(self.search_engine.last_trace.get("selected_backend") or result.get("provider") or "search").strip().lower()
@@ -627,41 +631,6 @@ class EvidenceRouter:
 
         if isinstance(content, dict) and content.get("ok"):
             self._domain_backoff.pop(domain, None)
-
-    def _build_search_queries(self, claim, context_result=None, claim_type_result=None, original_claim=None, language=None):
-        base_claim = " ".join((claim or "").strip().split())
-        if not base_claim:
-            return []
-        original_query = " ".join((original_claim or "").strip().split())
-        query_language = str(language or "").strip().lower()
-        context_result = context_result or {}
-        hinted_query_language = str(context_result.get("query_language") or "").strip().lower()
-        region_hints = [str(item or "").strip().lower() for item in (context_result.get("region_hints") or []) if str(item or "").strip()]
-        state_focus = str(context_result.get("state_focus") or "").strip().lower()
-
-        candidates = [base_claim]
-        if original_query and original_query != base_claim and query_language and query_language != "en":
-            candidates.append(original_query)
-
-        # Add locality-aware variants in addition to the global query path.
-        if "india" in region_hints or state_focus:
-            candidates.append(f"india {base_claim}")
-        if state_focus:
-            state_tokens = state_focus.replace("_", " ").strip()
-            if state_tokens:
-                candidates.append(f"{state_tokens} {base_claim}")
-        if hinted_query_language and hinted_query_language not in {"en", query_language}:
-            candidates.append(f"{base_claim} {hinted_query_language}")
-
-        seen = set()
-        ordered = []
-        for candidate in candidates:
-            compact = re.sub(r"\s+", " ", candidate).strip()
-            key = compact.lower()
-            if compact and key not in seen:
-                seen.add(key)
-                ordered.append(compact)
-        return ordered[:4]
 
     @staticmethod
     def _tokenize_rank_text(text):

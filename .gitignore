@@ -52,6 +52,48 @@ trained_models/
 runs/
 .gradio/
 
+# Data, output, and result files
+*.csv
+*.tsv
+*.jsonl
+*.out
+*.output
+*.results
+*.bak
+*.tmp
+*.dat
+*.pth
+*.pt
+*.bin
+*.npz
+*.npy
+*.h5
+*.ckpt
+*.onnx
+*.pb
+*.weights
+*.model
+*.safetensors
+
+# Images and figures
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.svg
+
+# More output and checkpoint folders
+models/
+outputs/
+results_mnli/
+test_images/
+open_data/
+data/
+data_multinli/
+logs/
+
 # Generated benchmark/debug outputs
 batch_results.json
 multi_test_results.json

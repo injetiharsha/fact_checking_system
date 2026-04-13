@@ -1,12 +1,18 @@
-﻿import json
+import json
 import os
 import re
+import time
+from pathlib import Path
 from typing import Optional
 
 import requests
 
 
 class LLMVerifier:
+    _RATE_STATE_PATH = Path("logs/llm_verifier_rpm_state.json")
+    _RATE_LOCK_DIR = Path("logs/llm_verifier_rpm_state.lock")
+    _LOCK_STALE_SECONDS = 180.0
+
     def __init__(self):
         self.enabled = os.getenv("ENABLE_LLM_VERIFIER", "0").strip().lower() in {"1", "true", "yes", "on"}
         self.api_key = os.getenv("LLM_VERIFIER_API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -17,6 +23,8 @@ class LLMVerifier:
         self.policy = os.getenv("LLM_VERIFIER_POLICY", "neutral_only").strip().lower()
         self.max_items = max(1, int(os.getenv("LLM_VERIFIER_MAX_ITEMS", "3")))
         self.provider_name = os.getenv("LLM_VERIFIER_PROVIDER", "openai_compatible")
+        self.max_requests_per_minute = max(1, int(os.getenv("LLM_VERIFIER_MAX_REQUESTS_PER_MINUTE", "20")))
+        self._RATE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     @property
     def available(self):
@@ -34,6 +42,8 @@ class LLMVerifier:
     def verify(self, claim: str, sentence_text: str, context_text: Optional[str] = None):
         if not self.available:
             raise RuntimeError("LLM verifier is not configured")
+
+        self._acquire_global_rate_slot()
 
         evidence = (context_text or sentence_text or "").strip()
         if len(evidence) > self.max_context_chars:
@@ -96,6 +106,87 @@ class LLMVerifier:
             "source": f"llm_verifier:{self.provider_name}:{self.model}",
             "rationale": rationale[:240],
         }
+
+    def _acquire_global_rate_slot(self):
+        window_seconds = 60.0
+        min_interval_seconds = window_seconds / float(self.max_requests_per_minute)
+        while True:
+            self._acquire_lock()
+            try:
+                now = time.time()
+                state = self._load_rate_state()
+                timestamps = list(state.get("timestamps", []))
+                next_allowed_at = float(state.get("next_allowed_at", 0.0) or 0.0)
+                timestamps = [ts for ts in timestamps if (now - ts) < window_seconds]
+                next_slot_wait = max(0.0, next_allowed_at - now)
+                window_wait = 0.0
+                if len(timestamps) >= self.max_requests_per_minute:
+                    oldest = min(timestamps)
+                    window_wait = max(0.0, (oldest + window_seconds) - now)
+                wait_seconds = max(next_slot_wait, window_wait)
+                if wait_seconds <= 0.0:
+                    timestamps.append(now)
+                    state = {
+                        "timestamps": timestamps,
+                        "next_allowed_at": now + min_interval_seconds,
+                    }
+                    self._save_rate_state(state)
+                    return
+            finally:
+                self._release_lock()
+            time.sleep(max(0.05, wait_seconds + 0.05))
+
+    def _load_rate_state(self):
+        try:
+            payload = json.loads(self._RATE_STATE_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            return {"timestamps": [], "next_allowed_at": 0.0}
+        if isinstance(payload, list):
+            payload = {"timestamps": payload, "next_allowed_at": 0.0}
+        if not isinstance(payload, dict):
+            return {"timestamps": [], "next_allowed_at": 0.0}
+        cleaned = []
+        for item in payload.get("timestamps", []):
+            try:
+                cleaned.append(float(item))
+            except Exception:
+                continue
+        try:
+            next_allowed_at = float(payload.get("next_allowed_at", 0.0) or 0.0)
+        except Exception:
+            next_allowed_at = 0.0
+        return {"timestamps": cleaned, "next_allowed_at": next_allowed_at}
+
+    def _save_rate_state(self, state):
+        temp_path = self._RATE_STATE_PATH.with_suffix(".tmp")
+        temp_path.write_text(
+            json.dumps(state, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        os.replace(temp_path, self._RATE_STATE_PATH)
+
+    def _acquire_lock(self):
+        while True:
+            try:
+                os.mkdir(self._RATE_LOCK_DIR)
+                return
+            except FileExistsError:
+                try:
+                    age = time.time() - self._RATE_LOCK_DIR.stat().st_mtime
+                    if age > self._LOCK_STALE_SECONDS:
+                        os.rmdir(self._RATE_LOCK_DIR)
+                        continue
+                except FileNotFoundError:
+                    continue
+                except OSError:
+                    pass
+                time.sleep(0.05)
+
+    def _release_lock(self):
+        try:
+            os.rmdir(self._RATE_LOCK_DIR)
+        except FileNotFoundError:
+            return
 
     @staticmethod
     def _parse_json(content: str):

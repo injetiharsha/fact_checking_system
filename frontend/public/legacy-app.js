@@ -801,29 +801,42 @@ function renderDocumentResult(data) {
   `;
 
   const sourceUrl = data.source_url ? `<p class="meta">Source: <a href="${escapeAttr(data.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(data.source_url)}</a></p>` : "";
-  const primaryClaim = Array.isArray(data.results) && data.results[0] ? data.results[0] : null;
-  const pdfAnalysisSentence = buildPdfAnalysisSentence(data);
-  const primaryView = primaryClaim
-    ? {
-      ...primaryClaim,
-      claim: pdfAnalysisSentence,
-    }
-    : null;
-  const primary = primaryClaim
-    ? claimResultHtml(primaryView, null, false, {
-      header: "Representative Claim Snapshot",
-      extraClass: "document-primary-claim-card",
-      introNote: "This card shows the first extracted claim only. Use the document overview above as the actual PDF verdict.",
-    })
-    : "<p>No claim result returned.</p>";
-  const sourceEvidence = primaryClaim ? getDisplayEvidence(primaryClaim) : [];
+  // Show all claims and their evidence for PDFs
+  const claims = Array.isArray(data.results) ? data.results : [];
   const analyzedContext = renderPdfAnalyzedContext(data);
-  renderInlineSourcePreview(sourceEvidence);
+  let claimsHtml = "<div class='pdf-claims-list'>";
+  if (claims.length) {
+    claims.forEach((claim, idx) => {
+      const evidence = getDisplayEvidence(claim);
+      claimsHtml += `
+        <section class="pdf-claim-block">
+          <h5>Claim ${idx + 1}:</h5>
+          <div class="pdf-claim-text">${escapeHtml(claim.claim || claim.text || "[No claim text]")}</div>
+          <div class="pdf-claim-evidence-list">
+            <strong>Evidence sources:</strong>
+            <ul>
+              ${evidence.map(ev => {
+                const src = escapeHtml(ev.source || "Unknown");
+                const url = escapeAttr(ev.url || "");
+                const domain = extractDomain(ev.url || "");
+                return `<li><a href="${url}" target="_blank">${src}</a> <span class='pdf-evidence-domain'>(${domain})</span></li>`;
+              }).join("")}
+            </ul>
+          </div>
+        </section>
+      `;
+    });
+    claimsHtml += "</div>";
+  } else {
+    claimsHtml += "<p>No claims extracted from PDF.</p></div>";
+  }
   resultsNode.innerHTML = [
     cardHtml("Document Summary", `${sourceUrl}${summary}`, "document-summary-card"),
     analyzedContext,
-    primary,
+    claimsHtml,
   ].join("");
+  // Optionally, show all sources for the first claim in the inline preview
+  if (claims[0]) renderInlineSourcePreview(getDisplayEvidence(claims[0]));
 }
 
 function renderImageDocumentResult(data) {

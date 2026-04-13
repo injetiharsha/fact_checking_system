@@ -42,13 +42,17 @@ def _normalize_space(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "")).strip()
 
 
-def _cache_file(cache_dir: str | Path, url: str) -> Path:
+def _cache_file(cache_dir: str | Path | None, url: str) -> Path | None:
+    if not cache_dir:
+        return None
     digest = hashlib.sha1((url or "").encode("utf-8")).hexdigest()
     return Path(cache_dir) / f"{digest}.json"
 
 
-def _read_cache(cache_dir: str | Path, url: str) -> dict | None:
+def _read_cache(cache_dir: str | Path | None, url: str) -> dict | None:
     path = _cache_file(cache_dir, url)
+    if path is None:
+        return None
     if not path.exists():
         return None
     try:
@@ -57,8 +61,10 @@ def _read_cache(cache_dir: str | Path, url: str) -> dict | None:
         return None
 
 
-def _write_cache(cache_dir: str | Path, url: str, payload: dict) -> None:
+def _write_cache(cache_dir: str | Path | None, url: str, payload: dict) -> None:
     path = _cache_file(cache_dir, url)
+    if path is None:
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
@@ -130,7 +136,7 @@ def fetch_and_extract(
     timeout: int = 10,
     retries: int = 2,
     verify: bool = True,
-    cache_dir: str | Path = "logs/extraction_cache",
+    cache_dir: str | Path | None = "logs/extraction_cache",
 ) -> dict:
     enable_playwright = os.getenv("ENABLE_PLAYWRIGHT_FALLBACK", "0").strip().lower() in {"1", "true", "yes", "on"}
     cached = _read_cache(cache_dir, url)

@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 # Load env first and force model caches to a writable local path.
 BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / ".env", override=True)
 
 is_vercel = os.getenv("VERCEL") == "1"
 default_cache_dir = "/tmp/model_cache" if is_vercel else str(BASE_DIR / ".venv" / "model_cache")

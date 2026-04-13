@@ -26,162 +26,146 @@ class ClaimTypeClassifier:
     MIXED_BAND = 0.15
 
     def __init__(self):
-        # Prefer GPU if available, but allow override via config
-        self.device = torch.device(os.getenv("CLAIM_TYPE_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu"))
-        self.tokenizer = None
-        self.model = None
         self.model_mode = "heuristic"
         self.trained_checkpoint = None
-        self.trained_device = self.device.type if hasattr(self.device, "type") else "cpu"
-        self.helper_script = Path(__file__).with_name("subprocess_infer.py")
+        self.device = torch.device(os.getenv("CLAIM_TYPE_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.model = None
+        self.tokenizer = None
 
         runtime = runtime_model_settings("claim_type")
         checkpoint = runtime.get("checkpoint")
         if runtime.get("enabled") and checkpoint is not None:
             self.trained_checkpoint = Path(checkpoint)
-            # Prefer GPU if available, but allow override
-            self.trained_device = runtime.get("device") or ("cuda" if torch.cuda.is_available() else "cpu")
-            self.model_mode = "trained_multiclass"
-            print(
-                "ClaimTypeClassifier using trained checkpoint via isolated inference:",
-                checkpoint,
-            )
-
-        candidates = [
-            "distilbert-base-uncased-finetuned-sst-2-english",
-            "distilbert-base-uncased",
-        ]
-
-        for model_name in candidates:
+            self.device = torch.device(runtime.get("device") or ("cuda" if torch.cuda.is_available() else "cpu"))
             try:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    model_name, local_files_only=True
-                )
-                self.model = AutoModelForSequenceClassification.from_pretrained(
-                    model_name, local_files_only=True
-                ).to(self.device)
+                from transformers import AutoModelForSequenceClassification, AutoTokenizer
+                self.tokenizer = AutoTokenizer.from_pretrained(str(self.trained_checkpoint), use_fast=False)
+                self.model = AutoModelForSequenceClassification.from_pretrained(str(self.trained_checkpoint)).to(self.device)
                 self.model.eval()
-                self.model_mode = "cached_binary"
-                print(f"ClaimTypeClassifier using cached model: {model_name}")
-                break
-            except Exception:
-                continue
-
-        if self.model is None:
-            if self.trained_checkpoint is not None:
-                print(
-                    "ClaimTypeClassifier foundation cache unavailable; using trained subprocess path with heuristic fallback"
-                )
-            else:
+                self.model_mode = "trained_multiclass"
+                print(f"ClaimTypeClassifier loaded model on {self.device} from {self.trained_checkpoint}")
+            except Exception as e:
+                print(f"Failed to load claim type model: {e}")
+                self.model = None
+                self.tokenizer = None
+        else:
+            # Try to load a cached binary model as fallback
+            candidates = [
+                "distilbert-base-uncased-finetuned-sst-2-english",
+                "distilbert-base-uncased",
+            ]
+            for model_name in candidates:
+                try:
+                    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+                    self.tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+                    self.model = AutoModelForSequenceClassification.from_pretrained(model_name, local_files_only=True).to(self.device)
+                    self.model.eval()
+                    self.model_mode = "cached_binary"
+                    print(f"ClaimTypeClassifier using cached model: {model_name}")
+                    break
+                except Exception:
+                    continue
+            if self.model is None:
                 print("ClaimTypeClassifier fallback: heuristic mode (no cached model)")
 
     def classify(self, claim: str) -> dict:
-        if self.trained_checkpoint is not None:
-            trained_result = self._classify_with_subprocess(claim)
-            if trained_result is not None:
-                return trained_result
-
-        if self.model is None or self.tokenizer is None:
-            return self._heuristic_classify(
+        if self.model is not None and self.tokenizer is not None:
+            import torch.nn.functional as F
+            inputs = self.tokenizer(
                 claim,
-                decision_source="heuristic_no_model",
-            )
+                max_length=512,
+                truncation=True,
+                return_tensors="pt",
+            ).to(self.device)
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                logits = outputs.logits
+                probabilities = F.softmax(logits, dim=-1)
 
-        inputs = self.tokenizer(
-            claim,
-            max_length=512,
-            truncation=True,
-            return_tensors="pt",
-        ).to(self.device)
+            if probabilities.shape[-1] >= 4 and self.model_mode == "trained_multiclass":
+                predicted_idx = torch.argmax(probabilities, dim=-1).item()
+                confidence = probabilities[0][predicted_idx].item()
+                raw_label = str(self.model.config.id2label.get(predicted_idx, "FACTUAL")).lower()
+                score_map = {
+                    str(self.model.config.id2label.get(idx, idx)).lower(): float(probabilities[0][idx].item())
+                    for idx in range(probabilities.shape[-1])
+                }
+                if confidence < self.MODEL_CONFIDENCE_THRESHOLD:
+                    return self._heuristic_classify(
+                        claim,
+                        decision_source="heuristic_low_trained_model_confidence",
+                        model_scores={
+                            **score_map,
+                            "model_confidence": float(confidence),
+                        },
+                    )
+                label_map = {
+                    "factual": ClaimType.FACTUAL,
+                    "opinion": ClaimType.OPINION,
+                    "mixed": ClaimType.MIXED,
+                    "numerical": ClaimType.NUMERICAL,
+                }
+                claim_type = label_map.get(raw_label, ClaimType.FACTUAL)
+                return {
+                    "type": claim_type,
+                    "confidence": float(confidence),
+                    "reasoning": "Fine-tuned claim type model prediction",
+                    "decision_source": "trained_model",
+                    "scores": score_map,
+                    "model_confidence": float(confidence),
+                }
 
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            logits = outputs.logits
-            probabilities = torch.nn.functional.softmax(logits, dim=-1)
-
-        if probabilities.shape[-1] >= 4 and self.model_mode == "trained_multiclass":
-            predicted_idx = torch.argmax(probabilities, dim=-1).item()
-            confidence = probabilities[0][predicted_idx].item()
-            raw_label = str(
-                self.model.config.id2label.get(predicted_idx, "FACTUAL")
-            ).lower()
-            score_map = {
-                str(self.model.config.id2label.get(idx, idx)).lower(): float(
-                    probabilities[0][idx].item()
-                )
-                for idx in range(probabilities.shape[-1])
-            }
-            if confidence < self.MODEL_CONFIDENCE_THRESHOLD:
+            if probabilities.shape[-1] < 2:
                 return self._heuristic_classify(
                     claim,
-                    decision_source="heuristic_low_trained_model_confidence",
+                    decision_source="heuristic_invalid_model_output",
+                )
+
+            factual_prob = probabilities[0][0].item()
+            opinion_prob = probabilities[0][1].item()
+            model_confidence = max(factual_prob, opinion_prob)
+
+            if model_confidence < self.MODEL_CONFIDENCE_THRESHOLD:
+                return self._heuristic_classify(
+                    claim,
+                    decision_source="heuristic_low_model_confidence",
                     model_scores={
-                        **score_map,
-                        "model_confidence": float(confidence),
+                        "factual": float(factual_prob),
+                        "opinion": float(opinion_prob),
+                        "model_confidence": float(model_confidence),
                     },
                 )
-            label_map = {
-                "factual": ClaimType.FACTUAL,
-                "opinion": ClaimType.OPINION,
-                "mixed": ClaimType.MIXED,
-                "numerical": ClaimType.NUMERICAL,
-            }
-            claim_type = label_map.get(raw_label, ClaimType.FACTUAL)
+
+            if abs(factual_prob - opinion_prob) < self.MIXED_BAND:
+                claim_type = ClaimType.MIXED
+                confidence = model_confidence
+                reasoning = "Mixed factual and opinion elements"
+            elif opinion_prob > factual_prob:
+                claim_type = ClaimType.OPINION
+                confidence = opinion_prob
+                reasoning = "Opinion-leaning language"
+            else:
+                claim_type = ClaimType.FACTUAL
+                confidence = factual_prob
+                reasoning = "Factual-leaning language"
+
+            if self._has_numerical_content(claim) and claim_type == ClaimType.FACTUAL:
+                claim_type = ClaimType.NUMERICAL
+                reasoning = "Numerical/statistical factual claim"
+
             return {
                 "type": claim_type,
                 "confidence": float(confidence),
-                "reasoning": "Fine-tuned claim type model prediction",
-                "decision_source": "trained_model",
-                "scores": score_map,
-                "model_confidence": float(confidence),
+                "reasoning": reasoning,
+                "decision_source": "model",
+                "scores": {"factual": float(factual_prob), "opinion": float(opinion_prob)},
+                "model_confidence": float(model_confidence),
             }
 
-        if probabilities.shape[-1] < 2:
-            return self._heuristic_classify(
-                claim,
-                decision_source="heuristic_invalid_model_output",
-            )
-
-        factual_prob = probabilities[0][0].item()
-        opinion_prob = probabilities[0][1].item()
-        model_confidence = max(factual_prob, opinion_prob)
-
-        if model_confidence < self.MODEL_CONFIDENCE_THRESHOLD:
-            return self._heuristic_classify(
-                claim,
-                decision_source="heuristic_low_model_confidence",
-                model_scores={
-                    "factual": float(factual_prob),
-                    "opinion": float(opinion_prob),
-                    "model_confidence": float(model_confidence),
-                },
-            )
-
-        if abs(factual_prob - opinion_prob) < self.MIXED_BAND:
-            claim_type = ClaimType.MIXED
-            confidence = model_confidence
-            reasoning = "Mixed factual and opinion elements"
-        elif opinion_prob > factual_prob:
-            claim_type = ClaimType.OPINION
-            confidence = opinion_prob
-            reasoning = "Opinion-leaning language"
-        else:
-            claim_type = ClaimType.FACTUAL
-            confidence = factual_prob
-            reasoning = "Factual-leaning language"
-
-        if self._has_numerical_content(claim) and claim_type == ClaimType.FACTUAL:
-            claim_type = ClaimType.NUMERICAL
-            reasoning = "Numerical/statistical factual claim"
-
-        return {
-            "type": claim_type,
-            "confidence": float(confidence),
-            "reasoning": reasoning,
-            "decision_source": "model",
-            "scores": {"factual": float(factual_prob), "opinion": float(opinion_prob)},
-            "model_confidence": float(model_confidence),
-        }
+        return self._heuristic_classify(
+            claim,
+            decision_source="heuristic_no_model",
+        )
 
     def _heuristic_classify(self, claim: str, decision_source="heuristic", model_scores=None) -> dict:
         text = (claim or "").lower()

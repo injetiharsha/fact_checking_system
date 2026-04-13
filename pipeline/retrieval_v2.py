@@ -1,4 +1,4 @@
-from pipeline.claim_pipeline import extract_best_sentences, _should_skip_claim_reporting_sentence
+from pipeline.claim_pipeline import extract_best_sentences
 
 
 class RetrievalPipelineV2:
@@ -52,19 +52,6 @@ class RetrievalPipelineV2:
             passage_rows = []
             for candidate in candidates:
                 sentence = candidate["text"]
-                if _should_skip_claim_reporting_sentence(
-                    claim,
-                    sentence,
-                    source_name=ev.get("source"),
-                    context_result=context_result,
-                ):
-                    if trace is not None:
-                        trace["evidence_selected"].append({
-                            "url": ev.get("url"),
-                            "sentence": sentence,
-                            "skipped": "claim_reporting_sentence_v2",
-                        })
-                    continue
                 relevance_score = self.relevance_scorer.score(claim, sentence)
                 quality_score = self.quality_scorer.score(sentence)
                 selector_score = float(candidate.get("selector_score", 0.0))
