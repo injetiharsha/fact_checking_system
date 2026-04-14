@@ -32,6 +32,20 @@ class StanceDetector:
         self.polarized_min_confidence = float(os.getenv("POLARIZED_STANCE_MIN_CONFIDENCE", "0.68"))
         self.polarized_support_min_confidence = float(os.getenv("POLARIZED_STANCE_SUPPORT_MIN_CONFIDENCE", "0.72"))
 
+    def _resolved_model_source(self, low_confidence=False):
+        model_name = str(getattr(self.model, "model_name", "") or "").strip()
+        trained_checkpoint = str(getattr(self.model, "trained_checkpoint", "") or "").strip()
+        if model_name and model_name.lower() != "unknown":
+            base = model_name
+        elif trained_checkpoint:
+            base = f"trained_subprocess:{trained_checkpoint}"
+        elif getattr(self.model, "trained_checkpoint", None) is not None:
+            base = "trained_subprocess:configured_checkpoint"
+        else:
+            base = "heuristic_fallback"
+        prefix = "model_low_confidence_or_neutral" if low_confidence else "model"
+        return f"{prefix}:{base}"
+
     def detect(self, evidence, claim):
         evidence = (evidence or "")[:800]
 
@@ -70,7 +84,7 @@ class StanceDetector:
             return {
                 "stance": filtered,
                 "confidence": round(confidence, 3),
-                "source": f"model:{self.model.model_name or 'unknown'}",
+                "source": self._resolved_model_source(low_confidence=False),
             }
 
         # Conservative lexical fallback only for clear refutations.
@@ -106,7 +120,7 @@ class StanceDetector:
         return {
             "stance": "NEUTRAL",
             "confidence": round(confidence, 3),
-            "source": f"model_low_confidence_or_neutral:{self.model.model_name or 'unknown'}",
+            "source": self._resolved_model_source(low_confidence=True),
         }
 
     def detect_many(self, evidences, claim):
@@ -138,7 +152,7 @@ class StanceDetector:
                 results.append({
                     "stance": filtered,
                     "confidence": round(confidence, 3),
-                    "source": f"model:{self.model.model_name or 'unknown'}",
+                    "source": self._resolved_model_source(low_confidence=False),
                 })
                 continue
 
@@ -174,7 +188,7 @@ class StanceDetector:
             results.append({
                 "stance": "NEUTRAL",
                 "confidence": round(confidence, 3),
-                "source": f"model_low_confidence_or_neutral:{self.model.model_name or 'unknown'}",
+                "source": self._resolved_model_source(low_confidence=True),
             })
         return results
 

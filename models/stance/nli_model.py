@@ -91,6 +91,7 @@ class NLIModel:
         self.trained_checkpoint = None
         self.trained_device = requested_device or "cpu"
         self.helper_script = Path(__file__).with_name("subprocess_infer.py")
+        self.use_foundation_fallback = os.getenv("STANCE_USE_FOUNDATION_FALLBACK", "0").strip().lower() in {"1", "true", "yes", "on"}
 
         checkpoint = runtime.get("checkpoint")
         if runtime.get("enabled") and checkpoint is not None:
@@ -99,6 +100,10 @@ class NLIModel:
                 "Configured trained NLI checkpoint for isolated inference:",
                 self.trained_checkpoint,
             )
+
+        if self.trained_checkpoint is not None and not self.use_foundation_fallback:
+            print("NLIModel using trained checkpoint only; foundation fallback disabled")
+            return
 
         preferred_foundation = (
             os.getenv("STANCE_FOUNDATION_MODEL")
@@ -236,9 +241,8 @@ class NLIModel:
         if self.trained_checkpoint is not None:
             trained_result = self._predict_with_subprocess(claim, evidence)
             if trained_result is not None:
-                _, trained_conf = trained_result
-                if float(trained_conf) < self.TRAINED_CONFIDENCE_THRESHOLD:
-                    trained_result = None
+                self._prediction_cache[cache_key] = trained_result
+                return trained_result
 
         foundation_result = None
         if self.model is not None and self.tokenizer is not None:

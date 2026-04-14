@@ -1,12 +1,13 @@
 from dotenv import load_dotenv
 load_dotenv()
+
 import asyncio
 import argparse
 import json
 import os
 import sys
 import time
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
 from pipeline.claim_pipeline import ClaimPipeline
@@ -21,13 +22,6 @@ CLAIM_DELAY_SECONDS = float(os.getenv("BENCHMARK_CLAIM_DELAY_SECONDS", "0.75"))
 BENCHMARK_TIMEOUT_SECONDS = float(os.getenv("BENCHMARK_TIMEOUT_SECONDS", "900"))
 semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
-
-def _safe_console_text(value):
-    text = str(value)
-    enc = sys.stdout.encoding or "utf-8"
-    return text.encode(enc, errors="replace").decode(enc, errors="replace")
-
-
 LABEL_ALIASES = {
     "TRUE": "SUPPORT",
     "SUPPORT": "SUPPORT",
@@ -37,50 +31,54 @@ LABEL_ALIASES = {
     "NEUTRAL": "NEUTRAL",
 }
 
+DEFAULT_CLAIMS_FILE = "benchmark_claims/topic_mix_30_v1.json"
+
+
+def _safe_console_text(value):
+    text = str(value)
+    enc = sys.stdout.encoding or "utf-8"
+    return text.encode(enc, errors="replace").decode(enc, errors="replace")
+
 
 def _canonical_label(value):
     return LABEL_ALIASES.get(str(value or "").strip().upper(), "NEUTRAL")
-
-
-DEFAULT_CLAIMS_FILE = "benchmark_claims/indian_languages_factual.json"
 
 
 def load_claim_batch(path: str | None):
     if not path:
         path = DEFAULT_CLAIMS_FILE
 
-    batch_path = Path(path)
-    payload = json.loads(batch_path.read_text(encoding="utf-8-sig"))
+    payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     if not isinstance(payload, list):
-        raise ValueError("Claims file must be a JSON list of {language, claim, expected_verdict} items.")
+        raise ValueError("Claims file must be a JSON list of {context_label, claim, expected_verdict} items.")
 
-    loaded_rows = []
+    rows = []
     for idx, row in enumerate(payload):
         if not isinstance(row, dict):
             raise ValueError(f"Invalid item at index {idx}: expected object.")
+        context_label = row.get("context_label")
         claim = row.get("claim")
         verdict = row.get("expected_verdict")
-        language = row.get("language")
-        if not claim or not verdict or not language:
-            raise ValueError(f"Missing language, claim or expected_verdict at index {idx}.")
-        loaded_rows.append({
-            "language": str(language).lower(),
+        if not context_label or not claim or not verdict:
+            raise ValueError(f"Missing context_label, claim or expected_verdict at index {idx}.")
+        rows.append({
+            "context_label": str(context_label).upper(),
             "claim": str(claim),
             "expected_verdict": _canonical_label(verdict),
             "source_hint": row.get("source_hint"),
         })
-    return loaded_rows
+    return rows
 
 
 async def process_claim(i, row, total_rows):
     async with semaphore:
         claim = row["claim"]
-        language = row["language"]
+        topic = row["context_label"]
         expected = row["expected_verdict"]
 
         print("\n==============================")
         print(f"Processing claim {i+1}/{len(total_rows)}")
-        print("Language:", language)
+        print("Topic:", topic)
         print("Claim:", _safe_console_text(claim))
 
         start = time.time()
@@ -119,7 +117,7 @@ async def process_claim(i, row, total_rows):
             await asyncio.sleep(CLAIM_DELAY_SECONDS)
 
         return {
-            "language": language,
+            "context_label": topic,
             "claim": claim,
             "predicted_verdict": verdict,
             "expected_verdict": expected,
@@ -147,15 +145,14 @@ def evaluate(results):
     confusion = {truth: Counter() for truth in labels}
     failed_by_expected = Counter()
     failed_by_predicted = Counter()
-    failed_by_language = Counter()
+    failed_by_topic = Counter()
     failed_claims = []
-    language_total = Counter()
-    language_correct = Counter()
-    language_neutral = Counter()
+    topic_total = Counter()
+    topic_correct = Counter()
+    topic_neutral = Counter()
 
     correct = 0
     neutral = 0
-    blocked_not_checkable = 0
     tp = tn = fp = fn = 0
     predicted_positive = predicted_negative = 0
     actual_positive = actual_negative = 0
@@ -164,41 +161,29 @@ def evaluate(results):
     for r in results:
         pred = _canonical_label(r["predicted_verdict"])
         truth = _canonical_label(r["expected_verdict"])
-        language = r.get("language", "unknown")
-        transparency = {}
-        output = r.get("pipeline_output")
-        if isinstance(output, dict):
-            first = None
-            rows = output.get("results")
-            if isinstance(rows, list) and rows and isinstance(rows[0], dict):
-                first = rows[0]
-            elif "final_verdict" in output:
-                first = output
-            if isinstance(first, dict):
-                transparency = first.get("transparency", {}) or {}
+        topic = r.get("context_label", "UNKNOWN")
 
-        language_total[language] += 1
+        topic_total[topic] += 1
         if pred == truth:
             correct += 1
-            language_correct[language] += 1
+            topic_correct[topic] += 1
         else:
             failed_by_expected[truth] += 1
             failed_by_predicted[pred] += 1
-            failed_by_language[language] += 1
+            failed_by_topic[topic] += 1
             failed_claims.append({
-                "language": language,
+                "context_label": topic,
                 "claim": r["claim"],
                 "expected_verdict": truth,
                 "predicted_verdict": pred,
                 "source_hint": r.get("source_hint"),
                 "time_seconds": r.get("time_seconds"),
-                "transparency": transparency,
                 "error": r.get("error"),
             })
 
         if pred == "NEUTRAL":
             neutral += 1
-            language_neutral[language] += 1
+            topic_neutral[topic] += 1
 
         confusion.setdefault(truth, Counter())
         confusion[truth][pred] += 1
@@ -225,57 +210,58 @@ def evaluate(results):
             elif pred == "REFUTE" and is_pos:
                 fn += 1
 
-        checkability = ((transparency.get("claim_checkability") or {}) if isinstance(transparency, dict) else {})
-        if checkability.get("allowed") is False:
-            blocked_not_checkable += 1
-
-    per_language_metrics = {}
-    for language, total in sorted(language_total.items()):
-        lang_correct = language_correct[language]
-        lang_neutral = language_neutral[language]
-        per_language_metrics[language] = {
+    per_topic_metrics = {}
+    for topic, total in sorted(topic_total.items()):
+        per_topic_metrics[topic] = {
             "total_claims": total,
-            "correct_predictions": lang_correct,
-            "accuracy": round(lang_correct / total, 3) if total else 0.0,
-            "neutral_rate": round(lang_neutral / total, 3) if total else 0.0,
-            "failed_predictions": failed_by_language[language],
+            "correct_predictions": topic_correct[topic],
+            "accuracy": round(topic_correct[topic] / total, 3) if total else 0.0,
+            "neutral_rate": round(topic_neutral[topic] / total, 3) if total else 0.0,
+            "failed_predictions": failed_by_topic[topic],
         }
 
-    metrics = {
+    return {
         "total_claims": len(results),
         "correct_predictions": correct,
         "accuracy": round(correct / len(results), 3) if results else 0.0,
         "neutral_rate": round(neutral / len(results), 3) if results else 0.0,
-        "blocked_not_checkable_count": blocked_not_checkable,
         "actual_positive": actual_positive,
         "actual_negative": actual_negative,
         "predicted_positive": predicted_positive,
         "predicted_negative": predicted_negative,
-        "binary_ground_truth_total": binary_total,
         "tp": tp,
         "tn": tn,
         "fp": fp,
         "fn": fn,
         "false_positive_rate": round(fp / binary_total, 3) if binary_total else 0.0,
         "false_negative_rate": round(fn / binary_total, 3) if binary_total else 0.0,
-        "label_confusion_matrix": {truth: dict(row) for truth, row in confusion.items()},
         "failed_by_expected_verdict": dict(failed_by_expected),
         "failed_by_predicted_verdict": dict(failed_by_predicted),
-        "failed_by_language": dict(failed_by_language),
-        "per_language_metrics": per_language_metrics,
+        "failed_by_topic": dict(failed_by_topic),
+        "confusion_matrix": {k: dict(v) for k, v in confusion.items()},
+        "per_topic_metrics": per_topic_metrics,
         "failed_claims": failed_claims,
     }
-    return metrics
+
+
+def save_results(results, metrics, claim_times, total_time, output_path):
+    output = {
+        "benchmark_metrics": metrics,
+        "total_time_seconds": total_time,
+        "average_claim_time": round(sum(claim_times) / len(claim_times), 3) if claim_times else 0.0,
+        "claims": results,
+    }
+    Path(output_path).write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\nResults saved to {output_path}")
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="Run the Indian-language benchmark.")
-    parser.add_argument("--claims-file", default=None, help="Optional JSON file with {language, claim, expected_verdict} rows.")
-    parser.add_argument("--output", default="indian_language_benchmark_results.json", help="Output JSON path.")
+    parser = argparse.ArgumentParser(description="Run topic-balanced 30-claim benchmark.")
+    parser.add_argument("--claims-file", default=None, help="Optional JSON file with {context_label, claim, expected_verdict} rows.")
+    parser.add_argument("--output", default="benchmark_topic_mix_30_results.json", help="Output JSON path.")
     args = parser.parse_args()
 
     rows = load_claim_batch(args.claims_file)
-
     try:
         results, claim_times, total_time = await asyncio.wait_for(
             run_benchmark(rows),
@@ -287,24 +273,23 @@ async def main():
         results, claim_times, total_time = [], [], BENCHMARK_TIMEOUT_SECONDS
 
     metrics = evaluate(results)
-    output = {
-        "benchmark_metrics": metrics,
-        "total_time_seconds": total_time,
-        "average_claim_time": round(sum(claim_times) / len(claim_times), 3) if claim_times else 0.0,
-        "claim_results": results,
-    }
-
-    Path(args.output).write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print("\n==============================")
     print("BENCHMARK METRICS")
     print("==============================")
-    for k, v in metrics.items():
-        if k in {"label_confusion_matrix", "failed_claims", "per_language_metrics"}:
-            continue
-        print(f"{k} : {v}")
-    print("per_language_metrics :", metrics.get("per_language_metrics"))
-    print("\nResults saved to", args.output)
+    for key in [
+        "total_claims", "correct_predictions", "accuracy", "neutral_rate",
+        "actual_positive", "actual_negative",
+        "predicted_positive", "predicted_negative",
+        "tp", "tn", "fp", "fn",
+        "false_positive_rate", "false_negative_rate",
+    ]:
+        print(key, ":", metrics.get(key))
+    print("failed_by_expected_verdict :", metrics.get("failed_by_expected_verdict"))
+    print("failed_by_predicted_verdict :", metrics.get("failed_by_predicted_verdict"))
+    print("failed_by_topic :", metrics.get("failed_by_topic"))
+
+    save_results(results, metrics, claim_times, total_time, args.output)
 
 
 if __name__ == "__main__":

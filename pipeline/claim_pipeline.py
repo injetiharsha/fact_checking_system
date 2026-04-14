@@ -151,7 +151,169 @@ def _claim_reporting_penalty(claim, sentence, source_name=None, context_result=N
 
 
 def _metadata_or_shell_penalty(sentence, source_name=None, context_text=None):
+    text = " ".join(
+        part.strip().lower()
+        for part in [sentence or "", context_text or "", source_name or ""]
+        if str(part or "").strip()
+    )
+    if not text:
+        return 0.0
+
+    heavy_markers = (
+        "cookie policy",
+        "accept cookies",
+        "privacy policy",
+        "terms of use",
+        "all rights reserved",
+        "sign in",
+        "log in",
+        "subscribe",
+        "newsletter",
+        "follow us",
+        "share this",
+        "advertisement",
+        "sponsored",
+        "read more",
+        "click here",
+        "watch live",
+        "live updates",
+        "photo gallery",
+        "image source",
+        "image credit",
+        "published on",
+        "updated on",
+        "min read",
+        "breadcrumb",
+    )
+    medium_markers = (
+        "author",
+        "copyright",
+        "comments",
+        "menu",
+        "navigation",
+        "skip to content",
+        "related stories",
+        "related articles",
+        "recommended",
+        "trending",
+    )
+    if any(marker in text for marker in heavy_markers):
+        return 0.22
+    if any(marker in text for marker in medium_markers):
+        return 0.1
+
+    words = (sentence or "").split()
+    if words:
+        alpha_ratio = sum(ch.isalpha() for ch in (sentence or "")) / max(len(sentence or ""), 1)
+        if len(words) < 8 and alpha_ratio < 0.65:
+            return 0.08
     return 0.0
+
+
+def _sentence_similarity(a, b):
+    a_tokens = _token_set(a)
+    b_tokens = _token_set(b)
+    if not a_tokens or not b_tokens:
+        return 0.0
+    return len(a_tokens & b_tokens) / max(len(a_tokens | b_tokens), 1)
+
+
+def _claim_evidence_overlap_ratio(claim, evidence):
+    claim_tokens = {
+        token for token in _token_set(claim)
+        if len(token) > 2 and token not in {
+            "the", "and", "for", "with", "from", "that", "this",
+            "said", "says", "will", "would", "could", "about", "into",
+            "after", "before", "during", "under", "over",
+        }
+    }
+    evidence_tokens = _token_set(evidence)
+    if not claim_tokens or not evidence_tokens:
+        return 0.0
+    return len(claim_tokens & evidence_tokens) / max(len(claim_tokens), 1)
+
+
+def _looks_like_code_or_template_sentence(sentence):
+    lowered = str(sentence or "").lower()
+    if any(marker in lowered for marker in (
+        "document.getelementsbytagname",
+        "href.indexof(",
+        "window.location",
+        "queryselector(",
+        "getelementbyid(",
+        "addEventlistener(",
+        "function(",
+        "function ",
+    )):
+        return True
+    if re.search(r"(?:^|\s)(if|for|while|function|return|var|const|let)(?:\s|\()", lowered):
+        return True
+    return False
+
+
+def _weighted_direction_strength(row):
+    confidence = float(row.get("confidence", 0.0) or 0.0)
+    weight = float(row.get("weight", 0.0) or 0.0)
+    source = str(row.get("stance_source") or "").lower()
+    multiplier = 1.0
+    if "heuristic" in source:
+        multiplier *= 0.9
+    if "model_low_confidence_or_neutral" in source:
+        multiplier *= 0.8
+    if source.startswith("model:trained_subprocess:") and confidence < 0.65:
+        multiplier *= 0.9
+    if source.startswith("model:") and "trained_subprocess:" not in source:
+        multiplier *= 0.75
+    return confidence * weight * multiplier
+
+
+def _is_trusted_llm_override_source(url):
+    lowered = str(url or "").lower()
+    trusted_markers = (
+        ".gov",
+        ".gov.in",
+        ".edu",
+        "who.int",
+        "un.org",
+        "worldbank.org",
+        "oecd.org",
+        "rbi.org.in",
+        "pib.gov.in",
+        "nasa.gov",
+        "jpl.nasa.gov",
+        "britannica.com",
+        "wikipedia.org",
+        "reuters.com",
+        "apnews.com",
+        "bbc.com",
+        "livescience.com",
+        "nationalgeographic.com",
+    )
+    return any(marker in lowered for marker in trusted_markers)
+
+
+def _select_candidates_mmr(candidates, max_sentences=3, lambda_weight=0.86):
+    ranked = sorted(candidates, key=lambda item: item[1], reverse=True)
+    if len(ranked) <= max_sentences:
+        return ranked[:max_sentences]
+
+    seed_pool = ranked[: min(len(ranked), 5)]
+    selected = [seed_pool[0]]
+    remaining = seed_pool[1:]
+
+    while remaining and len(selected) < max_sentences:
+        best_idx = 0
+        best_score = None
+        for idx, candidate in enumerate(remaining):
+            sentence = candidate[0]
+            relevance = float(candidate[1])
+            redundancy = max(_sentence_similarity(sentence, chosen[0]) for chosen in selected)
+            mmr_score = (lambda_weight * relevance) - ((1.0 - lambda_weight) * redundancy)
+            if best_score is None or mmr_score > best_score:
+                best_score = mmr_score
+                best_idx = idx
+        selected.append(remaining.pop(best_idx))
+    return selected
 
 
 def _is_official_public_admin_source(url):
@@ -213,6 +375,8 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
 
         if len(words) < 6 or len(words) > 80:
             continue
+        if _looks_like_code_or_template_sentence(sent):
+            continue
 
         normalized_sentence = " ".join(sent.lower().split())
         if normalized_sentence in seen_sentences:
@@ -238,6 +402,9 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
             source_name=source_name,
             context_text=context_text,
         )
+        overlap_ratio = _claim_evidence_overlap_ratio(claim, sent)
+        if overlap_ratio < 0.18 and fast_score < 0.45:
+            continue
         lexical_score = (
             (fast_score * 0.96)
             + (overlap * 0.02)
@@ -324,13 +491,13 @@ def extract_best_sentences(claim, text, relevance_scorer, max_sentences=3, sourc
                     context_text,
                 )
             )
-        rescored.sort(key=lambda item: item[1], reverse=True)
-        selected_candidates = rescored[:max_sentences]
+        selected_candidates = _select_candidates_mmr(rescored, max_sentences=max_sentences)
     else:
         ranked = sorted(rescored_candidates, key=lambda item: item[1], reverse=True)
+        mmr_ranked = _select_candidates_mmr(ranked, max_sentences=max_sentences)
         selected_candidates = [
             (sent, score, score, semantic_score, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text)
-            for sent, score, semantic_score, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text in ranked[:max_sentences]
+            for sent, score, semantic_score, fast_score, reporting_penalty, metadata_penalty, direct_bonus, lead_bonus, context_text in mmr_ranked
         ]
 
     print("\n--- Sentence candidates ---")
@@ -900,6 +1067,11 @@ class ClaimPipeline:
                 "retrieval_attempt": int(trace.get("retrieval_attempt", 1)) if isinstance(trace, dict) else 1,
                 "retrieval_expanded": bool(trace.get("retrieval_expanded", False)) if isinstance(trace, dict) else False,
             },
+            "retrieval_audit": {
+                "search_results": list(trace.get("search_results", [])) if isinstance(trace, dict) else [],
+                "scraped_pages": list(trace.get("scraped_pages", [])) if isinstance(trace, dict) else [],
+                "evidence_selected": list(trace.get("evidence_selected", [])) if isinstance(trace, dict) else [],
+            },
             "experimental_rerank": {
                 "enabled": bool(trace.get("index_rerank", {}).get("enabled")) if isinstance(trace, dict) else False,
                 "baseline_order": list(trace.get("index_rerank_baseline_order", [])) if isinstance(trace, dict) else [],
@@ -1080,6 +1252,48 @@ class ClaimPipeline:
         self._emit_progress(progress_callback, stage="language", status="done", detail=language_detail)
         await self._flush_progress()
 
+        # checkability first
+        checkability = self.claim_checkability.classify(
+            claim,
+            logical_metadata=logic_metadata,
+        )
+        trace["claim_checkability"] = {
+            **checkability,
+            "label": getattr(checkability.get("label"), "value", checkability.get("label")),
+            "subtype": getattr(checkability.get("subtype"), "value", checkability.get("subtype")),
+        }
+        if not checkability.get("allowed", True):
+            warning = {
+                "code": checkability.get("code", "not_checkable"),
+                "severity": "error",
+                "block": True,
+                "message": checkability.get("message", "This input is not a fact-checkable claim."),
+            }
+            combined_warnings = [warning] + list(ux_warnings or [])
+            transparency = {
+                "version": "phase6-v1",
+                "language_detected": language,
+                "status": "blocked_not_checkable",
+                "claim_checkability": {
+                    **trace["claim_checkability"],
+                },
+                "stage_timings_seconds": dict(stage_timings),
+            }
+            return {
+                "claim": claim,
+                "language": language,
+                "evidence": [],
+                "final_verdict": "NEUTRAL",
+                "confidence": 0.0,
+                "conflict_analysis": "Input is not a fact-checkable claim",
+                "citations": [],
+                "logical_analysis": logic_metadata,
+                "explanation": checkability.get("message", "This input is not a fact-checkable claim."),
+                "transparency": transparency,
+                "search_queries": [],
+                "ux_warnings": combined_warnings,
+            }
+
         # classify claim type (FACTUAL, OPINION, NUMERICAL, MIXED)
         start = time.time()
         claim_type_result = self.claim_type_classifier.classify(claim)
@@ -1104,53 +1318,6 @@ class ClaimPipeline:
         )
         stage_timings["claim_context_classification"] = round(time.time() - start, 3)
         print("Claim context classification:", stage_timings["claim_context_classification"], "sec")
-
-        checkability = self.claim_checkability.classify(
-            claim,
-            claim_type_result=claim_type_result,
-            logical_metadata=logic_metadata,
-        )
-        trace["claim_checkability"] = {
-            **checkability,
-            "label": getattr(checkability.get("label"), "value", checkability.get("label")),
-            "subtype": getattr(checkability.get("subtype"), "value", checkability.get("subtype")),
-        }
-        if not checkability.get("allowed", True):
-            warning = {
-                "code": checkability.get("code", "not_checkable"),
-                "severity": "error",
-                "block": True,
-                "message": checkability.get("message", "This input is not a fact-checkable claim."),
-            }
-            combined_warnings = [warning] + list(ux_warnings or [])
-            transparency = {
-                "version": "phase6-v1",
-                "language_detected": language,
-                "status": "blocked_not_checkable",
-                "claim_type": {
-                    **claim_type_result,
-                    "type": claim_type_result["type"].value,
-                },
-                "claim_context": dict(context_result),
-                "claim_checkability": {
-                    **trace["claim_checkability"],
-                },
-                "stage_timings_seconds": dict(stage_timings),
-            }
-            return {
-                "claim": claim,
-                "language": language,
-                "evidence": [],
-                "final_verdict": "NEUTRAL",
-                "confidence": 0.0,
-                "conflict_analysis": "Input is not a fact-checkable claim",
-                "citations": [],
-                "logical_analysis": logic_metadata,
-                "explanation": checkability.get("message", "This input is not a fact-checkable claim."),
-                "transparency": transparency,
-                "search_queries": [],
-                "ux_warnings": combined_warnings,
-            }
 
         # extract domain to exclude original source
         exclude_domain = None
@@ -1386,14 +1553,20 @@ class ClaimPipeline:
                 quality_score = self.quality_scorer.score(best_sentence)
                 stage_timings["quality_scoring"] += time.time() - quality_start
                 effective_relevance = round(min(1.0, (relevance_score * 0.85) + (selector_score * 0.15)), 3)
+                overlap_ratio = _claim_evidence_overlap_ratio(claim, best_sentence)
 
                 print("Relevance:", relevance_score)
                 print("Selector:", selector_score)
                 print("Effective relevance:", effective_relevance)
                 print("Quality:", quality_score)
+                print("Overlap ratio:", round(overlap_ratio, 3))
 
                 evidence_tier = None
                 adjusted_weight = ev["weight"]
+
+                if overlap_ratio < 0.22 and effective_relevance < max(scoring_profile["soft_relevance"], 0.35):
+                    print("Rejected evidence (low overlap)")
+                    continue
 
                 if (
                     effective_relevance >= scoring_profile["strong_relevance"]
@@ -1426,6 +1599,7 @@ class ClaimPipeline:
                     "metadata_penalty": metadata_penalty,
                     "direct_answer_bonus": direct_answer_bonus,
                     "lead_bonus": lead_bonus,
+                    "overlap_ratio": round(overlap_ratio, 3),
                     "quality_score": quality_score,
                     "combined_score": round(effective_relevance * quality_score, 4),
                     "evidence_tier": evidence_tier,
@@ -1441,6 +1615,7 @@ class ClaimPipeline:
                     "metadata_penalty": metadata_penalty,
                     "direct_answer_bonus": direct_answer_bonus,
                     "lead_bonus": lead_bonus,
+                    "overlap_ratio": round(overlap_ratio, 3),
                     "quality": quality_score
                 })
 
@@ -1582,7 +1757,13 @@ class ClaimPipeline:
 
             print("Stance:", _safe_console_text(stance_result))
 
-            if llm_verifier_enabled and self.llm_verifier.should_verify(len(results), stance_result.get("stance")):
+            overlap_ratio = _claim_evidence_overlap_ratio(claim, highlighted)
+            llm_overlap_ok = (
+                overlap_ratio >= 0.34
+                or float(ev.get("selector_score", 0.0) or 0.0) >= 0.88
+                or float(ev.get("relevance_score", 0.0) or 0.0) >= 0.9
+            )
+            if llm_verifier_enabled and llm_overlap_ok and self.llm_verifier.should_verify(len(results), stance_result.get("stance")):
                 try:
                     llm_start = time.time()
                     llm_result = self.llm_verifier.verify(claim, highlighted, ev.get("context_text"))
@@ -1600,12 +1781,35 @@ class ClaimPipeline:
                             "stance": llm_result.get("stance"),
                             "reason": "regional_local_non_official_source",
                         })
+                    trusted_llm_source = _is_trusted_llm_override_source(ev.get("url"))
+                    llm_override_allowed = (
+                        trusted_llm_source
+                        and overlap_ratio >= 0.45
+                        and float(ev.get("relevance_score", 0.0) or 0.0) >= 0.75
+                        and float(ev.get("selector_score", 0.0) or 0.0) >= 0.7
+                    )
                     if llm_result.get("stance") != "NEUTRAL" and llm_non_neutral_allowed:
-                        stance_result = llm_result
+                        if llm_override_allowed:
+                            stance_result = llm_result
+                        else:
+                            trace.setdefault("llm_verifier_suppressed", []).append({
+                                "url": ev.get("url"),
+                                "stance": llm_result.get("stance"),
+                                "reason": "override_guard_low_trust_or_low_overlap",
+                                "overlap_ratio": round(overlap_ratio, 3),
+                            })
                     elif llm_result.get("stance") == "NEUTRAL" and stance_result.get("stance") == "NEUTRAL":
                         stance_result = llm_result
                 except Exception as exc:
                     trace.setdefault("llm_verifier_errors", []).append(str(exc))
+            elif llm_verifier_enabled and not llm_overlap_ok and self.llm_verifier.should_verify(len(results), stance_result.get("stance")):
+                trace.setdefault("llm_verifier_skipped", []).append({
+                    "url": ev.get("url"),
+                    "reason": "low_claim_overlap",
+                    "overlap_ratio": round(overlap_ratio, 3),
+                    "selector_score": round(float(ev.get("selector_score", 0.0) or 0.0), 3),
+                    "relevance_score": round(float(ev.get("relevance_score", 0.0) or 0.0), 3),
+                })
 
             if stance_result.get("stance") == "NEUTRAL":
                 year_check = year_reasoning(claim, highlighted)
@@ -1849,17 +2053,26 @@ class ClaimPipeline:
 
         # Guardrail: mixed support/refute evidence with weak margin should not end as TRUE/FALSE.
         if verdict in {"TRUE", "FALSE"} and support_items and refute_items:
-            support_strength = sum(
-                float(r.get("confidence", 0.0) or 0.0) * float(r.get("weight", 0.0) or 0.0)
-                for r in support_items
-            )
-            refute_strength = sum(
-                float(r.get("confidence", 0.0) or 0.0) * float(r.get("weight", 0.0) or 0.0)
-                for r in refute_items
-            )
+            support_strength = sum(_weighted_direction_strength(r) for r in support_items)
+            refute_strength = sum(_weighted_direction_strength(r) for r in refute_items)
             total_strength = support_strength + refute_strength
             strength_margin = abs(support_strength - refute_strength) / max(total_strength, 1e-6)
-            if confidence < 0.4 or strength_margin < 0.2:
+            trusted_support_max = max(
+                (_weighted_direction_strength(r) for r in support_items if _is_trusted_llm_override_source(r.get("url"))),
+                default=0.0,
+            )
+            trusted_refute_max = max(
+                (_weighted_direction_strength(r) for r in refute_items if _is_trusted_llm_override_source(r.get("url"))),
+                default=0.0,
+            )
+            dominant_trusted_strength = max(trusted_support_max, trusted_refute_max)
+            opposing_strength = min(support_strength, refute_strength)
+            allow_dominant_trusted_decision = (
+                dominant_trusted_strength >= 0.55
+                and opposing_strength <= 0.42
+                and strength_margin >= 0.12
+            )
+            if (confidence < 0.4 or strength_margin < 0.2) and not allow_dominant_trusted_decision:
                 verdict = "NEUTRAL"
                 forced_neutral = True
                 conflict_summary = "Conflicting support/refute evidence with weak decision margin"

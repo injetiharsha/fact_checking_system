@@ -26,7 +26,7 @@ LANGUAGE_HL_MAP = {
 
 class SearchPlanner:
     def __init__(self):
-        self.max_variants = max(1, min(4, int(os.getenv("SEARCH_PLANNER_MAX_VARIANTS", "3"))))
+        self.max_variants = max(1, min(6, int(os.getenv("SEARCH_PLANNER_MAX_VARIANTS", "5"))))
 
     def build_plan(self, claim, context_result=None, claim_type_result=None, original_claim=None, language=None):
         claim_text = " ".join((claim or "").strip().split())
@@ -35,6 +35,7 @@ class SearchPlanner:
 
         context_result = context_result or {}
         resolved_language = str(language or "").strip().lower() or self._infer_language_from_script(claim_text) or "en"
+        normalized_claim = self._normalize_claim_text(claim_text)
         plan = {
             "queries": [],
             "language": resolved_language,
@@ -44,7 +45,7 @@ class SearchPlanner:
             "intent_tags": [],
         }
 
-        text_lower = claim_text.lower()
+        text_lower = normalized_claim.lower()
         original_query = " ".join((original_claim or "").strip().split())
         state_focus = str(context_result.get("state_focus") or "").strip().lower()
         region_hints = [str(item or "").strip().lower() for item in (context_result.get("region_hints") or []) if str(item or "").strip()]
@@ -56,21 +57,34 @@ class SearchPlanner:
         plan["recency_days"] = self._infer_recency_days(text_lower, domain, subcategory)
         plan["intent_tags"] = self._infer_intent_tags(text_lower, domain, subcategory, plan["recency_days"])
 
-        queries = [claim_text]
-        if original_query and original_query != claim_text and plan["language"] != "en":
+        queries = [normalized_claim]
+        if original_query and original_query != normalized_claim and plan["language"] != "en":
             queries.append(original_query)
 
-        queries.extend(self._keyword_variants(claim_text, plan))
+        question_variant = self._question_variant(normalized_claim, plan["language"])
+        if question_variant:
+            queries.append(question_variant)
+
+        keyword_variant = self._keyword_variant(normalized_claim)
+        if keyword_variant:
+            queries.append(keyword_variant)
+
+        queries.extend(self._keyword_variants(normalized_claim, plan))
+        queries.extend(self._official_variants(normalized_claim, plan, domain, subcategory))
+        queries.extend(self._region_variants(normalized_claim, state_focus, region_hints))
 
         if plan["country"] == "in" and not any("india " in q.lower() for q in queries):
-            queries.append(f"India {claim_text}")
-        if state_focus:
-            region_text = state_focus.replace("_", " ").strip()
-            if region_text:
-                queries.append(f"{region_text} {claim_text}")
+            queries.append(f"India {normalized_claim}")
 
         plan["queries"] = self._dedupe_queries(queries)[: self.max_variants]
         return plan
+
+    @staticmethod
+    def _normalize_claim_text(text):
+        compact = " ".join((text or "").split()).strip()
+        compact = compact.replace("“", "\"").replace("”", "\"").replace("’", "'")
+        compact = re.sub(r"\s+([?.!,;:])", r"\1", compact)
+        return compact
 
     @staticmethod
     def _infer_language_from_script(text):
@@ -160,6 +174,87 @@ class SearchPlanner:
             variants.append(f"{claim_text} official")
 
         return variants
+
+    def _official_variants(self, claim_text, plan, domain, subcategory):
+        variants = []
+        country = str(plan.get("country") or "").lower()
+        lowered = claim_text.lower()
+        if domain in {"government_public_policy", "business_economy"} or any(token in lowered for token in ("rbi", "minister", "policy", "law", "court", "government")):
+            if country == "in":
+                variants.append(f"site:rbi.org.in OR site:pib.gov.in {self._keyword_variant(claim_text) or claim_text}")
+            else:
+                variants.append(f"{claim_text} official")
+        if domain in {"science", "space_astronomy"} or any(token in lowered for token in ("nasa", "space", "planet", "moon", "sun", "venus", "mars", "jupiter")):
+            variants.append(f"site:nasa.gov {self._keyword_variant(claim_text) or claim_text}")
+        if domain in {"health_medicine", "public_health"} or any(token in lowered for token in ("covid", "vaccine", "virus", "bleach", "health", "medical")):
+            variants.append(f"site:who.int OR site:cdc.gov OR site:nih.gov {self._keyword_variant(claim_text) or claim_text}")
+        if subcategory in {"elections", "policy", "weather_alerts"}:
+            variants.append(f"{claim_text} official")
+        return variants
+
+    @staticmethod
+    def _region_variants(claim_text, state_focus, region_hints):
+        variants = []
+        if state_focus:
+            region_text = state_focus.replace("_", " ").strip()
+            if region_text:
+                variants.append(f"{region_text} {claim_text}")
+        for hint in region_hints[:2]:
+            hint = str(hint or "").strip()
+            if hint:
+                variants.append(f"{hint} {claim_text}")
+        return variants
+
+    @staticmethod
+    def _question_variant(claim_text, language):
+        compact = " ".join((claim_text or "").split()).strip()
+        if not compact:
+            return ""
+        lowered = compact.lower()
+        if compact.endswith("?"):
+            return compact
+        if language == "en":
+            be_starts = ("is ", "are ", "was ", "were ", "has ", "have ", "had ", "can ", "could ", "will ", "did ", "does ", "do ")
+            if lowered.startswith(be_starts):
+                return compact + "?"
+            subject_match = re.match(r"^([A-Z][^ ]*(?: [A-Z][^ ]*){0,3}) (is|are|was|were|has|have|had) (.+)$", compact)
+            if subject_match:
+                subj, verb, rest = subject_match.groups()
+                return f"{verb.capitalize()} {subj} {rest}?"
+            action_match = re.match(r"^([A-Z][^ ]*(?: [A-Z][^ ]*){0,4}) ([a-z]+ed|won|changed|launched|approved|announced|visited|signed) (.+)$", compact)
+            if action_match:
+                subj, verb, rest = action_match.groups()
+                return f"Did {subj} {verb} {rest}?"
+        return compact + "?"
+
+    @staticmethod
+    def _keyword_variant(claim_text):
+        compact = " ".join((claim_text or "").split()).strip()
+        if not compact:
+            return ""
+        tokens = re.findall(r"\b[\w'-]+\b", compact, flags=re.UNICODE)
+        if not tokens:
+            return ""
+        stop = {
+            "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+            "of", "in", "on", "at", "to", "for", "by", "with", "from", "that",
+            "this", "these", "those", "and", "or", "but", "it", "as",
+        }
+        important = []
+        for tok in tokens:
+            low = tok.lower()
+            if low in stop:
+                continue
+            if any(ch.isdigit() for ch in tok) or len(tok) >= 4 or tok[:1].isupper() or re.match(r"^(covid|rbi|nasa|dna|un|iss)$", low):
+                important.append(tok)
+        deduped = []
+        seen = set()
+        for tok in important:
+            key = tok.lower()
+            if key not in seen:
+                seen.add(key)
+                deduped.append(tok)
+        return " ".join(deduped[:8]).strip()
 
     @staticmethod
     def _dedupe_queries(queries):

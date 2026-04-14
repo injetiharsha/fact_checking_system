@@ -1,42 +1,43 @@
 ﻿[
   {
     "claim": "ఇవి మీకు అందకపోతే మార్చి 31లోగా ఈ పని చేయండి ఏపీలోని రైతులకు బిగ్ అలర్ట్.",
-    "expected_verdict": "FALSE"
+    "expected_verdict": "REFUTE"
   },
   {
     "claim": "మార్స్‌కు రెండు చంద్రులు ఉన్నాయి.",
-    "expected_verdict": "TRUE"
+    "expected_verdict": "SUPPORT"
   },
   {
     "claim": "హైదరాబాద్ తెలంగాణ రాజధాని.",
-    "expected_verdict": "TRUE"
+    "expected_verdict": "SUPPORT"
   },
   {
     "claim": "दिल्ली भारत की राजधानी है।",
-    "expected_verdict": "TRUE"
+    "expected_verdict": "SUPPORT"
   },
   {
     "claim": "मुंबई भारत की राजधानी है।",
-    "expected_verdict": "FALSE"
+    "expected_verdict": "REFUTE"
   },
   {
     "claim": "चेन्नई तमिलनाडु की राजधानी नहीं है।",
-    "expected_verdict": "FALSE"
+    "expected_verdict": "REFUTE"
   },
   {
     "claim": "சென்னை தமிழ்நாட்டின் தலைநகரம்.",
-    "expected_verdict": "TRUE"
+    "expected_verdict": "SUPPORT"
   },
   {
     "claim": "பெங்களூரு இந்தியாவின் தலைநகரம்.",
-    "expected_verdict": "FALSE"
+    "expected_verdict": "REFUTE"
   },
   {
     "claim": "ಬೆಂಗಳೂರು ಕರ್ನಾಟಕದ ರಾಜಧಾನಿ.",
-    "expected_verdict": "TRUE"
+    "expected_verdict": "SUPPORT"
   },
   {
     "claim": "ಬೆಂಗಳೂರು ಭಾರತದ ರಾಜಧಾನಿ.",
-    "expected_verdict": "FALSE"
+    "expected_verdict": "REFUTE"
   }
 ]
+

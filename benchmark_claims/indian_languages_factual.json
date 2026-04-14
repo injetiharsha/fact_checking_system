@@ -1,92 +1,93 @@
-[
+﻿[
   {
     "language": "ta",
     "claim": "மெரினா கடற்கரை சென்னை நகரத்தில் அமைந்துள்ளது.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "Stable factual benchmark: Tamil Nadu geography."
   },
   {
     "language": "ta",
     "claim": "ஜல்லிக்கட்டு பொதுவாக பொங்கல் காலத்தில் நடத்தப்படுகிறது.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "Stable factual benchmark: Tamil cultural festival."
   },
   {
     "language": "ta",
     "claim": "மதுரை தமிழ்நாட்டின் தலைநகரம்.",
-    "expected_verdict": "FALSE",
+    "expected_verdict": "REFUTE",
     "source_hint": "Stable factual benchmark: Tamil Nadu capital city."
   },
   {
     "language": "te",
     "claim": "చార్మినార్ హైదరాబాద్ నగరంలో ఉంది.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "Stable factual benchmark: Telangana landmark."
   },
   {
     "language": "te",
     "claim": "కూచిపూడి ఆంధ్రప్రదేశ్‌కు చెందిన శాస్త్రీయ నృత్యరూపం.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "Stable factual benchmark: Telugu cultural form."
   },
   {
     "language": "te",
     "claim": "విశాఖపట్నం తెలంగాణ రాష్ట్ర రాజధాని.",
-    "expected_verdict": "FALSE",
+    "expected_verdict": "REFUTE",
     "source_hint": "Stable factual benchmark: Telangana capital city."
   },
   {
     "language": "ml",
     "claim": "ഓണം കേരളത്തിന്റെ പ്രധാന ഉത്സവങ്ങളിലൊന്നാണ്.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "Stable factual benchmark: Kerala culture."
   },
   {
     "language": "ml",
     "claim": "ശബരിമല ക്ഷേത്രം കേരളത്തിലാണ്.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "Stable factual benchmark: Kerala pilgrimage site."
   },
   {
     "language": "ml",
     "claim": "കോഴിക്കോട് കേരളത്തിന്റെ തലസ്ഥാനമാണ്.",
-    "expected_verdict": "FALSE",
+    "expected_verdict": "REFUTE",
     "source_hint": "Stable factual benchmark: Kerala capital city."
   },
   {
     "language": "kn",
     "claim": "ಹಂಪಿ ಕರ್ನಾಟಕದಲ್ಲಿರುವ ಐತಿಹಾಸಿಕ ತಾಣವಾಗಿದೆ.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "Stable factual benchmark: Karnataka heritage site."
   },
   {
     "language": "kn",
     "claim": "ಮೈಸೂರು ದಸರಾ ಕರ್ನಾಟಕದ ಪ್ರಸಿದ್ಧ ಉತ್ಸವವಾಗಿದೆ.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "Stable factual benchmark: Karnataka festival."
   },
   {
     "language": "kn",
     "claim": "ಮಂಗಳೂರು ಕರ್ನಾಟಕದ ರಾಜಧಾನಿಯಾಗಿದೆ.",
-    "expected_verdict": "FALSE",
+    "expected_verdict": "REFUTE",
     "source_hint": "Stable factual benchmark: Karnataka capital city."
   },
   {
     "language": "hi",
     "claim": "हवा महल जयपुर में स्थित है।",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "Stable factual benchmark: Rajasthan landmark."
   },
   {
     "language": "hi",
     "claim": "गंगा नदी उत्तराखंड से निकलती है।",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "Stable factual benchmark: Indian geography."
   },
   {
     "language": "hi",
     "claim": "भोपाल राजस्थान की राजधानी है।",
-    "expected_verdict": "FALSE",
+    "expected_verdict": "REFUTE",
     "source_hint": "Stable factual benchmark: Rajasthan capital city."
   }
 ]
+

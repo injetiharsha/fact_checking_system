@@ -22,6 +22,7 @@ htmlcov/
 
 # Virtual environments
 .venv/
+.venv-gpu/
 venv/
 env/
 ENV/
@@ -109,10 +110,12 @@ baseline_prev.json
 *.temp
 *.bak
 *.swp
+.tmp_caveman/
 temp_*.pdf
 temp_*.png
 temp_test.py
 temp_test2.py
+temp_*.py
 
 # Jupyter
 .ipynb_checkpoints/
@@ -128,6 +131,27 @@ data/public
 
 # Browser / automation
 playwright-report/
+
+# Local benchmark / debug scratch dirs
+context_data/
+context_training/
+index_search/
+plugins/
+
+# Root-level ad hoc debug scripts and outputs
+api_test.py
+cuda-test.py
+run_document_pipeline.py
+crawl4ai_import_*.txt
+test_*.py
+fever_dataset.py
+fever_trans.py
+
+# Local one-off analysis scripts
+scripts/analyze_best_checkpoint_failures.py
+scripts/diagnose_retrieval_stack.py
+scripts/eval_relevance_index.py
+scripts/eval_stance_index.py
 
 # Keep source assets tracked by default:
 # - markdown corpus files

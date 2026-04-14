@@ -1,62 +1,63 @@
-[
+﻿[
   {
     "language": "ta",
     "claim": "ஏப்ரல் 2026ல் ஹர்தீப் சிங் பூரி தோஹாவிற்கு அதிகாரப்பூர்வ பயணம் மேற்கொண்டார்.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "PIB, 10 Apr 2026: Visit of Shri Hardeep Singh Puri to Doha, Qatar, 9-10 April 2026."
   },
   {
     "language": "ta",
     "claim": "ஏப்ரல் 2026ல் ககன்யான் திட்டத்தின் இரண்டாவது ஒருங்கிணைந்த ஏர்ட்ராப் சோதனை பெங்களூருவில் நடைபெற்றது.",
-    "expected_verdict": "FALSE",
+    "expected_verdict": "REFUTE",
     "source_hint": "ISRO/PIB, 10 Apr 2026: Gaganyaan IADT-02 was conducted at Satish Dhawan Space Centre, Sriharikota."
   },
   {
     "language": "te",
     "claim": "ఏప్రిల్ 2026లో గగనయాన్ రెండవ సమగ్ర ఎయిర్‌డ్రాప్ పరీక్ష శ్రీహరికోటలో నిర్వహించారు.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "ISRO/PIB, 10 Apr 2026: Second Integrated Air Drop Test for Gaganyaan at Sriharikota."
   },
   {
     "language": "te",
     "claim": "మిషన్ మిత్రా 2026 ఏప్రిల్‌లో చెన్నైలో నిర్వహించబడింది.",
-    "expected_verdict": "FALSE",
+    "expected_verdict": "REFUTE",
     "source_hint": "ISRO, Apr 2026: MISSION MITRA was conducted in Leh, Ladakh from 2-9 April 2026."
   },
   {
     "language": "ml",
     "claim": "2026 ഏപ്രിലിൽ ഇസ്രോയുടെ മിഷൻ മിത്ര ലേഹ്, ലഡാക്കിൽ സംഘടിപ്പിച്ചു.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "ISRO, Apr 2026: MISSION MITRA in Leh, Ladakh from 2-9 April 2026."
   },
   {
     "language": "ml",
     "claim": "2026 ഏപ്രിലിൽ ഹർദീപ് സിംഗ് പുരി ഖത്തറിന്റെ ദോഹയ്ക്ക് പോയില്ല.",
-    "expected_verdict": "FALSE",
+    "expected_verdict": "REFUTE",
     "source_hint": "PIB, 10 Apr 2026: Shri Hardeep Singh Puri visited Doha, Qatar, on 9-10 April 2026."
   },
   {
     "language": "kn",
     "claim": "ಏಪ್ರಿಲ್ 2026ರಲ್ಲಿ ಇಸ್ರೋನ ಸಾಧನಾ ಸಪ್ತಾಹವು ಏಪ್ರಿಲ್ 2ರಿಂದ 8ರವರೆಗೆ ನಡೆಯಿತು.",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "ISRO, Apr 2026: National Learning Week 'SADHANA SAPTAH' at ISRO from 2-8 April 2026."
   },
   {
     "language": "kn",
     "claim": "ಏಪ್ರಿಲ್ 2026ರಲ್ಲಿ ಗಗನಯಾನದ ಏರ್‌ಡ್ರಾಪ್ ಪರೀಕ್ಷೆ ಲಖ್ನೌನಲ್ಲಿ ನಡೆಯಿತು.",
-    "expected_verdict": "FALSE",
+    "expected_verdict": "REFUTE",
     "source_hint": "ISRO/PIB, 10 Apr 2026: Gaganyaan IADT-02 took place at Sriharikota, not Lucknow."
   },
   {
     "language": "hi",
     "claim": "अप्रैल 2026 में हरदीप सिंह पुरी ने दोहा, कतर का आधिकारिक दौरा किया।",
-    "expected_verdict": "TRUE",
+    "expected_verdict": "SUPPORT",
     "source_hint": "PIB, 10 Apr 2026: Visit of Shri Hardeep Singh Puri to Doha, Qatar, 9-10 April 2026."
   },
   {
     "language": "hi",
     "claim": "अप्रैल 2026 में इसरो का मिशन मित्रा चेन्नई में आयोजित हुआ।",
-    "expected_verdict": "FALSE",
+    "expected_verdict": "REFUTE",
     "source_hint": "ISRO, Apr 2026: MISSION MITRA was conducted in Leh, Ladakh, not Chennai."
   }
 ]
+

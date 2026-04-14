@@ -11,7 +11,7 @@ except Exception:  # pragma: no cover - import guard for environments without Py
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 ENV_PATH = ROOT_DIR / '.env'
-load_dotenv(ENV_PATH, override=False)
+load_dotenv(ENV_PATH, override=True)
 
 RUNTIME_ENV_MAP = {
     "claim_checkability": {

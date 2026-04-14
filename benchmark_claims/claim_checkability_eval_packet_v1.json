@@ -1,4 +1,4 @@
-[
+﻿[
   {"text": "Mars has two moons.", "expected_label": "checkable", "expected_subtype": "factual_claim", "group": "short_factual"},
   {"text": "The Sun is a star.", "expected_label": "checkable", "expected_subtype": "factual_claim", "group": "short_factual"},
   {"text": "Delhi is the capital of India.", "expected_label": "checkable", "expected_subtype": "factual_claim", "group": "short_factual"},
@@ -45,3 +45,4 @@
   {"text": "???? ?? ?? ???", "expected_label": "uncheckable", "expected_subtype": "question_or_rewrite", "group": "multilingual"},
   {"text": "???? ???? ?????.", "expected_label": "uncheckable", "expected_subtype": "opinion", "group": "multilingual"}
 ]
+

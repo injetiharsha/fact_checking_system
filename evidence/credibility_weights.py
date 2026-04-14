@@ -38,6 +38,20 @@ SCIENCE_SOURCES = [
 
 LOW_TRUST = [
     "facebook.com",
+    "instagram.com",
+    "youtube.com",
+    "youtu.be",
+    "twitter.com",
+    "x.com",
+    "threads.net",
+    "linkedin.com",
+    "telegram.me",
+    "t.me",
+    "whatsapp.com",
+    "wa.me",
+    "vimeo.com",
+    "dailymotion.com",
+    "rumble.com",
     "answers.com",
     "medium.com",
     "blogspot",
@@ -46,7 +60,20 @@ LOW_TRUST = [
 ]
 
 BAD_DOMAINS = [
-    "grokipedia.com"
+    "grokipedia.com",
+    "quora.com",
+    "facebook.com",
+    "instagram.com",
+    "youtube.com",
+    "youtu.be",
+    "twitter.com",
+    "x.com",
+    "threads.net",
+    "telegram.me",
+    "t.me",
+    "whatsapp.com",
+    "wa.me",
+    "reddit.com",
 ]
 
 

@@ -17,6 +17,11 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     sync_playwright = None
 
+try:
+    from curl_cffi import requests as curl_requests
+except Exception:  # pragma: no cover - optional dependency
+    curl_requests = None
+
 
 JUNK_URL_PATTERNS = (
     "/search",
@@ -35,7 +40,45 @@ JUNK_TEXT_PATTERNS = (
     "category archive",
 )
 
+SCRIPT_TEXT_PATTERNS = (
+    "document.getelementsbytagname",
+    "href.indexof(",
+    "window.location",
+    "navigator.",
+    "function(",
+    "function ",
+    "var ",
+    "const ",
+    "let ",
+    "return false",
+    "addEventListener(",
+    "getElementById(",
+    "querySelector(",
+)
+
 MIN_WORDS = 30
+JUNK_NODE_MARKERS = (
+    "cookie",
+    "consent",
+    "banner",
+    "breadcrumb",
+    "footer",
+    "header",
+    "nav",
+    "menu",
+    "subscribe",
+    "newsletter",
+    "share",
+    "social",
+    "related",
+    "recommended",
+    "sidebar",
+    "advert",
+    "promo",
+    "popup",
+    "modal",
+    "comment",
+)
 
 
 def _normalize_space(text: str) -> str:
@@ -82,6 +125,30 @@ def _looks_like_junk_text(text: str) -> str | None:
     for pattern in JUNK_TEXT_PATTERNS:
         if pattern in lowered:
             return f"junk_text:{pattern}"
+    for pattern in SCRIPT_TEXT_PATTERNS:
+        if pattern in lowered:
+            return f"script_text:{pattern}"
+    lines = [line.strip() for line in re.split(r"[.!?\n]+", text or "") if line.strip()]
+    if lines:
+        scripty = sum(
+            1 for line in lines
+            if any(token in line.lower() for token in SCRIPT_TEXT_PATTERNS)
+        )
+        if scripty / max(1, len(lines)) >= 0.2:
+            return "script_heavy_text"
+    return None
+
+
+def _prose_quality_reject(text: str) -> str | None:
+    normalized = _normalize_space(text)
+    if not normalized:
+        return "empty_text"
+    words = normalized.split()
+    alpha_words = sum(1 for w in words if re.search(r"[A-Za-z\u00C0-\u024F\u0900-\u097F\u0B80-\u0BFF\u0C00-\u0C7F\u0D00-\u0D7F]", w))
+    if alpha_words / max(1, len(words)) < 0.55:
+        return "low_prose_ratio"
+    if re.search(r"(?:^|\s)(if|for|while|function|return|var|const|let)(?:\s|\()", normalized.lower()):
+        return "code_like_text"
     return None
 
 
@@ -89,9 +156,30 @@ def _extract_with_bs4(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
     for tag in soup(["script", "style", "noscript", "header", "footer", "nav", "aside", "form"]):
         tag.decompose()
+    for node in soup.find_all(True):
+        attrs = " ".join(
+            str(value)
+            for key, value in node.attrs.items()
+            if key in {"id", "class", "role", "aria-label"}
+        ).lower()
+        if attrs and any(marker in attrs for marker in JUNK_NODE_MARKERS):
+            node.decompose()
     root = soup.find("article") or soup.find("main") or soup.find("body") or soup
     paragraphs = root.find_all(["p", "li"])
-    text = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
+    kept = []
+    for p in paragraphs:
+        line = _normalize_space(p.get_text(" ", strip=True))
+        lowered = line.lower()
+        if not line:
+            continue
+        if len(line.split()) < 5:
+            continue
+        if any(pattern in lowered for pattern in JUNK_TEXT_PATTERNS):
+            continue
+        if any(marker in lowered for marker in ("read more", "click here", "follow us", "share this", "sign up", "subscribe")):
+            continue
+        kept.append(line)
+    text = " ".join(kept)
     return _normalize_space(text)
 
 
@@ -121,6 +209,22 @@ def _extract_with_playwright(url: str, timeout: int = 10) -> tuple[str, str]:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
+            page.add_init_script(
+                """
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+                window.chrome = window.chrome || { runtime: {} };
+                const originalQuery = window.navigator.permissions && window.navigator.permissions.query;
+                if (originalQuery) {
+                    window.navigator.permissions.query = (parameters) => (
+                        parameters && parameters.name === 'notifications'
+                            ? Promise.resolve({ state: Notification.permission })
+                            : originalQuery(parameters)
+                    );
+                }
+                """
+            )
             page.goto(url, wait_until="networkidle", timeout=timeout * 1000)
             html = page.content()
             browser.close()
@@ -128,6 +232,23 @@ def _extract_with_playwright(url: str, timeout: int = 10) -> tuple[str, str]:
         return text, "playwright"
     except Exception:
         return "", "playwright_failed"
+
+
+def _fetch_with_curl_cffi(url: str, headers: dict, timeout: int = 10, verify: bool = True):
+    if curl_requests is None:
+        return None, "curl_cffi_unavailable"
+    try:
+        response = curl_requests.get(
+            url,
+            headers=headers,
+            timeout=timeout,
+            verify=verify,
+            impersonate="chrome124",
+            allow_redirects=True,
+        )
+        return response, None
+    except Exception as exc:
+        return None, f"curl_cffi_error:{type(exc).__name__}"
 
 
 def fetch_and_extract(
@@ -139,6 +260,7 @@ def fetch_and_extract(
     cache_dir: str | Path | None = "logs/extraction_cache",
 ) -> dict:
     enable_playwright = os.getenv("ENABLE_PLAYWRIGHT_FALLBACK", "0").strip().lower() in {"1", "true", "yes", "on"}
+    enable_curl_cffi = os.getenv("ENABLE_CURL_CFFI_FALLBACK", "1").strip().lower() in {"1", "true", "yes", "on"}
     cached = _read_cache(cache_dir, url)
     if cached is not None:
         cached["cache_hit"] = True
@@ -185,6 +307,28 @@ def fetch_and_extract(
 
     html = response.text or ""
     status_code = response.status_code
+    if enable_curl_cffi and status_code in {401, 403}:
+        curl_response, curl_error = _fetch_with_curl_cffi(url, headers=headers, timeout=timeout, verify=verify)
+        if curl_response is not None and int(getattr(curl_response, "status_code", 0) or 0) == 200:
+            response = curl_response
+            html = response.text or ""
+            status_code = response.status_code
+        elif enable_playwright:
+            pw_text, pw_state = _extract_with_playwright(url, timeout=timeout)
+            if pw_text:
+                payload = {
+                    "url": url,
+                    "ok": True,
+                    "text": pw_text,
+                    "word_count": len(pw_text.split()),
+                    "extractor": "playwright",
+                    "reject_reason": None,
+                    "status_code": 200,
+                    "cache_hit": False,
+                }
+                _write_cache(cache_dir, url, payload)
+                return payload
+
     if status_code != 200 or "html" not in (response.headers.get("Content-Type", "").lower()):
         payload = {
             "url": url,
@@ -196,6 +340,8 @@ def fetch_and_extract(
             "status_code": status_code,
             "cache_hit": False,
         }
+        if enable_curl_cffi and status_code in {401, 403} and curl_requests is None:
+            payload["reject_reason"] = f"bad_response:{status_code}|curl_cffi_unavailable"
         _write_cache(cache_dir, url, payload)
         return payload
 
@@ -223,6 +369,8 @@ def fetch_and_extract(
         reject_reason = "too_short"
     else:
         reject_reason = _looks_like_junk_text(text)
+        if reject_reason is None:
+            reject_reason = _prose_quality_reject(text)
 
     if reject_reason is not None and enable_playwright:
         pw_text, pw_state = _extract_with_playwright(url, timeout=timeout)
@@ -230,7 +378,10 @@ def fetch_and_extract(
             text = pw_text
             extractor = "playwright"
             word_count = len(text.split())
-            reject_reason = None if word_count >= MIN_WORDS else "too_short"
+            if word_count < MIN_WORDS:
+                reject_reason = "too_short"
+            else:
+                reject_reason = _looks_like_junk_text(text) or _prose_quality_reject(text)
         elif pw_state == "playwright_failed":
             reject_reason = f"{reject_reason}|playwright_failed"
 

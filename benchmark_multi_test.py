@@ -29,6 +29,20 @@ def _safe_console_text(value):
     return text.encode(enc, errors="replace").decode(enc, errors="replace")
 
 
+LABEL_ALIASES = {
+    "TRUE": "SUPPORT",
+    "SUPPORT": "SUPPORT",
+    "FALSE": "REFUTE",
+    "REFUTE": "REFUTE",
+    "REFUSE": "REFUTE",
+    "NEUTRAL": "NEUTRAL",
+}
+
+
+def _canonical_label(value):
+    return LABEL_ALIASES.get(str(value or "").strip().upper(), "NEUTRAL")
+
+
 # ------------------------------------------------
 # Benchmark claims
 # ------------------------------------------------
@@ -79,12 +93,12 @@ claims = [
 
 ground_truth = [
 
-    "FALSE","FALSE","FALSE","FALSE","FALSE",
-    "TRUE","FALSE","FALSE","TRUE","TRUE",
-    "TRUE","TRUE","TRUE","TRUE","TRUE",
-    "TRUE","TRUE","TRUE","TRUE","TRUE",
-    "TRUE","TRUE","TRUE","TRUE","TRUE",
-    "TRUE","TRUE","TRUE","TRUE","FALSE"
+    "REFUTE","REFUTE","REFUTE","REFUTE","REFUTE",
+    "SUPPORT","REFUTE","REFUTE","SUPPORT","SUPPORT",
+    "SUPPORT","SUPPORT","SUPPORT","SUPPORT","SUPPORT",
+    "SUPPORT","SUPPORT","SUPPORT","SUPPORT","SUPPORT",
+    "SUPPORT","SUPPORT","SUPPORT","SUPPORT","SUPPORT",
+    "SUPPORT","SUPPORT","SUPPORT","SUPPORT","REFUTE"
 ]
 
 
@@ -107,7 +121,7 @@ def load_claim_batch(path: str | None):
         if not claim or not verdict:
             raise ValueError(f"Missing claim or expected_verdict at index {idx}.")
         loaded_claims.append(str(claim))
-        loaded_truth.append(str(verdict).upper())
+        loaded_truth.append(_canonical_label(verdict))
     return loaded_claims, loaded_truth
 
 
@@ -151,7 +165,7 @@ async def process_claim(i, claim, active_claims, active_truth):
         if not claim_result:
             claim_result = {"final_verdict": "NEUTRAL", "logical_analysis": {}, "evidence": []}
 
-        verdict = claim_result.get("final_verdict", "NEUTRAL")
+        verdict = _canonical_label(claim_result.get("final_verdict", "NEUTRAL"))
 
         print("Verdict:", verdict)
         print("Time:", elapsed, "sec")
@@ -214,7 +228,7 @@ def evaluate(results):
     actual_negative = 0
     binary_total = 0
     adjusted_binary_total = 0
-    labels = ("TRUE", "FALSE", "NEUTRAL")
+    labels = ("SUPPORT", "REFUTE", "NEUTRAL")
     confusion = {truth: Counter() for truth in labels}
     failed_by_expected = Counter()
     failed_by_predicted = Counter()
@@ -245,20 +259,20 @@ def evaluate(results):
             return "neutral_despite_evidence"
 
         if truth == "NEUTRAL":
-            if pred == "TRUE":
+            if pred == "SUPPORT":
                 return "overclaim_support_on_neutral"
-            if pred == "FALSE":
+            if pred == "REFUTE":
                 return "overclaim_refute_on_neutral"
             return "neutral_other"
 
-        if truth == "TRUE" and pred != "TRUE":
+        if truth == "SUPPORT" and pred != "SUPPORT":
             if "numeric" in tags:
                 return "false_negative_numeric"
             if refute_n > support_n:
                 return "false_negative_refute_bias"
             return "false_negative_general"
 
-        if truth == "FALSE" and pred != "FALSE":
+        if truth == "REFUTE" and pred != "REFUTE":
             if "numeric" in tags:
                 return "false_positive_numeric"
             if support_n >= refute_n and support_n > 0:
@@ -268,11 +282,11 @@ def evaluate(results):
         return "other"
 
     for r in results:
-        pred = r["predicted_verdict"]
-        truth = r["expected_verdict"]
+        pred = _canonical_label(r["predicted_verdict"])
+        truth = _canonical_label(r["expected_verdict"])
         analysis = r.get("logical_analysis", {})
-        is_pos = truth == "TRUE"
-        pred_pos = pred == "TRUE"
+        is_pos = truth == "SUPPORT"
+        pred_pos = pred == "SUPPORT"
 
         evidence_items = []
         transparency = {}
@@ -307,18 +321,18 @@ def evaluate(results):
 
         if pred_pos:
             predicted_positive += 1
-        elif pred == "FALSE":
+        elif pred == "REFUTE":
             predicted_negative += 1
 
-        if truth in {"TRUE", "FALSE"}:
+        if truth in {"SUPPORT", "REFUTE"}:
             binary_total += 1
             if pred_pos and is_pos:
                 tp += 1
             elif pred_pos and not is_pos:
                 fp += 1
-            elif pred == "FALSE" and is_pos:
+            elif pred == "REFUTE" and is_pos:
                 fn += 1
-            elif pred == "FALSE" and not is_pos:
+            elif pred == "REFUTE" and not is_pos:
                 tn += 1
             elif pred == "NEUTRAL" and is_pos:
                 fn += 1
@@ -340,15 +354,15 @@ def evaluate(results):
                 adjusted_correct += 1
             if pred == "NEUTRAL":
                 adjusted_neutral += 1
-            if truth in {"TRUE", "FALSE"}:
+            if truth in {"SUPPORT", "REFUTE"}:
                 adjusted_binary_total += 1
                 if pred_pos and is_pos:
                     adjusted_tp += 1
                 elif pred_pos and not is_pos:
                     adjusted_fp += 1
-                elif pred == "FALSE" and is_pos:
+                elif pred == "REFUTE" and is_pos:
                     adjusted_fn += 1
-                elif pred == "FALSE" and not is_pos:
+                elif pred == "REFUTE" and not is_pos:
                     adjusted_tn += 1
                 elif pred == "NEUTRAL" and is_pos:
                     adjusted_fn += 1

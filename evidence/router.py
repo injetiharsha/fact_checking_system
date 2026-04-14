@@ -29,12 +29,27 @@ BLOCKED_DOMAINS = [
     "tiktok.com",
     "instagram.com",
     "facebook.com",
+    "fb.watch",
+    "fbcdn.net",
     "reddit.com",
+    "quora.com",
     "pinterest.com",
     "youtube.com",
     "youtu.be",
     "twitter.com",
     "x.com",
+    "threads.net",
+    "linkedin.com",
+    "telegram.me",
+    "t.me",
+    "whatsapp.com",
+    "wa.me",
+    "discord.com",
+    "discord.gg",
+    "snapchat.com",
+    "rumble.com",
+    "vimeo.com",
+    "dailymotion.com",
 ]
 
 WEAK_RESULT_URL_MARKERS = (
@@ -115,6 +130,30 @@ LOW_SIGNAL_TITLE_MARKERS = (
     "media",
     "technical reports server",
     "citation",
+)
+
+HEALTH_TRUSTED_DOMAINS = (
+    "who.int",
+    "cdc.gov",
+    "nih.gov",
+    "fda.gov",
+    "mayoclinic.org",
+    "clevelandclinic.org",
+)
+
+SPACE_TRUSTED_DOMAINS = (
+    "nasa.gov",
+    "esa.int",
+    "jpl.nasa.gov",
+    "space.com",
+    "livescience.com",
+)
+
+FACT_REFERENCE_DOMAINS = (
+    "britannica.com",
+    "nationalgeographic.com",
+    "wikipedia.org",
+    "ourworldindata.org",
 )
 
 def _safe_console_text(value):
@@ -370,7 +409,8 @@ class EvidenceRouter:
             enriched["rank_components"] = components
 
         search_results.sort(key=lambda item: item.get("rank_score", 0.0), reverse=True)
-        search_results = search_results[:web_source_cap]
+        scrape_candidate_cap = max(12, web_source_cap * 3)
+        search_results = search_results[:scrape_candidate_cap]
         self._emit_progress(progress_callback, stage="web_search", status="done", detail=f"Selected {len(search_results)} web result(s)")
         await self._flush_progress()
 
@@ -389,7 +429,7 @@ class EvidenceRouter:
 
         scrape_jobs = []
 
-        for result in search_results[:web_source_cap]:
+        for result in search_results:
 
             url = result["url"]
 
@@ -518,6 +558,8 @@ class EvidenceRouter:
                 substep=f"extract_{len(evidence_list)}",
                 substatus="done",
             )
+            if len(evidence_list) >= web_source_cap:
+                break
 
         print("Search results:", round(time.time() - search_start, 3), "sec")
         self._emit_progress(progress_callback, stage="extraction", status="done", detail=f"Built {len(evidence_list)} evidence source(s)")
@@ -730,6 +772,14 @@ class EvidenceRouter:
         source_bonus = 0.08 if any(token in url for token in ("wikipedia.org", ".gov", "who.int", "worldbank.org", "oecd.org", "un.org", ".edu")) else 0.0
         if domain == "technology":
             source_bonus = 0.08 if any(token in url for token in ("techcrunch.com", "theverge.com", "niantic", "linkedin.com", "wikipedia.org")) else 0.0
+        if domain in {"health_medicine", "public_health"} or any(token in claim_text for token in ("covid", "vaccine", "virus", "cures", "bleach", "medical", "disease", "health")):
+            if any(token in url for token in HEALTH_TRUSTED_DOMAINS):
+                source_bonus += 0.14
+        if domain in {"science", "space_astronomy"} or any(token in claim_text for token in ("space", "planet", "moon", "sun", "venus", "mars", "jupiter", "great wall")):
+            if any(token in url for token in SPACE_TRUSTED_DOMAINS + FACT_REFERENCE_DOMAINS):
+                source_bonus += 0.12
+        if any(token in url for token in FACT_REFERENCE_DOMAINS):
+            source_bonus += 0.06
         domain_bonus = 0.0
         if domain == "history" and (year_match > 0 or any(token in title for token in ("history", "war", "event", "wall", "empire"))):
             domain_bonus += 0.08
@@ -778,6 +828,24 @@ class EvidenceRouter:
             weak_result_penalty += 0.2
         if any(domain in url for domain in BLOCKED_DOMAINS):
             weak_result_penalty += 0.6
+        if any(domain in url for domain in (
+            "quora.com",
+            "reddit.com",
+            "answers.com",
+            "medium.com",
+            "facebook.com",
+            "instagram.com",
+            "youtube.com",
+            "twitter.com",
+            "x.com",
+            "threads.net",
+            "linkedin.com",
+            "telegram.me",
+            "t.me",
+            "vimeo.com",
+            "rumble.com",
+        )):
+            weak_result_penalty += 0.5
 
         positive_score = (
             (bm25_normalized * 0.44)
